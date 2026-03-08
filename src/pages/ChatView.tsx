@@ -59,6 +59,7 @@ export default function ChatView() {
   const [sending, setSending] = useState(false);
   const [contactTags, setContactTags] = useState<ContactTag[]>([]);
   const [assignedAgent, setAssignedAgent] = useState<AgentProfile | null>(null);
+  const [assignmentHistory, setAssignmentHistory] = useState<AssignmentHistory[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
