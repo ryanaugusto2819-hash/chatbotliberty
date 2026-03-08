@@ -324,6 +324,42 @@ export type Database = {
         }
         Relationships: []
       }
+      quick_messages: {
+        Row: {
+          audio_url: string | null
+          content: string
+          created_at: string
+          id: string
+          shortcut: string | null
+          sort_order: number
+          title: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          audio_url?: string | null
+          content?: string
+          created_at?: string
+          id?: string
+          shortcut?: string | null
+          sort_order?: number
+          title: string
+          type?: string
+          updated_at?: string
+        }
+        Update: {
+          audio_url?: string | null
+          content?: string
+          created_at?: string
+          id?: string
+          shortcut?: string | null
+          sort_order?: number
+          title?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       tags: {
         Row: {
           color: string
