@@ -242,8 +242,10 @@ export type Database = {
           contact_name: string
           contact_phone: string
           created_at: string
+          ctwa_clid: string | null
           id: string
           resolved_at: string | null
+          source_id: string | null
           status: string
           tags: string[] | null
           updated_at: string
@@ -254,8 +256,10 @@ export type Database = {
           contact_name: string
           contact_phone: string
           created_at?: string
+          ctwa_clid?: string | null
           id?: string
           resolved_at?: string | null
+          source_id?: string | null
           status?: string
           tags?: string[] | null
           updated_at?: string
@@ -266,8 +270,10 @@ export type Database = {
           contact_name?: string
           contact_phone?: string
           created_at?: string
+          ctwa_clid?: string | null
           id?: string
           resolved_at?: string | null
+          source_id?: string | null
           status?: string
           tags?: string[] | null
           updated_at?: string
