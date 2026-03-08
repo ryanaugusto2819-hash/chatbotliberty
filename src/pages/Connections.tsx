@@ -102,7 +102,7 @@ function ConnectionCard({ config }: { config: ConnectionConfig }) {
           .from('connection_configs')
           .select('is_connected, config')
           .eq('connection_id', config.id)
-          .single();
+          .maybeSingle();
 
         if (data) {
           setConnected(data.is_connected);
@@ -200,7 +200,7 @@ function ConnectionCard({ config }: { config: ConnectionConfig }) {
           {config.webhookUrl && (
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                URL do Webhook (cole na Meta)
+                URL do Webhook (cole no painel do provedor)
               </label>
               <div className="flex items-center gap-2">
                 <div className="flex-1 rounded-lg border border-input bg-secondary/50 px-3 py-2 text-xs text-foreground font-mono truncate">
