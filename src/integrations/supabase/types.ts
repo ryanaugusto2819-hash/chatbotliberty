@@ -167,6 +167,35 @@ export type Database = {
         }
         Relationships: []
       }
+      contact_tags: {
+        Row: {
+          contact_phone: string
+          created_at: string
+          id: string
+          tag_id: string
+        }
+        Insert: {
+          contact_phone: string
+          created_at?: string
+          id?: string
+          tag_id: string
+        }
+        Update: {
+          contact_phone?: string
+          created_at?: string
+          id?: string
+          tag_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_tags_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversations: {
         Row: {
           assigned_agent_id: string | null
@@ -292,6 +321,27 @@ export type Database = {
           status?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      tags: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          name?: string
         }
         Relationships: []
       }
