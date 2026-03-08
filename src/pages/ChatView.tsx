@@ -20,6 +20,8 @@ interface ConversationData {
   updated_at: string;
   created_at: string;
   assigned_agent_id: string | null;
+  ctwa_clid: string | null;
+  source_id: string | null;
 }
 
 interface ContactTag {
