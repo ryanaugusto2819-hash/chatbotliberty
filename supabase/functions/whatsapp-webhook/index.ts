@@ -118,6 +118,7 @@ async function processWebhook(body: any) {
               tags: [],
               ctwa_clid: ctwaClid,
               source_id: sourceId,
+              ad_title: adTitle,
             })
             .select("id")
             .single();
