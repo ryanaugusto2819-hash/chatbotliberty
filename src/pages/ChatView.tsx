@@ -94,6 +94,20 @@ export default function ChatView() {
       if (tags) {
         setContactTags(tags.map((t: any) => ({ id: t.id, tag: t.tags })));
       }
+      // Fetch assignment history
+      const { data: history } = await supabase
+        .from('agent_assignment_history')
+        .select('id, assigned_at, unassigned_at, agent_id, profiles(full_name)')
+        .eq('conversation_id', id)
+        .order('assigned_at', { ascending: false });
+      if (history) {
+        setAssignmentHistory(history.map((h: any) => ({
+          id: h.id,
+          agent_name: h.profiles?.full_name || 'Agente removido',
+          assigned_at: h.assigned_at,
+          unassigned_at: h.unassigned_at,
+        })));
+      }
     }
   };
 
