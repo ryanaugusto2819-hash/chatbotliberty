@@ -412,27 +412,17 @@ export default function FlowEditor() {
         </div>
 
         {/* Node editor panel */}
-        <AnimatePresence>
-          {selectedNode && (
-            <motion.div
-              initial={{ x: 340 }}
-              animate={{ x: 0 }}
-              exit={{ x: 340 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="absolute right-0 top-0 h-full"
-            >
-              <NodeEditor
-                nodeId={selectedNode.id}
-                nodeType={selectedNode.data.nodeType as string}
-                label={selectedNode.data.label as string}
-                config={(selectedNode.data.config as Record<string, unknown>) || {}}
-                onSave={handleNodeSave}
-                onDelete={handleNodeDelete}
-                onClose={() => setSelectedNode(null)}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {selectedNode && (
+          <NodeEditor
+            nodeId={selectedNode.id}
+            nodeType={selectedNode.data.nodeType as string}
+            label={selectedNode.data.label as string}
+            config={(selectedNode.data.config as Record<string, unknown>) || {}}
+            onSave={handleNodeSave}
+            onDelete={handleNodeDelete}
+            onClose={() => setSelectedNode(null)}
+          />
+        )}
       </div>
     </div>
   );
