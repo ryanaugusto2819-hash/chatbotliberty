@@ -140,16 +140,7 @@ export default function FlowEditor() {
         }))
       );
 
-      // Load connection IDs from any trigger node
-      const triggerNode = nodesRes.data.find((n: any) => n.node_type === 'trigger');
-      if (triggerNode) {
-        const tc = triggerNode.config as Record<string, unknown>;
-        if (tc.connection_ids) {
-          setSelectedConnections(tc.connection_ids as string[]);
-        } else if (tc.connection_id) {
-          setSelectedConnections([tc.connection_id as string]);
-        }
-      }
+      // Connection IDs are now stored per trigger node in their config
     } else {
       // Create a default trigger node
       const triggerNode: Node = {
