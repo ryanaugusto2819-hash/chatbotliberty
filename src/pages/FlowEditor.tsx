@@ -99,7 +99,7 @@ export default function FlowEditor() {
         .eq('is_connected', true);
       if (data) {
         setConnections(data);
-        if (data.length === 1) setSelectedConnection(data[0].id);
+        if (data.length === 1) setSelectedConnections([data[0].id]);
       }
     };
     loadConnections();
