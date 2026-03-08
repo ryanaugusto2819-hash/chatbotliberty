@@ -432,37 +432,54 @@ export default function FlowEditor() {
 
           {showSettings && (
             <div className="border-b border-border bg-secondary/20 p-3 space-y-4">
-              {/* Trigger Type */}
+              {/* Trigger Types - Multi Select */}
               <div className="space-y-1.5">
                 <div className="flex items-center gap-1.5">
                   <Zap className="h-3.5 w-3.5 text-primary" />
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Gatilho</label>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Gatilhos (múltiplos)</label>
                 </div>
                 <div className="space-y-1">
-                  {triggerOptions.map((t) => (
-                    <button
-                      key={t.value}
-                      onClick={() => setTriggerType(t.value)}
-                      className={`w-full rounded-lg border px-3 py-2 text-left transition-all ${
-                        triggerType === t.value
-                          ? 'border-primary bg-primary/5 ring-1 ring-primary/50'
-                          : 'border-border hover:border-primary/30 hover:bg-secondary/50'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm">{t.icon}</span>
-                        <div>
-                          <p className="text-[11px] font-semibold text-card-foreground">{t.label}</p>
-                          <p className="text-[9px] text-muted-foreground leading-tight">{t.desc}</p>
+                  {triggerOptions.map((t) => {
+                    const isActive = activeTriggers.includes(t.value);
+                    return (
+                      <button
+                        key={t.value}
+                        onClick={() => {
+                          setActiveTriggers(prev =>
+                            isActive
+                              ? prev.length > 1 ? prev.filter(v => v !== t.value) : prev
+                              : [...prev, t.value]
+                          );
+                        }}
+                        className={`w-full rounded-lg border px-3 py-2 text-left transition-all ${
+                          isActive
+                            ? 'border-primary bg-primary/5 ring-1 ring-primary/50'
+                            : 'border-border hover:border-primary/30 hover:bg-secondary/50'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className={`flex h-4 w-4 items-center justify-center rounded border transition-colors ${
+                            isActive ? 'bg-primary border-primary' : 'border-muted-foreground/40'
+                          }`}>
+                            {isActive && <span className="text-[8px] text-primary-foreground font-bold">✓</span>}
+                          </div>
+                          <span className="text-sm">{t.icon}</span>
+                          <div>
+                            <p className="text-[11px] font-semibold text-card-foreground">{t.label}</p>
+                            <p className="text-[9px] text-muted-foreground leading-tight">{t.desc}</p>
+                          </div>
                         </div>
-                      </div>
-                    </button>
-                  ))}
+                      </button>
+                    );
+                  })}
                 </div>
+                <p className="text-[9px] text-muted-foreground">
+                  {activeTriggers.length} gatilho{activeTriggers.length !== 1 ? 's' : ''} selecionado{activeTriggers.length !== 1 ? 's' : ''}
+                </p>
               </div>
 
               {/* Keyword config */}
-              {triggerType === 'keyword' && (
+              {activeTriggers.includes('keyword') && (
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Palavras-chave</label>
                   <div className="flex gap-1.5">
@@ -500,7 +517,7 @@ export default function FlowEditor() {
               )}
 
               {/* Schedule config */}
-              {triggerType === 'scheduled' && (
+              {activeTriggers.includes('scheduled') && (
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Horário</label>
                   <input
@@ -526,27 +543,46 @@ export default function FlowEditor() {
                 </div>
               )}
 
-              {/* Connection selector */}
+              {/* Connection selector - Multi Select */}
               <div className="space-y-1.5">
                 <div className="flex items-center gap-1.5">
                   <Link2 className="h-3.5 w-3.5 text-primary" />
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Conexão WhatsApp</label>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Conexões WhatsApp (múltiplas)</label>
                 </div>
                 {connections.length > 0 ? (
-                  <select
-                    value={selectedConnection}
-                    onChange={(e) => setSelectedConnection(e.target.value)}
-                    className="w-full rounded-lg border border-input bg-background px-2.5 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring appearance-none"
-                  >
-                    <option value="">Selecione uma conexão</option>
-                    {connections.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {(c.config as any)?.phone_number_id
-                          ? `WhatsApp (${(c.config as any).phone_number_id})`
-                          : c.connection_id}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="space-y-1">
+                    {connections.map((c) => {
+                      const isSelected = selectedConnections.includes(c.id);
+                      const connLabel = (c.config as any)?.phone_number_id
+                        ? `WhatsApp (${(c.config as any).phone_number_id})`
+                        : c.connection_id;
+                      return (
+                        <button
+                          key={c.id}
+                          onClick={() => setSelectedConnections(prev =>
+                            isSelected ? prev.filter(id => id !== c.id) : [...prev, c.id]
+                          )}
+                          className={`w-full rounded-lg border px-3 py-2 text-left transition-all ${
+                            isSelected
+                              ? 'border-primary bg-primary/5 ring-1 ring-primary/50'
+                              : 'border-border hover:border-primary/30 hover:bg-secondary/50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <div className={`flex h-4 w-4 items-center justify-center rounded border transition-colors ${
+                              isSelected ? 'bg-primary border-primary' : 'border-muted-foreground/40'
+                            }`}>
+                              {isSelected && <span className="text-[8px] text-primary-foreground font-bold">✓</span>}
+                            </div>
+                            <p className="text-[11px] font-semibold text-card-foreground">{connLabel}</p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                    <p className="text-[9px] text-muted-foreground">
+                      {selectedConnections.length} conexão{selectedConnections.length !== 1 ? 'ões' : ''} selecionada{selectedConnections.length !== 1 ? 's' : ''}
+                    </p>
+                  </div>
                 ) : (
                   <div className="rounded-lg border border-dashed border-border p-3 text-center">
                     <p className="text-[10px] text-muted-foreground">Nenhuma conexão configurada</p>
