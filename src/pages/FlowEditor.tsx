@@ -91,9 +91,7 @@ export default function FlowEditor() {
   const [saving, setSaving] = useState(false);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [toolbarOpen, setToolbarOpen] = useState(true);
-  const [showSettings, setShowSettings] = useState(true);
   const [connections, setConnections] = useState<any[]>([]);
-  const [selectedConnections, setSelectedConnections] = useState<string[]>([]);
 
   // Load available WhatsApp connections
   useEffect(() => {
