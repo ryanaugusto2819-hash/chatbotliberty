@@ -21,7 +21,7 @@ import NodeEditor from '@/components/automation/NodeEditor';
 import {
   ArrowLeft, Save, MessageSquare, Clock, Image, Music, Video,
   Loader2, FileText, GitFork, Bot, ListOrdered, Play, Pause,
-  Settings, Zap, Link2, ChevronDown, ChevronUp
+  Zap
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -91,24 +91,7 @@ export default function FlowEditor() {
   const [saving, setSaving] = useState(false);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [toolbarOpen, setToolbarOpen] = useState(true);
-  const [showSettings, setShowSettings] = useState(true);
-  const [connections, setConnections] = useState<any[]>([]);
-  const [selectedConnections, setSelectedConnections] = useState<string[]>([]);
 
-  // Load available WhatsApp connections
-  useEffect(() => {
-    const loadConnections = async () => {
-      const { data } = await supabase
-        .from('connection_configs')
-        .select('*')
-        .eq('is_connected', true);
-      if (data) {
-        setConnections(data);
-        if (data.length === 1) setSelectedConnections([data[0].id]);
-      }
-    };
-    loadConnections();
-  }, []);
 
   useEffect(() => {
     if (id) loadFlow();
@@ -145,16 +128,7 @@ export default function FlowEditor() {
         }))
       );
 
-      // Load connection IDs from any trigger node
-      const triggerNode = nodesRes.data.find((n: any) => n.node_type === 'trigger');
-      if (triggerNode) {
-        const tc = triggerNode.config as Record<string, unknown>;
-        if (tc.connection_ids) {
-          setSelectedConnections(tc.connection_ids as string[]);
-        } else if (tc.connection_id) {
-          setSelectedConnections([tc.connection_id as string]);
-        }
-      }
+      // Connection IDs are now stored per trigger node in their config
     } else {
       // Create a default trigger node
       const triggerNode: Node = {
@@ -216,7 +190,7 @@ export default function FlowEditor() {
       actualType = 'trigger';
       const triggerSubtype = type.replace('trigger_', '');
       defaultConfig.trigger_type = triggerSubtype;
-      defaultConfig.connection_ids = selectedConnections;
+      defaultConfig.connection_ids = [];
       label = triggerOptions.find(t => t.value === triggerSubtype)?.label || 'Gatilho';
 
       // Position triggers side by side at top
@@ -314,22 +288,8 @@ export default function FlowEditor() {
       .update({ name: flowName, description: flowDescription })
       .eq('id', id);
 
-    // Inject connection_ids into all trigger nodes before saving
-    const updatedNodes = nodes.map((n) =>
-      (n.data.nodeType as string) === 'trigger'
-        ? {
-            ...n,
-            data: {
-              ...n.data,
-              config: {
-                ...(n.data.config as Record<string, unknown>),
-                connection_ids: selectedConnections,
-                connection_id: selectedConnections[0] || '',
-              },
-            },
-          }
-        : n
-    );
+    // Nodes are saved as-is (connection_ids are already in each trigger node's config)
+    const updatedNodes = nodes;
 
     await supabase.from('automation_edges').delete().eq('flow_id', id);
     await supabase.from('automation_nodes').delete().eq('flow_id', id);
@@ -436,75 +396,6 @@ export default function FlowEditor() {
       <div className="flex flex-1 relative overflow-hidden">
         {/* Sidebar */}
         <div className="w-64 border-r border-border bg-card flex flex-col shrink-0 overflow-y-auto">
-          {/* === SETTINGS SECTION === */}
-          <button
-            onClick={() => setShowSettings(!showSettings)}
-            className="flex items-center justify-between px-4 py-3 border-b border-border hover:bg-secondary/50 transition-colors"
-          >
-            <div className="flex items-center gap-2">
-              <Settings className="h-4 w-4 text-primary" />
-              <p className="text-xs font-bold text-card-foreground">Configurações</p>
-            </div>
-            {showSettings ? <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />}
-          </button>
-
-          {showSettings && (
-            <div className="border-b border-border bg-secondary/20 p-3 space-y-4">
-              {/* Connection selector - Multi Select */}
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-1.5">
-                  <Link2 className="h-3.5 w-3.5 text-primary" />
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Conexões WhatsApp</label>
-                </div>
-                {connections.length > 0 ? (
-                  <div className="space-y-1">
-                    {connections.map((c) => {
-                      const isSelected = selectedConnections.includes(c.id);
-                      const connLabel = (c.config as any)?.phone_number_id
-                        ? `WhatsApp (${(c.config as any).phone_number_id})`
-                        : c.connection_id;
-                      return (
-                        <button
-                          key={c.id}
-                          onClick={() => setSelectedConnections(prev =>
-                            isSelected ? prev.filter(id => id !== c.id) : [...prev, c.id]
-                          )}
-                          className={`w-full rounded-lg border px-3 py-2 text-left transition-all ${
-                            isSelected
-                              ? 'border-primary bg-primary/5 ring-1 ring-primary/50'
-                              : 'border-border hover:border-primary/30 hover:bg-secondary/50'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2">
-                            <div className={`flex h-4 w-4 items-center justify-center rounded border transition-colors ${
-                              isSelected ? 'bg-primary border-primary' : 'border-muted-foreground/40'
-                            }`}>
-                              {isSelected && <span className="text-[8px] text-primary-foreground font-bold">✓</span>}
-                            </div>
-                            <p className="text-[11px] font-semibold text-card-foreground">{connLabel}</p>
-                          </div>
-                        </button>
-                      );
-                    })}
-                    <p className="text-[9px] text-muted-foreground">
-                      {selectedConnections.length} conexão{selectedConnections.length !== 1 ? 'ões' : ''} selecionada{selectedConnections.length !== 1 ? 's' : ''}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="rounded-lg border border-dashed border-border p-3 text-center">
-                    <p className="text-[10px] text-muted-foreground">Nenhuma conexão configurada</p>
-                    <button
-                      onClick={() => navigate('/connections')}
-                      className="mt-1 text-[10px] font-semibold text-primary hover:underline"
-                    >
-                      Configurar conexão →
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
           {/* === COMPONENTS SECTION === */}
           <div className="p-3 border-b border-border">
             <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-muted-foreground">Componentes</p>
