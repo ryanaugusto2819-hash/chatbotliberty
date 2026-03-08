@@ -6,6 +6,7 @@ import {
   Users,
   Bot,
   GitBranch,
+  Plug,
   BookOpen,
   BarChart3,
   Settings,
@@ -21,6 +22,7 @@ const navItems = [
   { to: '/ai', icon: Bot, label: 'IA' },
   { to: '/knowledge', icon: BookOpen, label: 'Base de Conhecimento' },
   { to: '/reports', icon: BarChart3, label: 'Relatórios' },
+  { to: '/connections', icon: Plug, label: 'Conexões' },
   { to: '/settings', icon: Settings, label: 'Configurações' },
 ];
 
