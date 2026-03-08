@@ -20,11 +20,9 @@ import AutomationNode from '@/components/automation/AutomationNode';
 import NodeEditor from '@/components/automation/NodeEditor';
 import {
   ArrowLeft, Save, MessageSquare, Clock, Image, Music, Video,
-  Loader2, FileText, GitFork, Bot, ListOrdered, Zap, ChevronDown,
-  Settings2, Play, Pause
+  Loader2, FileText, GitFork, Bot, ListOrdered, Play, Pause
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { motion, AnimatePresence } from 'framer-motion';
 
 const nodeTypes = { automation: AutomationNode };
 
