@@ -11,6 +11,7 @@ import ChatView from "./pages/ChatView";
 import Agents from "./pages/Agents";
 import Automation from "./pages/Automation";
 import PlaceholderPage from "./pages/PlaceholderPage";
+import AiSettings from "./pages/AiSettings";
 import Reports from "./pages/Reports";
 import Connections from "./pages/Connections";
 import Login from "./pages/Login";
