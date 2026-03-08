@@ -10,6 +10,7 @@ import Conversations from "./pages/Conversations";
 import ChatView from "./pages/ChatView";
 import Agents from "./pages/Agents";
 import Automation from "./pages/Automation";
+import FlowEditor from "./pages/FlowEditor";
 import PlaceholderPage from "./pages/PlaceholderPage";
 import AiSettings from "./pages/AiSettings";
 import Reports from "./pages/Reports";
@@ -41,6 +42,7 @@ const App = () => (
               <Route path="/conversations/:id" element={<ChatView />} />
               <Route path="/agents" element={<Agents />} />
               <Route path="/automation" element={<Automation />} />
+              <Route path="/automation/:id" element={<FlowEditor />} />
               <Route path="/ai" element={<AiSettings />} />
               <Route path="/knowledge" element={<PlaceholderPage title="Base de Conhecimento" subtitle="Artigos e respostas rápidas" />} />
               <Route path="/reports" element={<Reports />} />
