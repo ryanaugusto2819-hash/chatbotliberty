@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 interface FlowOption {
   id: string;
   name: string;
+  is_active: boolean;
 }
 
 interface FlowTriggerProps {
