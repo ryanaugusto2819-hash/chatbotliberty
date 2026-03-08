@@ -75,9 +75,14 @@ function AutomationNode({ data, selected }: NodeProps) {
   const preview = data.preview as string;
   const config = data.config as Record<string, unknown>;
 
-  // For trigger nodes, show trigger type
+  // For trigger nodes, show trigger types (supports multiple)
   const triggerType = config?.trigger_type as string;
-  const triggerLabel = nodeType === 'trigger' && triggerType ? triggerLabels[triggerType] : null;
+  const activeTriggersList = (config?.active_triggers as string[]) || (triggerType ? [triggerType] : []);
+  const triggerLabel = nodeType === 'trigger' && activeTriggersList.length > 0
+    ? activeTriggersList.length === 1
+      ? triggerLabels[activeTriggersList[0]]
+      : null
+    : null;
 
   return (
     <div
