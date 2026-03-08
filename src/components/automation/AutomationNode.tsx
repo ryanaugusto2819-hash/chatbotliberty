@@ -75,9 +75,14 @@ function AutomationNode({ data, selected }: NodeProps) {
   const preview = data.preview as string;
   const config = data.config as Record<string, unknown>;
 
-  // For trigger nodes, show trigger type
+  // For trigger nodes, show trigger types (supports multiple)
   const triggerType = config?.trigger_type as string;
-  const triggerLabel = nodeType === 'trigger' && triggerType ? triggerLabels[triggerType] : null;
+  const activeTriggersList = (config?.active_triggers as string[]) || (triggerType ? [triggerType] : []);
+  const triggerLabel = nodeType === 'trigger' && activeTriggersList.length > 0
+    ? activeTriggersList.length === 1
+      ? triggerLabels[activeTriggersList[0]]
+      : null
+    : null;
 
   return (
     <div
@@ -110,6 +115,16 @@ function AutomationNode({ data, selected }: NodeProps) {
         {triggerLabel && (
           <div className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-current/10 px-2 py-0.5">
             <span className="text-[11px] font-medium">{triggerLabel}</span>
+          </div>
+        )}
+
+        {nodeType === 'trigger' && activeTriggersList.length > 1 && (
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {activeTriggersList.map((t) => (
+              <span key={t} className="inline-flex items-center rounded-full bg-current/10 px-2 py-0.5 text-[10px] font-medium">
+                {triggerLabels[t] || t}
+              </span>
+            ))}
           </div>
         )}
 
