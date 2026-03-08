@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 interface FlowOption {
   id: string;
   name: string;
+  is_active: boolean;
 }
 
 interface FlowTriggerProps {
@@ -22,8 +23,9 @@ export default function FlowTrigger({ conversationId }: FlowTriggerProps) {
     if (open) {
       supabase
         .from('automation_flows')
-        .select('id, name')
-        .eq('is_active', true)
+        .select('id, name, is_active')
+        .order('is_active', { ascending: false })
+        .order('created_at', { ascending: false })
         .then(({ data }) => setFlows(data || []));
     }
   }, [open]);
@@ -63,7 +65,7 @@ export default function FlowTrigger({ conversationId }: FlowTriggerProps) {
         </button>
       </div>
       {flows.length === 0 ? (
-        <p className="text-xs text-muted-foreground py-2">Nenhum fluxo ativo</p>
+        <p className="text-xs text-muted-foreground py-2">Nenhum fluxo criado</p>
       ) : (
         <div className="space-y-1 max-h-40 overflow-y-auto">
           {flows.map((f) => (
@@ -71,14 +73,19 @@ export default function FlowTrigger({ conversationId }: FlowTriggerProps) {
               key={f.id}
               onClick={() => trigger(f.id)}
               disabled={!!executing}
-              className="flex items-center gap-2 w-full rounded-lg px-3 py-2 text-left text-sm text-card-foreground hover:bg-secondary transition-colors disabled:opacity-50"
+              className="flex items-center justify-between gap-2 w-full rounded-lg px-3 py-2 text-left text-sm text-card-foreground hover:bg-secondary transition-colors disabled:opacity-50"
             >
-              {executing === f.id ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <GitBranch className="h-3.5 w-3.5 text-primary" />
-              )}
-              {f.name}
+              <div className="flex items-center gap-2 min-w-0">
+                {executing === f.id ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
+                ) : (
+                  <GitBranch className="h-3.5 w-3.5 text-primary shrink-0" />
+                )}
+                <span className="truncate">{f.name}</span>
+              </div>
+              <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${f.is_active ? 'bg-primary/10 text-primary' : 'bg-secondary text-muted-foreground'}`}>
+                {f.is_active ? 'Ativo' : 'Inativo'}
+              </span>
             </button>
           ))}
         </div>
