@@ -162,12 +162,16 @@ async function processWebhook(body: any) {
         }
 
         // Insert message
+        // Normalize message type to match check constraint
+        const allowedTypes = ["text", "image", "document", "audio"];
+        const normalizedType = allowedTypes.includes(messageType) ? messageType : "text";
+
         const { error: msgError } = await supabase.from("messages").insert({
           conversation_id: conversationId,
           content,
-          sender_type: "contact",
-          message_type: messageType,
-          status: "received",
+          sender_type: "customer",
+          message_type: normalizedType,
+          status: "delivered",
         });
 
         if (msgError) {
