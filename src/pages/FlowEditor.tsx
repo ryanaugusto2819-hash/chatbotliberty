@@ -28,11 +28,11 @@ import { toast } from 'sonner';
 const nodeTypes = { automation: AutomationNode };
 
 const triggerOptions = [
-  { value: 'manual', label: 'Disparo Manual', desc: 'O agente inicia manualmente na conversa', icon: '🖱️' },
-  { value: 'message_received', label: 'Ao Receber Mensagem', desc: 'Dispara quando qualquer mensagem chega', icon: '📩' },
-  { value: 'keyword', label: 'Palavra-chave', desc: 'Dispara com palavras específicas', icon: '🔑' },
-  { value: 'new_conversation', label: 'Nova Conversa', desc: 'Quando um novo contato inicia conversa', icon: '🆕' },
-  { value: 'scheduled', label: 'Agendado', desc: 'Em horários programados', icon: '⏰' },
+  { value: 'manual', label: 'Disparo Manual' },
+  { value: 'message_received', label: 'Ao Receber Mensagem' },
+  { value: 'keyword', label: 'Palavra-chave' },
+  { value: 'new_conversation', label: 'Nova Conversa' },
+  { value: 'scheduled', label: 'Agendado' },
 ];
 
 interface ToolCategory {
