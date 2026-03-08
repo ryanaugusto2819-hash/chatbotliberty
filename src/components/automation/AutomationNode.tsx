@@ -118,6 +118,16 @@ function AutomationNode({ data, selected }: NodeProps) {
           </div>
         )}
 
+        {nodeType === 'trigger' && activeTriggersList.length > 1 && (
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {activeTriggersList.map((t) => (
+              <span key={t} className="inline-flex items-center rounded-full bg-current/10 px-2 py-0.5 text-[10px] font-medium">
+                {triggerLabels[t] || t}
+              </span>
+            ))}
+          </div>
+        )}
+
         {nodeType === 'trigger' && triggerType === 'keyword' && config?.keywords && (
           <p className="text-[11px] mt-1 opacity-60 truncate">
             Palavras: {(config.keywords as string[])?.join(', ')}
