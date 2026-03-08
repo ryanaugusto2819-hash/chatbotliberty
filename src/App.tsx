@@ -41,7 +41,7 @@ const App = () => (
               <Route path="/conversations/:id" element={<ChatView />} />
               <Route path="/agents" element={<Agents />} />
               <Route path="/automation" element={<Automation />} />
-              <Route path="/ai" element={<PlaceholderPage title="Integração IA" subtitle="Chatbot inteligente com IA" />} />
+              <Route path="/ai" element={<AiSettings />} />
               <Route path="/knowledge" element={<PlaceholderPage title="Base de Conhecimento" subtitle="Artigos e respostas rápidas" />} />
               <Route path="/reports" element={<Reports />} />
               <Route path="/connections" element={<Connections />} />
