@@ -314,26 +314,20 @@ export default function FlowEditor() {
       .update({ name: flowName, description: flowDescription })
       .eq('id', id);
 
-    // Sync trigger settings into the trigger node before saving
-    const triggerConfig: Record<string, unknown> = {
-      active_triggers: activeTriggers,
-      trigger_type: activeTriggers[0] || 'manual', // backwards compat
-      connection_ids: selectedConnections,
-      connection_id: selectedConnections[0] || '', // backwards compat
-    };
-    if (activeTriggers.includes('keyword')) triggerConfig.keywords = triggerKeywords;
-    if (activeTriggers.includes('scheduled')) {
-      triggerConfig.schedule_time = triggerScheduleTime;
-      triggerConfig.schedule_days = triggerScheduleDays;
-    }
-
-    const triggerLabel = activeTriggers.length === 1
-      ? triggerOptions.find(t => t.value === activeTriggers[0])?.label || 'Gatilho'
-      : `${activeTriggers.length} Gatilhos`;
-
+    // Inject connection_ids into all trigger nodes before saving
     const updatedNodes = nodes.map((n) =>
       (n.data.nodeType as string) === 'trigger'
-        ? { ...n, data: { ...n.data, config: triggerConfig, label: triggerLabel } }
+        ? {
+            ...n,
+            data: {
+              ...n.data,
+              config: {
+                ...(n.data.config as Record<string, unknown>),
+                connection_ids: selectedConnections,
+                connection_id: selectedConnections[0] || '',
+              },
+            },
+          }
         : n
     );
 
