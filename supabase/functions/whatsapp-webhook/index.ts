@@ -197,3 +197,20 @@ async function processWebhook(body: any) {
     }
   }
 }
+
+async function triggerAutoReply(conversationId: string) {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+  const response = await fetch(`${supabaseUrl}/functions/v1/ai-auto-reply`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${serviceRoleKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ conversationId }),
+  });
+
+  const result = await response.json();
+  console.log("Auto-reply result:", result);
+}
