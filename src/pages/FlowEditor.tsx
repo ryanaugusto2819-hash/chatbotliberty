@@ -227,6 +227,7 @@ export default function FlowEditor() {
     const item = allItems.find((b) => b.type === type);
     if (type === 'delay') { defaultConfig.delay_value = 5; defaultConfig.delay_unit = 'seconds'; }
     if (type === 'condition') { defaultConfig.condition_field = 'last_message'; defaultConfig.condition_operator = 'equals'; }
+    if (type === 'action') { defaultConfig.action_type = 'add_tag'; }
 
     const lastNode = nodes[nodes.length - 1];
     const yPos = lastNode ? lastNode.position.y + 160 : 200;
