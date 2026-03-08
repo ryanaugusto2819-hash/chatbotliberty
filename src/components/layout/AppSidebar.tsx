@@ -10,6 +10,7 @@ import {
   BarChart3,
   Settings,
   Headphones,
+  LogOut,
 } from 'lucide-react';
 
 const navItems = [
@@ -25,6 +26,9 @@ const navItems = [
 
 export default function AppSidebar() {
   const location = useLocation();
+  const { user, signOut } = useAuth();
+  const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Usuário';
+  const initials = displayName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
 
   return (
     <aside className="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col bg-sidebar border-r border-sidebar-border">
@@ -71,14 +75,17 @@ export default function AppSidebar() {
         <div className="flex items-center gap-3">
           <div className="relative">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-sidebar-accent text-sm font-semibold text-sidebar-accent-foreground">
-              AC
+              {initials}
             </div>
             <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-sidebar bg-success" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-sidebar-accent-foreground truncate">Ana Costa</p>
-            <p className="text-[11px] text-sidebar-foreground/60">Admin</p>
+            <p className="text-sm font-medium text-sidebar-accent-foreground truncate">{displayName}</p>
+            <p className="text-[11px] text-sidebar-foreground/60">{user?.email}</p>
           </div>
+          <button onClick={signOut} className="text-sidebar-foreground/60 hover:text-sidebar-foreground transition-colors" title="Sair">
+            <LogOut className="h-4 w-4" />
+          </button>
         </div>
       </div>
     </aside>
