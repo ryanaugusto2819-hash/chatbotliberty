@@ -28,11 +28,11 @@ import { toast } from 'sonner';
 const nodeTypes = { automation: AutomationNode };
 
 const triggerOptions = [
-  { value: 'manual', label: 'Disparo Manual', desc: 'O agente inicia manualmente na conversa', icon: '🖱️' },
-  { value: 'message_received', label: 'Ao Receber Mensagem', desc: 'Dispara quando qualquer mensagem chega', icon: '📩' },
-  { value: 'keyword', label: 'Palavra-chave', desc: 'Dispara com palavras específicas', icon: '🔑' },
-  { value: 'new_conversation', label: 'Nova Conversa', desc: 'Quando um novo contato inicia conversa', icon: '🆕' },
-  { value: 'scheduled', label: 'Agendado', desc: 'Em horários programados', icon: '⏰' },
+  { value: 'manual', label: 'Disparo Manual' },
+  { value: 'message_received', label: 'Ao Receber Mensagem' },
+  { value: 'keyword', label: 'Palavra-chave' },
+  { value: 'new_conversation', label: 'Nova Conversa' },
+  { value: 'scheduled', label: 'Agendado' },
 ];
 
 interface ToolCategory {
@@ -41,6 +41,16 @@ interface ToolCategory {
 }
 
 const toolCategories: ToolCategory[] = [
+  {
+    label: 'Gatilhos',
+    items: [
+      { type: 'trigger_manual', label: 'Disparo Manual', icon: Zap, desc: 'O agente inicia manualmente' },
+      { type: 'trigger_message_received', label: 'Ao Receber Mensagem', icon: Zap, desc: 'Quando qualquer mensagem chega' },
+      { type: 'trigger_keyword', label: 'Palavra-chave', icon: Zap, desc: 'Dispara com palavras específicas' },
+      { type: 'trigger_new_conversation', label: 'Nova Conversa', icon: Zap, desc: 'Novo contato inicia conversa' },
+      { type: 'trigger_scheduled', label: 'Agendado', icon: Zap, desc: 'Em horários programados' },
+    ],
+  },
   {
     label: 'Mensagens',
     items: [
@@ -84,11 +94,6 @@ export default function FlowEditor() {
   const [showSettings, setShowSettings] = useState(true);
   const [connections, setConnections] = useState<any[]>([]);
   const [selectedConnections, setSelectedConnections] = useState<string[]>([]);
-  const [activeTriggers, setActiveTriggers] = useState<string[]>(['manual']);
-  const [triggerKeywords, setTriggerKeywords] = useState<string[]>([]);
-  const [triggerScheduleTime, setTriggerScheduleTime] = useState('09:00');
-  const [triggerScheduleDays, setTriggerScheduleDays] = useState<number[]>([]);
-  const [newKw, setNewKw] = useState('');
 
   // Load available WhatsApp connections
   useEffect(() => {
@@ -125,27 +130,6 @@ export default function FlowEditor() {
     }
 
     if (nodesRes.data && nodesRes.data.length > 0) {
-      // Extract trigger config from trigger node
-      const triggerNode = nodesRes.data.find((n: any) => n.node_type === 'trigger');
-      if (triggerNode) {
-        const tc = triggerNode.config as Record<string, unknown>;
-        // Support legacy single trigger_type and new active_triggers array
-        if (tc.active_triggers) {
-          setActiveTriggers(tc.active_triggers as string[]);
-        } else if (tc.trigger_type) {
-          setActiveTriggers([tc.trigger_type as string]);
-        }
-        setTriggerKeywords((tc.keywords as string[]) || []);
-        setTriggerScheduleTime((tc.schedule_time as string) || '09:00');
-        setTriggerScheduleDays((tc.schedule_days as number[]) || []);
-        // Support legacy single connection_id and new connection_ids array
-        if (tc.connection_ids) {
-          setSelectedConnections(tc.connection_ids as string[]);
-        } else if (tc.connection_id) {
-          setSelectedConnections([tc.connection_id as string]);
-        }
-      }
-
       setNodes(
         nodesRes.data.map((n: any) => ({
           id: n.id,
@@ -157,16 +141,28 @@ export default function FlowEditor() {
             preview: getPreview(n.node_type, n.config as Record<string, unknown>),
             config: n.config,
           },
-          deletable: n.node_type !== 'trigger',
+          deletable: true,
         }))
       );
+
+      // Load connection IDs from any trigger node
+      const triggerNode = nodesRes.data.find((n: any) => n.node_type === 'trigger');
+      if (triggerNode) {
+        const tc = triggerNode.config as Record<string, unknown>;
+        if (tc.connection_ids) {
+          setSelectedConnections(tc.connection_ids as string[]);
+        } else if (tc.connection_id) {
+          setSelectedConnections([tc.connection_id as string]);
+        }
+      }
     } else {
+      // Create a default trigger node
       const triggerNode: Node = {
         id: crypto.randomUUID(),
         type: 'automation',
         position: { x: 300, y: 50 },
-        data: { nodeType: 'trigger', label: 'Gatilho', config: { trigger_type: 'manual' }, preview: '' },
-        deletable: false,
+        data: { nodeType: 'trigger', label: 'Disparo Manual', config: { trigger_type: 'manual' }, preview: '' },
+        deletable: true,
       };
       setNodes([triggerNode]);
     }
@@ -211,14 +207,42 @@ export default function FlowEditor() {
   );
 
   const addNode = (type: string) => {
+    // Determine actual nodeType and default config for trigger subtypes
+    let actualType = type;
+    const defaultConfig: Record<string, unknown> = {};
+    let label = '';
+
+    if (type.startsWith('trigger_')) {
+      actualType = 'trigger';
+      const triggerSubtype = type.replace('trigger_', '');
+      defaultConfig.trigger_type = triggerSubtype;
+      defaultConfig.connection_ids = selectedConnections;
+      label = triggerOptions.find(t => t.value === triggerSubtype)?.label || 'Gatilho';
+
+      // Position triggers side by side at top
+      const triggerNodes = nodes.filter(n => (n.data.nodeType as string) === 'trigger');
+      const xPos = triggerNodes.length > 0
+        ? Math.max(...triggerNodes.map(n => n.position.x)) + 300
+        : 300;
+
+      const newNode: Node = {
+        id: crypto.randomUUID(),
+        type: 'automation',
+        position: { x: xPos, y: 50 },
+        data: { nodeType: actualType, label, config: defaultConfig, preview: '' },
+        deletable: true,
+      };
+      setNodes((nds) => [...nds, newNode]);
+      return;
+    }
+
+    const item = allItems.find((b) => b.type === type);
+    if (type === 'delay') { defaultConfig.delay_value = 5; defaultConfig.delay_unit = 'seconds'; }
+    if (type === 'condition') { defaultConfig.condition_field = 'last_message'; defaultConfig.condition_operator = 'equals'; }
+
     const lastNode = nodes[nodes.length - 1];
     const yPos = lastNode ? lastNode.position.y + 160 : 200;
     const xPos = lastNode ? lastNode.position.x : 300;
-
-    const item = allItems.find((b) => b.type === type);
-    const defaultConfig: Record<string, unknown> = {};
-    if (type === 'delay') { defaultConfig.delay_value = 5; defaultConfig.delay_unit = 'seconds'; }
-    if (type === 'condition') { defaultConfig.condition_field = 'last_message'; defaultConfig.condition_operator = 'equals'; }
 
     const newNode: Node = {
       id: crypto.randomUUID(),
@@ -290,26 +314,20 @@ export default function FlowEditor() {
       .update({ name: flowName, description: flowDescription })
       .eq('id', id);
 
-    // Sync trigger settings into the trigger node before saving
-    const triggerConfig: Record<string, unknown> = {
-      active_triggers: activeTriggers,
-      trigger_type: activeTriggers[0] || 'manual', // backwards compat
-      connection_ids: selectedConnections,
-      connection_id: selectedConnections[0] || '', // backwards compat
-    };
-    if (activeTriggers.includes('keyword')) triggerConfig.keywords = triggerKeywords;
-    if (activeTriggers.includes('scheduled')) {
-      triggerConfig.schedule_time = triggerScheduleTime;
-      triggerConfig.schedule_days = triggerScheduleDays;
-    }
-
-    const triggerLabel = activeTriggers.length === 1
-      ? triggerOptions.find(t => t.value === activeTriggers[0])?.label || 'Gatilho'
-      : `${activeTriggers.length} Gatilhos`;
-
+    // Inject connection_ids into all trigger nodes before saving
     const updatedNodes = nodes.map((n) =>
       (n.data.nodeType as string) === 'trigger'
-        ? { ...n, data: { ...n.data, config: triggerConfig, label: triggerLabel } }
+        ? {
+            ...n,
+            data: {
+              ...n.data,
+              config: {
+                ...(n.data.config as Record<string, unknown>),
+                connection_ids: selectedConnections,
+                connection_id: selectedConnections[0] || '',
+              },
+            },
+          }
         : n
     );
 
@@ -432,122 +450,11 @@ export default function FlowEditor() {
 
           {showSettings && (
             <div className="border-b border-border bg-secondary/20 p-3 space-y-4">
-              {/* Trigger Types - Multi Select */}
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-1.5">
-                  <Zap className="h-3.5 w-3.5 text-primary" />
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Gatilhos (múltiplos)</label>
-                </div>
-                <div className="space-y-1">
-                  {triggerOptions.map((t) => {
-                    const isActive = activeTriggers.includes(t.value);
-                    return (
-                      <button
-                        key={t.value}
-                        onClick={() => {
-                          setActiveTriggers(prev =>
-                            isActive
-                              ? prev.length > 1 ? prev.filter(v => v !== t.value) : prev
-                              : [...prev, t.value]
-                          );
-                        }}
-                        className={`w-full rounded-lg border px-3 py-2 text-left transition-all ${
-                          isActive
-                            ? 'border-primary bg-primary/5 ring-1 ring-primary/50'
-                            : 'border-border hover:border-primary/30 hover:bg-secondary/50'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <div className={`flex h-4 w-4 items-center justify-center rounded border transition-colors ${
-                            isActive ? 'bg-primary border-primary' : 'border-muted-foreground/40'
-                          }`}>
-                            {isActive && <span className="text-[8px] text-primary-foreground font-bold">✓</span>}
-                          </div>
-                          <span className="text-sm">{t.icon}</span>
-                          <div>
-                            <p className="text-[11px] font-semibold text-card-foreground">{t.label}</p>
-                            <p className="text-[9px] text-muted-foreground leading-tight">{t.desc}</p>
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-                <p className="text-[9px] text-muted-foreground">
-                  {activeTriggers.length} gatilho{activeTriggers.length !== 1 ? 's' : ''} selecionado{activeTriggers.length !== 1 ? 's' : ''}
-                </p>
-              </div>
-
-              {/* Keyword config */}
-              {activeTriggers.includes('keyword') && (
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Palavras-chave</label>
-                  <div className="flex gap-1.5">
-                    <input
-                      value={newKw}
-                      onChange={(e) => setNewKw(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && newKw.trim()) {
-                          setTriggerKeywords(prev => [...prev, newKw.trim()]);
-                          setNewKw('');
-                        }
-                      }}
-                      placeholder="Ex: oi, menu..."
-                      className="flex-1 rounded-lg border border-input bg-background px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                    />
-                    <button
-                      onClick={() => {
-                        if (newKw.trim()) {
-                          setTriggerKeywords(prev => [...prev, newKw.trim()]);
-                          setNewKw('');
-                        }
-                      }}
-                      className="shrink-0 rounded-lg bg-primary px-2.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
-                    >+</button>
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    {triggerKeywords.map((k, i) => (
-                      <span key={i} className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
-                        {k}
-                        <button onClick={() => setTriggerKeywords(prev => prev.filter((_, idx) => idx !== i))} className="hover:text-destructive">×</button>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Schedule config */}
-              {activeTriggers.includes('scheduled') && (
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Horário</label>
-                  <input
-                    type="time"
-                    value={triggerScheduleTime}
-                    onChange={(e) => setTriggerScheduleTime(e.target.value)}
-                    className="w-full rounded-lg border border-input bg-background px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                  />
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Dias</label>
-                  <div className="flex gap-1">
-                    {['S', 'T', 'Q', 'Q', 'S', 'S', 'D'].map((d, i) => (
-                      <button
-                        key={i}
-                        onClick={() => setTriggerScheduleDays(prev =>
-                          prev.includes(i) ? prev.filter(x => x !== i) : [...prev, i]
-                        )}
-                        className={`flex h-7 w-7 items-center justify-center rounded-lg text-[10px] font-bold transition-colors ${
-                          triggerScheduleDays.includes(i) ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground'
-                        }`}
-                      >{d}</button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               {/* Connection selector - Multi Select */}
               <div className="space-y-1.5">
                 <div className="flex items-center gap-1.5">
                   <Link2 className="h-3.5 w-3.5 text-primary" />
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Conexões WhatsApp (múltiplas)</label>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Conexões WhatsApp</label>
                 </div>
                 {connections.length > 0 ? (
                   <div className="space-y-1">
