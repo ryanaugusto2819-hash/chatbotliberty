@@ -12,6 +12,7 @@ import Agents from "./pages/Agents";
 import Automation from "./pages/Automation";
 import PlaceholderPage from "./pages/PlaceholderPage";
 import Reports from "./pages/Reports";
+import Connections from "./pages/Connections";
 import Login from "./pages/Login";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
@@ -42,6 +43,7 @@ const App = () => (
               <Route path="/ai" element={<PlaceholderPage title="Integração IA" subtitle="Chatbot inteligente com IA" />} />
               <Route path="/knowledge" element={<PlaceholderPage title="Base de Conhecimento" subtitle="Artigos e respostas rápidas" />} />
               <Route path="/reports" element={<Reports />} />
+              <Route path="/connections" element={<Connections />} />
               <Route path="/settings" element={<PlaceholderPage title="Configurações" subtitle="Configurar conta e integrações" />} />
             </Route>
             <Route path="*" element={<NotFound />} />
