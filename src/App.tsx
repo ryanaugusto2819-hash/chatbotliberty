@@ -10,6 +10,7 @@ import Conversations from "./pages/Conversations";
 import ChatView from "./pages/ChatView";
 import Agents from "./pages/Agents";
 import Automation from "./pages/Automation";
+import FlowEditor from "./pages/FlowEditor";
 import PlaceholderPage from "./pages/PlaceholderPage";
 import AiSettings from "./pages/AiSettings";
 import Reports from "./pages/Reports";
