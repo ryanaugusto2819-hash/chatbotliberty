@@ -74,6 +74,7 @@ export default function Conversations() {
       .from('conversations')
       .select('*')
       .not('contact_phone', 'like', '%-group')
+      .not('contact_phone', 'like', '%-_________%')
       .order('updated_at', { ascending: false });
 
     if (error) {
