@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
         conversation_id: conversationId,
         content: message,
         sender_type: "agent",
-        sender_agent_id: profile?.id || null,
+        sender_agent_id: null,
         message_type: type,
         status: "sent",
       })
