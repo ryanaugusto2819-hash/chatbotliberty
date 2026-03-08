@@ -3,7 +3,7 @@ import { Handle, Position, type NodeProps } from '@xyflow/react';
 import {
   MessageSquare, Clock, Image, Music, Video, Play, Zap, FileText,
   MapPin, Hash, GitFork, MousePointer, Inbox, MessageCircle, Send,
-  Bot, ListOrdered, Link2
+  Bot, ListOrdered, Link2, Cog, Tag, ArrowRightLeft, Globe
 } from 'lucide-react';
 
 const nodeConfig: Record<string, { icon: React.ElementType; typeLabel: string; colors: string }> = {
@@ -56,6 +56,11 @@ const nodeConfig: Record<string, { icon: React.ElementType; typeLabel: string; c
     icon: Bot,
     typeLabel: 'RESPOSTA IA',
     colors: 'bg-fuchsia-50 border-fuchsia-300 text-fuchsia-700 dark:bg-fuchsia-900/20 dark:border-fuchsia-500/40 dark:text-fuchsia-300',
+  },
+  action: {
+    icon: Cog,
+    typeLabel: 'AÇÃO',
+    colors: 'bg-rose-50 border-rose-300 text-rose-700 dark:bg-rose-900/20 dark:border-rose-500/40 dark:text-rose-300',
   },
 };
 
@@ -161,6 +166,22 @@ function AutomationNode({ data, selected }: NodeProps) {
             {(config.buttons as string[])?.slice(0, 3).map((b, i) => (
               <span key={i} className="rounded-full bg-current/10 px-2 py-0.5 text-[10px] font-medium">{b}</span>
             ))}
+          </div>
+        )}
+
+        {/* Action node preview */}
+        {nodeType === 'action' && config?.action_type && (
+          <div className="mt-1.5 flex items-center gap-1.5">
+            {(config.action_type as string) === 'add_tag' && <Tag className="h-3 w-3" />}
+            {(config.action_type as string) === 'remove_tag' && <Tag className="h-3 w-3" />}
+            {(config.action_type as string) === 'transfer_agent' && <ArrowRightLeft className="h-3 w-3" />}
+            {(config.action_type as string) === 'webhook' && <Globe className="h-3 w-3" />}
+            <span className="text-[10px] font-medium opacity-70">
+              {(config.action_type as string) === 'add_tag' ? `+ ${(config.tag_name as string) || 'etiqueta'}`
+                : (config.action_type as string) === 'remove_tag' ? `- ${(config.tag_name as string) || 'etiqueta'}`
+                : (config.action_type as string) === 'transfer_agent' ? `→ ${(config.agent_name as string) || 'agente'}`
+                : (config.webhook_url as string)?.slice(0, 25) || 'webhook'}
+            </span>
           </div>
         )}
       </div>

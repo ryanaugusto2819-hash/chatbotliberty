@@ -21,7 +21,7 @@ import NodeEditor from '@/components/automation/NodeEditor';
 import {
   ArrowLeft, Save, MessageSquare, Clock, Image, Music, Video,
   Loader2, FileText, GitFork, Bot, ListOrdered, Play, Pause,
-  Zap
+  Zap, Cog
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -73,6 +73,12 @@ const toolCategories: ToolCategory[] = [
     items: [
       { type: 'delay', label: 'Espera', icon: Clock, desc: 'Aguardar antes de continuar' },
       { type: 'condition', label: 'Condição', icon: GitFork, desc: 'Caminho condicional' },
+    ],
+  },
+  {
+    label: 'Ações',
+    items: [
+      { type: 'action', label: 'Ação', icon: Cog, desc: 'Etiqueta, transferir, webhook' },
     ],
   },
 ];
@@ -168,6 +174,14 @@ export default function FlowEditor() {
     if (type === 'quick_reply') return (config?.content as string)?.slice(0, 40) || '';
     if (type === 'ai_reply') return (config?.ai_prompt as string)?.slice(0, 40) || '';
     if (type === 'condition') return `${config?.condition_field || ''} ${config?.condition_operator || ''} ${config?.condition_value || ''}`;
+    if (type === 'action') {
+      const at = config?.action_type as string;
+      if (at === 'add_tag') return `+ ${(config?.tag_name as string) || 'etiqueta'}`;
+      if (at === 'remove_tag') return `- ${(config?.tag_name as string) || 'etiqueta'}`;
+      if (at === 'transfer_agent') return `→ ${(config?.agent_name as string) || 'agente'}`;
+      if (at === 'webhook') return (config?.webhook_url as string)?.slice(0, 30) || 'webhook';
+      return 'Ação';
+    }
     return '';
   };
 
@@ -213,6 +227,7 @@ export default function FlowEditor() {
     const item = allItems.find((b) => b.type === type);
     if (type === 'delay') { defaultConfig.delay_value = 5; defaultConfig.delay_unit = 'seconds'; }
     if (type === 'condition') { defaultConfig.condition_field = 'last_message'; defaultConfig.condition_operator = 'equals'; }
+    if (type === 'action') { defaultConfig.action_type = 'add_tag'; }
 
     const lastNode = nodes[nodes.length - 1];
     const yPos = lastNode ? lastNode.position.y + 160 : 200;
