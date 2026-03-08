@@ -129,11 +129,21 @@ export default function FlowEditor() {
       const triggerNode = nodesRes.data.find((n: any) => n.node_type === 'trigger');
       if (triggerNode) {
         const tc = triggerNode.config as Record<string, unknown>;
-        setTriggerType((tc.trigger_type as string) || 'manual');
+        // Support legacy single trigger_type and new active_triggers array
+        if (tc.active_triggers) {
+          setActiveTriggers(tc.active_triggers as string[]);
+        } else if (tc.trigger_type) {
+          setActiveTriggers([tc.trigger_type as string]);
+        }
         setTriggerKeywords((tc.keywords as string[]) || []);
         setTriggerScheduleTime((tc.schedule_time as string) || '09:00');
         setTriggerScheduleDays((tc.schedule_days as number[]) || []);
-        if (tc.connection_id) setSelectedConnection(tc.connection_id as string);
+        // Support legacy single connection_id and new connection_ids array
+        if (tc.connection_ids) {
+          setSelectedConnections(tc.connection_ids as string[]);
+        } else if (tc.connection_id) {
+          setSelectedConnections([tc.connection_id as string]);
+        }
       }
 
       setNodes(
