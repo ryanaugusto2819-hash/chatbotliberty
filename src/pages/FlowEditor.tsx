@@ -81,7 +81,29 @@ export default function FlowEditor() {
   const [saving, setSaving] = useState(false);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [toolbarOpen, setToolbarOpen] = useState(true);
-  const [showSettings, setShowSettings] = useState(false);
+  const [showSettings, setShowSettings] = useState(true);
+  const [connections, setConnections] = useState<any[]>([]);
+  const [selectedConnection, setSelectedConnection] = useState<string>('');
+  const [triggerType, setTriggerType] = useState('manual');
+  const [triggerKeywords, setTriggerKeywords] = useState<string[]>([]);
+  const [triggerScheduleTime, setTriggerScheduleTime] = useState('09:00');
+  const [triggerScheduleDays, setTriggerScheduleDays] = useState<number[]>([]);
+  const [newKw, setNewKw] = useState('');
+
+  // Load available WhatsApp connections
+  useEffect(() => {
+    const loadConnections = async () => {
+      const { data } = await supabase
+        .from('connection_configs')
+        .select('*')
+        .eq('is_connected', true);
+      if (data) {
+        setConnections(data);
+        if (data.length === 1) setSelectedConnection(data[0].id);
+      }
+    };
+    loadConnections();
+  }, []);
 
   useEffect(() => {
     if (id) loadFlow();
