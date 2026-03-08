@@ -24,14 +24,40 @@ interface ConnectionConfig {
 }
 
 const WEBHOOK_URL = `https://glceihfavfvebaaxgsnq.supabase.co/functions/v1/whatsapp-webhook`;
+const ZAPI_WEBHOOK_URL = `https://glceihfavfvebaaxgsnq.supabase.co/functions/v1/zapi-webhook`;
 
 const connections: ConnectionConfig[] = [
   {
-    id: 'whatsapp',
-    name: 'WhatsApp Cloud API',
-    description: 'Conecte sua conta do WhatsApp Business para receber e enviar mensagens.',
+    id: 'zapi',
+    name: 'Z-API (WhatsApp via QR Code)',
+    description: 'Conecte seu WhatsApp pessoal ou Business via QR Code usando a Z-API. Sem necessidade de conta Meta Business.',
     icon: <MessageSquare className="h-6 w-6" />,
     color: 'bg-accent text-accent-foreground',
+    docsUrl: 'https://developer.z-api.io',
+    webhookUrl: ZAPI_WEBHOOK_URL,
+    fields: [
+      {
+        key: 'zapi_instance_id',
+        label: 'Instance ID',
+        placeholder: 'Ex: 3C2A7F8B9D1E...',
+        type: 'text',
+        helpText: 'Encontrado no painel da Z-API ao criar uma instância.',
+      },
+      {
+        key: 'zapi_token',
+        label: 'Token',
+        placeholder: 'Ex: A1B2C3D4E5F6...',
+        type: 'password',
+        helpText: 'Token da instância, visível no painel da Z-API.',
+      },
+    ],
+  },
+  {
+    id: 'whatsapp',
+    name: 'WhatsApp Cloud API (Meta)',
+    description: 'Conecte via API oficial da Meta. Requer conta Meta Business verificada.',
+    icon: <MessageSquare className="h-6 w-6" />,
+    color: 'bg-secondary text-secondary-foreground',
     docsUrl: 'https://developers.facebook.com/docs/whatsapp/cloud-api/get-started',
     webhookUrl: WEBHOOK_URL,
     fields: [

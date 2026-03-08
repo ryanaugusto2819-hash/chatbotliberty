@@ -29,16 +29,28 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    // Build config based on connection type
+    let savedConfig: Record<string, string> = {};
+
+    if (connectionId === "whatsapp") {
+      savedConfig = {
+        phone_number_id: config.whatsapp_phone_number_id || "",
+        configured_at: new Date().toISOString(),
+      };
+    } else if (connectionId === "zapi") {
+      savedConfig = {
+        instance_id: config.zapi_instance_id || "",
+        configured_at: new Date().toISOString(),
+      };
+    }
+
     const { error: upsertError } = await serviceClient
       .from("connection_configs")
       .upsert(
         {
           connection_id: connectionId,
           is_connected: true,
-          config: {
-            phone_number_id: config.whatsapp_phone_number_id || "",
-            configured_at: new Date().toISOString(),
-          },
+          config: savedConfig,
           updated_at: new Date().toISOString(),
         },
         { onConflict: "connection_id" }
