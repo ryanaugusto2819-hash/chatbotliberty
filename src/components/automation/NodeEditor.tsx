@@ -133,14 +133,14 @@ export default function NodeEditor({ nodeId, nodeType, label, config, onSave, on
   const iconMap: Record<string, React.ElementType> = {
     trigger: Zap, message: MessageSquare, delay: Clock, image: Image,
     audio: Music, video: Video, document: FileText, condition: GitFork,
-    quick_reply: ListOrdered, ai_reply: Bot,
+    quick_reply: ListOrdered, ai_reply: Bot, action: Cog,
   };
   const Icon = iconMap[nodeType] || MessageSquare;
 
   const typeLabels: Record<string, string> = {
     trigger: 'Gatilho', message: 'Mensagem', delay: 'Espera', image: 'Imagem',
     audio: 'Áudio', video: 'Vídeo', document: 'Documento', condition: 'Condição',
-    quick_reply: 'Resposta Rápida', ai_reply: 'Resposta IA',
+    quick_reply: 'Resposta Rápida', ai_reply: 'Resposta IA', action: 'Ação',
   };
 
   const inputClass = "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring";

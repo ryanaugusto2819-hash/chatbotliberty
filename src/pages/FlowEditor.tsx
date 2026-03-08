@@ -75,6 +75,12 @@ const toolCategories: ToolCategory[] = [
       { type: 'condition', label: 'Condição', icon: GitFork, desc: 'Caminho condicional' },
     ],
   },
+  {
+    label: 'Ações',
+    items: [
+      { type: 'action', label: 'Ação', icon: Cog, desc: 'Etiqueta, transferir, webhook' },
+    ],
+  },
 ];
 
 const allItems = toolCategories.flatMap((c) => c.items);

@@ -57,6 +57,11 @@ const nodeConfig: Record<string, { icon: React.ElementType; typeLabel: string; c
     typeLabel: 'RESPOSTA IA',
     colors: 'bg-fuchsia-50 border-fuchsia-300 text-fuchsia-700 dark:bg-fuchsia-900/20 dark:border-fuchsia-500/40 dark:text-fuchsia-300',
   },
+  action: {
+    icon: Cog,
+    typeLabel: 'AÇÃO',
+    colors: 'bg-rose-50 border-rose-300 text-rose-700 dark:bg-rose-900/20 dark:border-rose-500/40 dark:text-rose-300',
+  },
 };
 
 const triggerLabels: Record<string, string> = {
