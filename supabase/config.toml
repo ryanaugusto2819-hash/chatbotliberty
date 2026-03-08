@@ -14,3 +14,9 @@ verify_jwt = false
 
 [functions.execute-flow]
 verify_jwt = false
+
+[functions.zapi-webhook]
+verify_jwt = false
+
+[functions.zapi-send]
+verify_jwt = false
