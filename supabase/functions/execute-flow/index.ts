@@ -100,11 +100,16 @@ Deno.serve(async (req) => {
       let waPayload: Record<string, unknown>;
 
       if (node.node_type === "message") {
+        const content = (config.content as string) || "";
+        if (!content.trim()) {
+          results.push({ nodeId: node.id, status: "skipped_empty" });
+          continue;
+        }
         waPayload = {
           messaging_product: "whatsapp",
           to: conversation.contact_phone,
           type: "text",
-          text: { body: config.content || "" },
+          text: { body: content },
         };
       } else if (node.node_type === "image") {
         waPayload = {
@@ -179,13 +184,16 @@ Deno.serve(async (req) => {
     }
 
     // Update trigger count
-    await supabase.rpc("increment_trigger_count" as never, { flow_id_param: flowId } as never).catch(() => {
-      // Fallback: manual update
-      supabase
-        .from("automation_flows")
-        .update({ trigger_count: nodes.length })
-        .eq("id", flowId);
-    });
+    const { data: currentFlow } = await supabase
+      .from("automation_flows")
+      .select("trigger_count")
+      .eq("id", flowId)
+      .single();
+
+    await supabase
+      .from("automation_flows")
+      .update({ trigger_count: (currentFlow?.trigger_count || 0) + 1 })
+      .eq("id", flowId);
 
     // Update conversation timestamp
     await supabase
