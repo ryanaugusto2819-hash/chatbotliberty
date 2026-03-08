@@ -3,7 +3,7 @@ import { Handle, Position, type NodeProps } from '@xyflow/react';
 import {
   MessageSquare, Clock, Image, Music, Video, Play, Zap, FileText,
   MapPin, Hash, GitFork, MousePointer, Inbox, MessageCircle, Send,
-  Bot, ListOrdered
+  Bot, ListOrdered, Link2
 } from 'lucide-react';
 
 const nodeConfig: Record<string, { icon: React.ElementType; typeLabel: string; colors: string }> = {
