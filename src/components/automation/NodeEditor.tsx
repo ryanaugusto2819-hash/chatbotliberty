@@ -580,6 +580,176 @@ export default function NodeEditor({ nodeId, nodeType, label, config, onSave, on
             </div>
           </div>
         )}
+
+        {/* === ACTION CONFIG === */}
+        {nodeType === 'action' && (
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <label className={labelClass}>Tipo de Ação</label>
+              <select
+                value={(editConfig.action_type as string) || 'add_tag'}
+                onChange={(e) => setEditConfig((p) => ({ ...p, action_type: e.target.value }))}
+                className={selectClass}
+              >
+                <option value="add_tag">Adicionar Etiqueta</option>
+                <option value="remove_tag">Remover Etiqueta</option>
+                <option value="transfer_agent">Transferir para Agente</option>
+                <option value="webhook">Enviar Webhook</option>
+              </select>
+            </div>
+
+            {/* Tag actions */}
+            {((editConfig.action_type as string) === 'add_tag' || (editConfig.action_type as string) === 'remove_tag' || !editConfig.action_type) && (
+              <div className="space-y-2">
+                <label className={labelClass}>Etiqueta</label>
+                {availableTags.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {availableTags.map((tag) => {
+                      const isSelected = (editConfig.tag_id as string) === tag.id;
+                      return (
+                        <button
+                          key={tag.id}
+                          onClick={() => setEditConfig((p) => ({ ...p, tag_id: tag.id, tag_name: tag.name }))}
+                          className={`w-full rounded-lg border p-2.5 text-left transition-all ${
+                            isSelected
+                              ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                              : 'border-border hover:border-primary/30 hover:bg-secondary/50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <div className="h-3 w-3 rounded-full" style={{ backgroundColor: tag.color }} />
+                            <p className="text-xs font-medium text-card-foreground">{tag.name}</p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed border-border p-3 text-center space-y-2">
+                    <Tag className="h-5 w-5 text-muted-foreground mx-auto" />
+                    <p className="text-[10px] text-muted-foreground">Nenhuma etiqueta criada</p>
+                    <p className="text-[9px] text-muted-foreground">Crie etiquetas para usar nas ações</p>
+                  </div>
+                )}
+                {/* Quick create tag */}
+                <div className="space-y-1.5 pt-1">
+                  <label className="text-[10px] text-muted-foreground">Criar nova etiqueta</label>
+                  <div className="flex gap-1.5">
+                    <input
+                      value={(editConfig._newTagName as string) || ''}
+                      onChange={(e) => setEditConfig((p) => ({ ...p, _newTagName: e.target.value }))}
+                      placeholder="Nome da etiqueta..."
+                      className={inputClass}
+                    />
+                    <input
+                      type="color"
+                      value={(editConfig._newTagColor as string) || '#3b82f6'}
+                      onChange={(e) => setEditConfig((p) => ({ ...p, _newTagColor: e.target.value }))}
+                      className="h-9 w-9 rounded-lg border border-input cursor-pointer"
+                    />
+                    <button
+                      onClick={async () => {
+                        const name = (editConfig._newTagName as string)?.trim();
+                        if (!name) return;
+                        const color = (editConfig._newTagColor as string) || '#3b82f6';
+                        const { data, error } = await supabase.from('tags').insert({ name, color }).select().single();
+                        if (error) { toast.error('Erro ao criar etiqueta'); return; }
+                        setAvailableTags((prev) => [...prev, data]);
+                        setEditConfig((p) => ({ ...p, tag_id: data.id, tag_name: data.name, _newTagName: '', _newTagColor: '#3b82f6' }));
+                        toast.success('Etiqueta criada');
+                      }}
+                      className="shrink-0 rounded-lg bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+                    >+</button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Transfer agent */}
+            {(editConfig.action_type as string) === 'transfer_agent' && (
+              <div className="space-y-2">
+                <label className={labelClass}>Agente</label>
+                {agents.length > 0 ? (
+                  <select
+                    value={(editConfig.agent_id as string) || ''}
+                    onChange={(e) => {
+                      const agent = agents.find(a => a.id === e.target.value);
+                      setEditConfig((p) => ({ ...p, agent_id: e.target.value, agent_name: agent?.full_name || '' }));
+                    }}
+                    className={selectClass}
+                  >
+                    <option value="">Selecione um agente...</option>
+                    {agents.map((a) => (
+                      <option key={a.id} value={a.id}>{a.full_name}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="text-[10px] text-muted-foreground">Nenhum agente cadastrado</p>
+                )}
+              </div>
+            )}
+
+            {/* Webhook */}
+            {(editConfig.action_type as string) === 'webhook' && (
+              <div className="space-y-2">
+                <div className="space-y-1.5">
+                  <label className={labelClass}>URL do Webhook</label>
+                  <input
+                    value={(editConfig.webhook_url as string) || ''}
+                    onChange={(e) => setEditConfig((p) => ({ ...p, webhook_url: e.target.value }))}
+                    placeholder="https://..."
+                    className={inputClass}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className={labelClass}>Método</label>
+                  <select
+                    value={(editConfig.webhook_method as string) || 'POST'}
+                    onChange={(e) => setEditConfig((p) => ({ ...p, webhook_method: e.target.value }))}
+                    className={selectClass}
+                  >
+                    <option value="POST">POST</option>
+                    <option value="GET">GET</option>
+                    <option value="PUT">PUT</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className={labelClass}>Headers (JSON, opcional)</label>
+                  <textarea
+                    value={(editConfig.webhook_headers as string) || ''}
+                    onChange={(e) => setEditConfig((p) => ({ ...p, webhook_headers: e.target.value }))}
+                    rows={3}
+                    placeholder='{"Authorization": "Bearer ..."}'
+                    className={`${inputClass} resize-none font-mono text-[11px]`}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className={labelClass}>Body (JSON, opcional)</label>
+                  <textarea
+                    value={(editConfig.webhook_body as string) || ''}
+                    onChange={(e) => setEditConfig((p) => ({ ...p, webhook_body: e.target.value }))}
+                    rows={3}
+                    placeholder='{"contact": "{{telefone}}"}'
+                    className={`${inputClass} resize-none font-mono text-[11px]`}
+                  />
+                </div>
+                <p className="text-[10px] text-muted-foreground">Variáveis: {"{{nome}}"}, {"{{telefone}}"}, {"{{mensagem}}"}</p>
+              </div>
+            )}
+
+            <div className="rounded-lg bg-rose-50 dark:bg-rose-900/10 border border-rose-200 dark:border-rose-800 p-3">
+              <p className="text-[11px] text-rose-700 dark:text-rose-300">
+                ⚙️ {(editConfig.action_type as string) === 'add_tag' || !editConfig.action_type
+                  ? 'Adiciona uma etiqueta ao contato da conversa'
+                  : (editConfig.action_type as string) === 'remove_tag'
+                  ? 'Remove uma etiqueta do contato da conversa'
+                  : (editConfig.action_type as string) === 'transfer_agent'
+                  ? 'Transfere a conversa para o agente selecionado'
+                  : 'Envia uma requisição HTTP para o endpoint configurado'}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Footer */}
