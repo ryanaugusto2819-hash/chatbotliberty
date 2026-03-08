@@ -132,7 +132,7 @@ export default function ChatView() {
             </div>
           </div>
           <div className="flex items-center gap-1">
-            <StatusBadge status={conversation.status} />
+            <StatusBadge status={conversation.status as 'new' | 'pending' | 'active' | 'resolved'} />
             <button className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary transition-colors">
               <MoreVertical className="h-4 w-4" />
             </button>

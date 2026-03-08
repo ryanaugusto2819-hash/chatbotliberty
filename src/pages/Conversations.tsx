@@ -143,7 +143,7 @@ export default function Conversations() {
                     </div>
                     <p className="text-xs text-muted-foreground truncate">{c.last_message}</p>
                     <div className="flex items-center gap-2 mt-1.5">
-                      <StatusBadge status={c.status} />
+                      <StatusBadge status={c.status as 'new' | 'pending' | 'active' | 'resolved'} />
                       {(c.tags || []).map(t => (
                         <span key={t} className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium text-secondary-foreground">{t}</span>
                       ))}
