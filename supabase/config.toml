@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.save-connection]
 verify_jwt = false
+
+[functions.ai-auto-reply]
+verify_jwt = false

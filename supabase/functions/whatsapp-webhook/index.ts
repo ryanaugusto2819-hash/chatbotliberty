@@ -176,6 +176,11 @@ async function processWebhook(body: any) {
 
         if (msgError) {
           console.error("Error inserting message:", msgError);
+        } else {
+          // Trigger AI auto-reply asynchronously
+          triggerAutoReply(conversationId).catch((err) =>
+            console.error("Auto-reply trigger error:", err)
+          );
         }
       }
 
