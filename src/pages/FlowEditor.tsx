@@ -83,8 +83,8 @@ export default function FlowEditor() {
   const [toolbarOpen, setToolbarOpen] = useState(true);
   const [showSettings, setShowSettings] = useState(true);
   const [connections, setConnections] = useState<any[]>([]);
-  const [selectedConnection, setSelectedConnection] = useState<string>('');
-  const [triggerType, setTriggerType] = useState('manual');
+  const [selectedConnections, setSelectedConnections] = useState<string[]>([]);
+  const [activeTriggers, setActiveTriggers] = useState<string[]>(['manual']);
   const [triggerKeywords, setTriggerKeywords] = useState<string[]>([]);
   const [triggerScheduleTime, setTriggerScheduleTime] = useState('09:00');
   const [triggerScheduleDays, setTriggerScheduleDays] = useState<number[]>([]);
