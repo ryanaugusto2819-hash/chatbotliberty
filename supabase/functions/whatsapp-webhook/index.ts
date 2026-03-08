@@ -103,6 +103,7 @@ async function processWebhook(body: any) {
           const updateData: any = { updated_at: new Date().toISOString(), status: "active" };
           if (ctwaClid) updateData.ctwa_clid = ctwaClid;
           if (sourceId) updateData.source_id = sourceId;
+          if (adTitle) updateData.ad_title = adTitle;
           await supabase
             .from("conversations")
             .update(updateData)
