@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import TopBar from '@/components/layout/TopBar';
-import { MessageSquare, Plug, CheckCircle2, XCircle, ExternalLink, Copy, Eye, EyeOff, Save } from 'lucide-react';
+import { MessageSquare, Plug, CheckCircle2, XCircle, ExternalLink, Copy, Eye, EyeOff, Save, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ConnectionField {
   key: string;
@@ -65,6 +66,37 @@ function ConnectionCard({ config }: { config: ConnectionConfig }) {
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
   const [connected, setConnected] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // Load connection status from database
+  useEffect(() => {
+    const loadStatus = async () => {
+      try {
+        const { data } = await supabase
+          .from('connection_configs')
+          .select('is_connected, config')
+          .eq('connection_id', config.id)
+          .single();
+
+        if (data) {
+          setConnected(data.is_connected);
+          // Pre-fill non-sensitive fields from saved config
+          const savedConfig = data.config as Record<string, string> | null;
+          if (savedConfig) {
+            const prefill: Record<string, string> = {};
+            if (savedConfig.phone_number_id) prefill.whatsapp_phone_number_id = savedConfig.phone_number_id;
+            if (savedConfig.verify_token) prefill.whatsapp_verify_token = savedConfig.verify_token;
+            setValues(prefill);
+          }
+        }
+      } catch {
+        // No config yet
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadStatus();
+  }, [config.id]);
 
   const handleSave = async () => {
     const missing = config.fields.filter(f => !values[f.key]?.trim());
@@ -73,11 +105,24 @@ function ConnectionCard({ config }: { config: ConnectionConfig }) {
       return;
     }
     setSaving(true);
-    // Simulate saving — in production this would call an edge function to update secrets
-    await new Promise(resolve => setTimeout(resolve, 1200));
-    setSaving(false);
-    setConnected(true);
-    toast.success(`${config.name} configurado com sucesso!`);
+    try {
+      const { data, error } = await supabase.functions.invoke('save-connection', {
+        body: {
+          connectionId: config.id,
+          config: values,
+        },
+      });
+
+      if (error) throw error;
+
+      setConnected(true);
+      toast.success(`${config.name} configurado com sucesso!`);
+    } catch (err: any) {
+      console.error('Save error:', err);
+      toast.error('Erro ao salvar configuração. Verifique suas permissões.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const copyWebhook = () => {
@@ -93,7 +138,6 @@ function ConnectionCard({ config }: { config: ConnectionConfig }) {
 
   return (
     <div className="rounded-2xl border border-border bg-card overflow-hidden transition-all duration-200">
-      {/* Header */}
       <button
         onClick={() => setExpanded(!expanded)}
         className="flex w-full items-center gap-4 p-5 text-left hover:bg-secondary/30 transition-colors"
@@ -104,7 +148,9 @@ function ConnectionCard({ config }: { config: ConnectionConfig }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold text-card-foreground">{config.name}</h3>
-            {connected ? (
+            {loading ? (
+              <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+            ) : connected ? (
               <span className="flex items-center gap-1 text-[11px] font-medium text-accent-foreground bg-accent px-2 py-0.5 rounded-full">
                 <CheckCircle2 className="h-3 w-3" /> Conectado
               </span>
@@ -119,10 +165,8 @@ function ConnectionCard({ config }: { config: ConnectionConfig }) {
         <Plug className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${expanded ? 'rotate-45' : ''}`} />
       </button>
 
-      {/* Expanded content */}
       {expanded && (
         <div className="border-t border-border px-5 pb-5 pt-4 space-y-5">
-          {/* Webhook URL */}
           {config.webhookUrl && (
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
@@ -143,7 +187,6 @@ function ConnectionCard({ config }: { config: ConnectionConfig }) {
             </div>
           )}
 
-          {/* Fields */}
           {config.fields.map(field => (
             <div key={field.key} className="space-y-1.5">
               <label className="text-sm font-medium text-card-foreground">{field.label}</label>
@@ -171,7 +214,6 @@ function ConnectionCard({ config }: { config: ConnectionConfig }) {
             </div>
           ))}
 
-          {/* Actions */}
           <div className="flex items-center justify-between pt-2">
             {config.docsUrl && (
               <a
@@ -189,7 +231,7 @@ function ConnectionCard({ config }: { config: ConnectionConfig }) {
               disabled={saving}
               className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 ml-auto"
             >
-              <Save className="h-4 w-4" />
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               {saving ? 'Salvando...' : 'Salvar Configuração'}
             </button>
           </div>
@@ -210,7 +252,6 @@ export default function Connections() {
           ))}
         </div>
 
-        {/* Future connections hint */}
         <div className="mt-8 rounded-2xl border border-dashed border-border p-6 text-center">
           <Plug className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" />
           <p className="text-sm text-muted-foreground">
