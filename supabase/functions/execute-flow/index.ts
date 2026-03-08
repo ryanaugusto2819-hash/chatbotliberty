@@ -100,11 +100,16 @@ Deno.serve(async (req) => {
       let waPayload: Record<string, unknown>;
 
       if (node.node_type === "message") {
+        const content = (config.content as string) || "";
+        if (!content.trim()) {
+          results.push({ nodeId: node.id, status: "skipped_empty" });
+          continue;
+        }
         waPayload = {
           messaging_product: "whatsapp",
           to: conversation.contact_phone,
           type: "text",
-          text: { body: config.content || "" },
+          text: { body: content },
         };
       } else if (node.node_type === "image") {
         waPayload = {
