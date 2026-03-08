@@ -3,10 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { sendWhatsAppMessage } from '@/lib/whatsapp';
 import StatusBadge from '@/components/shared/StatusBadge';
-import { ArrowLeft, Send, Paperclip, MoreVertical, User, Clock, CheckCheck, Check, Loader2 } from 'lucide-react';
+import { ArrowLeft, Send, Paperclip, MoreVertical, User, Clock, CheckCheck, Check, Loader2, Phone, MessageSquare, Tag, Calendar, Hash } from 'lucide-react';
 import FlowTrigger from '@/components/automation/FlowTrigger';
 import { motion } from 'framer-motion';
-import { format } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 
 interface ConversationData {
@@ -16,6 +17,19 @@ interface ConversationData {
   status: string;
   tags: string[] | null;
   updated_at: string;
+  created_at: string;
+  assigned_agent_id: string | null;
+}
+
+interface ContactTag {
+  id: string;
+  tag: { id: string; name: string; color: string };
+}
+
+interface AgentProfile {
+  id: string;
+  full_name: string;
+  avatar_url: string | null;
 }
 
 interface MessageData {
@@ -35,6 +49,8 @@ export default function ChatView() {
   const [messages, setMessages] = useState<MessageData[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [contactTags, setContactTags] = useState<ContactTag[]>([]);
+  const [assignedAgent, setAssignedAgent] = useState<AgentProfile | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -48,7 +64,28 @@ export default function ChatView() {
       .select('*')
       .eq('id', id)
       .single();
-    if (data) setConversation(data);
+    if (data) {
+      setConversation(data);
+      // Fetch assigned agent
+      if (data.assigned_agent_id) {
+        const { data: agent } = await supabase
+          .from('profiles')
+          .select('id, full_name, avatar_url')
+          .eq('id', data.assigned_agent_id)
+          .single();
+        if (agent) setAssignedAgent(agent);
+      } else {
+        setAssignedAgent(null);
+      }
+      // Fetch contact tags
+      const { data: tags } = await supabase
+        .from('contact_tags')
+        .select('id, tag_id, tags(id, name, color)')
+        .eq('contact_phone', data.contact_phone);
+      if (tags) {
+        setContactTags(tags.map((t: any) => ({ id: t.id, tag: t.tags })));
+      }
+    }
   };
 
   const fetchMessages = async () => {
@@ -199,34 +236,135 @@ export default function ChatView() {
       </div>
 
       {/* Sidebar */}
-      <div className="hidden lg:flex w-72 flex-col border-l border-border bg-card">
-        <div className="flex flex-col items-center py-8 px-4 border-b border-border">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-accent text-lg font-bold text-accent-foreground mb-3">
-            {conversation.contact_name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+      <div className="hidden lg:flex w-80 flex-col border-l border-border bg-card overflow-y-auto">
+        {/* Profile Header */}
+        <div className="flex flex-col items-center py-6 px-4 border-b border-border bg-gradient-to-b from-primary/5 to-transparent">
+          <div className="relative">
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 text-xl font-bold text-primary ring-4 ring-primary/20">
+              {conversation.contact_name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+            </div>
+            <span className={`absolute bottom-0 right-1 h-4 w-4 rounded-full border-2 border-card ${conversation.status === 'active' ? 'bg-green-500' : conversation.status === 'pending' ? 'bg-yellow-500' : 'bg-muted-foreground'}`} />
           </div>
-          <p className="text-sm font-semibold text-card-foreground">{conversation.contact_name}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">{conversation.contact_phone}</p>
+          <p className="text-base font-semibold text-card-foreground mt-3">{conversation.contact_name}</p>
+          <div className="flex items-center gap-1.5 mt-1">
+            <Phone className="h-3 w-3 text-muted-foreground" />
+            <p className="text-xs text-muted-foreground">{conversation.contact_phone}</p>
+          </div>
+          <div className="mt-3">
+            <StatusBadge status={conversation.status as 'new' | 'pending' | 'active' | 'resolved'} />
+          </div>
         </div>
-        <div className="p-4 space-y-4">
+
+        {/* Stats Row */}
+        <div className="grid grid-cols-2 gap-px bg-border border-b border-border">
+          <div className="flex flex-col items-center py-3 bg-card">
+            <span className="text-lg font-bold text-card-foreground">{messages.length}</span>
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Mensagens</span>
+          </div>
+          <div className="flex flex-col items-center py-3 bg-card">
+            <span className="text-lg font-bold text-card-foreground">
+              {formatDistanceToNow(new Date(conversation.created_at), { locale: ptBR, addSuffix: false })}
+            </span>
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Duração</span>
+          </div>
+        </div>
+
+        <div className="p-4 space-y-5 flex-1">
+          {/* Contact Details */}
           <div>
-            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-2">Informações</p>
-            <div className="space-y-2.5">
-              <div className="flex items-center gap-2.5 text-sm">
-                <User className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-card-foreground">Não atribuído</span>
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+              <User className="h-3 w-3" /> Detalhes do Contato
+            </p>
+            <div className="space-y-2.5 rounded-lg border border-border bg-background/50 p-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">Telefone</span>
+                <span className="text-xs font-medium text-card-foreground">{conversation.contact_phone}</span>
               </div>
-              <div className="flex items-center gap-2.5 text-sm">
-                <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-card-foreground">Última msg: {format(new Date(conversation.updated_at), 'dd/MM HH:mm')}</span>
+              <div className="h-px bg-border" />
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">Primeira conversa</span>
+                <span className="text-xs font-medium text-card-foreground">{format(new Date(conversation.created_at), 'dd/MM/yyyy')}</span>
+              </div>
+              <div className="h-px bg-border" />
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">Última atividade</span>
+                <span className="text-xs font-medium text-card-foreground">{format(new Date(conversation.updated_at), 'dd/MM HH:mm')}</span>
               </div>
             </div>
           </div>
+
+          {/* Assigned Agent */}
           <div>
-            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-2">Tags</p>
-            <div className="flex flex-wrap gap-1.5">
-              {(conversation.tags || []).map(t => (
-                <span key={t} className="rounded-full bg-accent px-2.5 py-1 text-[11px] font-medium text-accent-foreground">{t}</span>
-              ))}
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+              <User className="h-3 w-3" /> Agente Responsável
+            </p>
+            <div className="rounded-lg border border-border bg-background/50 p-3">
+              {assignedAgent ? (
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                    {assignedAgent.full_name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-card-foreground">{assignedAgent.full_name}</p>
+                    <p className="text-[10px] text-muted-foreground">Atribuído</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs text-muted-foreground">
+                    <User className="h-3.5 w-3.5" />
+                  </div>
+                  <p className="text-xs text-muted-foreground">Nenhum agente atribuído</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Tags */}
+          <div>
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+              <Tag className="h-3 w-3" /> Etiquetas
+            </p>
+            <div className="rounded-lg border border-border bg-background/50 p-3">
+              {contactTags.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {contactTags.map(ct => (
+                    <span
+                      key={ct.id}
+                      className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium text-white"
+                      style={{ backgroundColor: ct.tag.color }}
+                    >
+                      <span className="h-1.5 w-1.5 rounded-full bg-white/40" />
+                      {ct.tag.name}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground text-center py-1">Sem etiquetas</p>
+              )}
+            </div>
+          </div>
+
+          {/* Conversation Info */}
+          <div>
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+              <MessageSquare className="h-3 w-3" /> Conversa
+            </p>
+            <div className="space-y-2.5 rounded-lg border border-border bg-background/50 p-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">ID</span>
+                <span className="text-[10px] font-mono text-card-foreground">{id?.slice(0, 8)}...</span>
+              </div>
+              <div className="h-px bg-border" />
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">Status</span>
+                <StatusBadge status={conversation.status as 'new' | 'pending' | 'active' | 'resolved'} />
+              </div>
+              <div className="h-px bg-border" />
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">Mensagens</span>
+                <span className="text-xs font-medium text-card-foreground">{messages.length}</span>
+              </div>
             </div>
           </div>
         </div>
