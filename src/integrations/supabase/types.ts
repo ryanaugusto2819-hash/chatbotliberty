@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_assignment_history: {
+        Row: {
+          agent_id: string
+          assigned_at: string
+          conversation_id: string
+          id: string
+          unassigned_at: string | null
+        }
+        Insert: {
+          agent_id: string
+          assigned_at?: string
+          conversation_id: string
+          id?: string
+          unassigned_at?: string | null
+        }
+        Update: {
+          agent_id?: string
+          assigned_at?: string
+          conversation_id?: string
+          id?: string
+          unassigned_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_assignment_history_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_assignment_history_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       automation_edges: {
         Row: {
           created_at: string

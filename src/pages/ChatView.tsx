@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { sendWhatsAppMessage } from '@/lib/whatsapp';
 import StatusBadge from '@/components/shared/StatusBadge';
-import { ArrowLeft, Send, Paperclip, MoreVertical, User, Clock, CheckCheck, Check, Loader2, Phone, MessageSquare, Tag, Calendar, Hash } from 'lucide-react';
+import { ArrowLeft, Send, Paperclip, MoreVertical, User, Clock, CheckCheck, Check, Loader2, Phone, MessageSquare, Tag, Calendar, Hash, History } from 'lucide-react';
 import FlowTrigger from '@/components/automation/FlowTrigger';
 import QuickMessages from '@/components/chat/QuickMessages';
 import { motion } from 'framer-motion';
@@ -33,6 +33,13 @@ interface AgentProfile {
   avatar_url: string | null;
 }
 
+interface AssignmentHistory {
+  id: string;
+  agent_name: string;
+  assigned_at: string;
+  unassigned_at: string | null;
+}
+
 interface MessageData {
   id: string;
   content: string;
@@ -52,6 +59,7 @@ export default function ChatView() {
   const [sending, setSending] = useState(false);
   const [contactTags, setContactTags] = useState<ContactTag[]>([]);
   const [assignedAgent, setAssignedAgent] = useState<AgentProfile | null>(null);
+  const [assignmentHistory, setAssignmentHistory] = useState<AssignmentHistory[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -85,6 +93,20 @@ export default function ChatView() {
         .eq('contact_phone', data.contact_phone);
       if (tags) {
         setContactTags(tags.map((t: any) => ({ id: t.id, tag: t.tags })));
+      }
+      // Fetch assignment history
+      const { data: history } = await supabase
+        .from('agent_assignment_history')
+        .select('id, assigned_at, unassigned_at, agent_id, profiles(full_name)')
+        .eq('conversation_id', id)
+        .order('assigned_at', { ascending: false });
+      if (history) {
+        setAssignmentHistory(history.map((h: any) => ({
+          id: h.id,
+          agent_name: h.profiles?.full_name || 'Agente removido',
+          assigned_at: h.assigned_at,
+          unassigned_at: h.unassigned_at,
+        })));
       }
     }
   };
@@ -318,6 +340,44 @@ export default function ChatView() {
                   </div>
                   <p className="text-xs text-muted-foreground">Nenhum agente atribuído</p>
                 </div>
+              )}
+            </div>
+          </div>
+
+          {/* Assignment History */}
+          <div>
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+              <History className="h-3 w-3" /> Histórico de Atendimento
+            </p>
+            <div className="rounded-lg border border-border bg-background/50 p-3">
+              {assignmentHistory.length > 0 ? (
+                <div className="space-y-3">
+                  {assignmentHistory.map((h, i) => (
+                    <div key={h.id} className="relative flex gap-3">
+                      {/* Timeline line */}
+                      {i < assignmentHistory.length - 1 && (
+                        <div className="absolute left-[11px] top-6 bottom-0 w-px bg-border" />
+                      )}
+                      {/* Dot */}
+                      <div className={`flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full ${
+                        !h.unassigned_at ? 'bg-primary/20 ring-2 ring-primary/30' : 'bg-muted'
+                      }`}>
+                        <div className={`h-2 w-2 rounded-full ${!h.unassigned_at ? 'bg-primary' : 'bg-muted-foreground/40'}`} />
+                      </div>
+                      <div className="flex-1 min-w-0 pb-3">
+                        <p className="text-xs font-medium text-card-foreground truncate">{h.agent_name}</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          {format(new Date(h.assigned_at), 'dd/MM/yyyy HH:mm')}
+                          {h.unassigned_at
+                            ? ` → ${format(new Date(h.unassigned_at), 'dd/MM HH:mm')}`
+                            : ' — atual'}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground text-center py-1">Sem histórico</p>
               )}
             </div>
           </div>
