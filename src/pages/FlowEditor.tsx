@@ -280,11 +280,28 @@ export default function FlowEditor() {
       .update({ name: flowName, description: flowDescription })
       .eq('id', id);
 
+    // Sync trigger settings into the trigger node before saving
+    const triggerConfig: Record<string, unknown> = {
+      trigger_type: triggerType,
+      connection_id: selectedConnection,
+    };
+    if (triggerType === 'keyword') triggerConfig.keywords = triggerKeywords;
+    if (triggerType === 'scheduled') {
+      triggerConfig.schedule_time = triggerScheduleTime;
+      triggerConfig.schedule_days = triggerScheduleDays;
+    }
+
+    const updatedNodes = nodes.map((n) =>
+      (n.data.nodeType as string) === 'trigger'
+        ? { ...n, data: { ...n.data, config: triggerConfig, label: triggerOptions.find(t => t.value === triggerType)?.label || 'Gatilho' } }
+        : n
+    );
+
     await supabase.from('automation_edges').delete().eq('flow_id', id);
     await supabase.from('automation_nodes').delete().eq('flow_id', id);
 
-    if (nodes.length > 0) {
-      const nodeInserts = nodes.map((n, i) => ({
+    if (updatedNodes.length > 0) {
+      const nodeInserts = updatedNodes.map((n, i) => ({
         id: n.id,
         flow_id: id,
         node_type: n.data.nodeType as string,
