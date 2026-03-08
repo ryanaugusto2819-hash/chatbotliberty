@@ -57,10 +57,15 @@ async function processZapiWebhook(body: any) {
 
   const contactName = body.senderName || body.chatName || phone;
   const isFromMe = body.fromMe === true;
+  const isGroup = body.isGroup === true;
 
-  // Skip messages sent by us
+  // Skip messages sent by us or from groups
   if (isFromMe) {
     console.log("Message from self, skipping");
+    return;
+  }
+  if (isGroup) {
+    console.log("Group message, skipping");
     return;
   }
 
