@@ -309,22 +309,8 @@ export default function FlowEditor() {
       .update({ name: flowName, description: flowDescription })
       .eq('id', id);
 
-    // Inject connection_ids into all trigger nodes before saving
-    const updatedNodes = nodes.map((n) =>
-      (n.data.nodeType as string) === 'trigger'
-        ? {
-            ...n,
-            data: {
-              ...n.data,
-              config: {
-                ...(n.data.config as Record<string, unknown>),
-                connection_ids: selectedConnections,
-                connection_id: selectedConnections[0] || '',
-              },
-            },
-          }
-        : n
-    );
+    // Nodes are saved as-is (connection_ids are already in each trigger node's config)
+    const updatedNodes = nodes;
 
     await supabase.from('automation_edges').delete().eq('flow_id', id);
     await supabase.from('automation_nodes').delete().eq('flow_id', id);
