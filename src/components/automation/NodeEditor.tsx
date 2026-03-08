@@ -259,6 +259,58 @@ export default function NodeEditor({ nodeId, nodeType, label, config, onSave, on
                 </div>
               </div>
             )}
+
+            {/* Connection selector inside trigger */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-1.5">
+                <Link2 className="h-3.5 w-3.5 text-primary" />
+                <label className={labelClass}>Conexões WhatsApp</label>
+              </div>
+              {connections.length > 0 ? (
+                <div className="space-y-1.5">
+                  {connections.map((c) => {
+                    const connIds = ((editConfig.connection_ids as string[]) || []);
+                    const isSelected = connIds.includes(c.id);
+                    const connLabel = (c.config as any)?.phone_number_id
+                      ? `WhatsApp (${(c.config as any).phone_number_id})`
+                      : c.connection_id;
+                    return (
+                      <button
+                        key={c.id}
+                        onClick={() => {
+                          setEditConfig((p) => {
+                            const ids = ((p.connection_ids as string[]) || []);
+                            const next = isSelected ? ids.filter(id => id !== c.id) : [...ids, c.id];
+                            return { ...p, connection_ids: next, connection_id: next[0] || '' };
+                          });
+                        }}
+                        className={`w-full rounded-lg border p-2.5 text-left transition-all ${
+                          isSelected
+                            ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                            : 'border-border hover:border-primary/30 hover:bg-secondary/50'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className={`flex h-4 w-4 items-center justify-center rounded border transition-colors ${
+                            isSelected ? 'bg-primary border-primary' : 'border-muted-foreground/40'
+                          }`}>
+                            {isSelected && <span className="text-[8px] text-primary-foreground font-bold">✓</span>}
+                          </div>
+                          <p className="text-xs font-medium text-card-foreground">{connLabel}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                  <p className="text-[10px] text-muted-foreground">
+                    {((editConfig.connection_ids as string[]) || []).length} conexão(ões) selecionada(s)
+                  </p>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-dashed border-border p-3 text-center">
+                  <p className="text-[10px] text-muted-foreground">Nenhuma conexão configurada</p>
+                </div>
+              )}
+            </div>
           </>
         )}
 
