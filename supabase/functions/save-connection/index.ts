@@ -37,7 +37,6 @@ Deno.serve(async (req) => {
           is_connected: true,
           config: {
             phone_number_id: config.whatsapp_phone_number_id || "",
-            verify_token: config.whatsapp_verify_token || "",
             configured_at: new Date().toISOString(),
           },
           updated_at: new Date().toISOString(),
