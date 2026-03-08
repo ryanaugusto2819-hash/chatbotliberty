@@ -23,8 +23,9 @@ export default function FlowTrigger({ conversationId }: FlowTriggerProps) {
     if (open) {
       supabase
         .from('automation_flows')
-        .select('id, name')
-        .eq('is_active', true)
+        .select('id, name, is_active')
+        .order('is_active', { ascending: false })
+        .order('created_at', { ascending: false })
         .then(({ data }) => setFlows(data || []));
     }
   }, [open]);
