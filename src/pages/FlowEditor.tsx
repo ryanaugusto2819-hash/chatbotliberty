@@ -207,14 +207,42 @@ export default function FlowEditor() {
   );
 
   const addNode = (type: string) => {
+    // Determine actual nodeType and default config for trigger subtypes
+    let actualType = type;
+    const defaultConfig: Record<string, unknown> = {};
+    let label = '';
+
+    if (type.startsWith('trigger_')) {
+      actualType = 'trigger';
+      const triggerSubtype = type.replace('trigger_', '');
+      defaultConfig.trigger_type = triggerSubtype;
+      defaultConfig.connection_ids = selectedConnections;
+      label = triggerOptions.find(t => t.value === triggerSubtype)?.label || 'Gatilho';
+
+      // Position triggers side by side at top
+      const triggerNodes = nodes.filter(n => (n.data.nodeType as string) === 'trigger');
+      const xPos = triggerNodes.length > 0
+        ? Math.max(...triggerNodes.map(n => n.position.x)) + 300
+        : 300;
+
+      const newNode: Node = {
+        id: crypto.randomUUID(),
+        type: 'automation',
+        position: { x: xPos, y: 50 },
+        data: { nodeType: actualType, label, config: defaultConfig, preview: '' },
+        deletable: true,
+      };
+      setNodes((nds) => [...nds, newNode]);
+      return;
+    }
+
+    const item = allItems.find((b) => b.type === type);
+    if (type === 'delay') { defaultConfig.delay_value = 5; defaultConfig.delay_unit = 'seconds'; }
+    if (type === 'condition') { defaultConfig.condition_field = 'last_message'; defaultConfig.condition_operator = 'equals'; }
+
     const lastNode = nodes[nodes.length - 1];
     const yPos = lastNode ? lastNode.position.y + 160 : 200;
     const xPos = lastNode ? lastNode.position.x : 300;
-
-    const item = allItems.find((b) => b.type === type);
-    const defaultConfig: Record<string, unknown> = {};
-    if (type === 'delay') { defaultConfig.delay_value = 5; defaultConfig.delay_unit = 'seconds'; }
-    if (type === 'condition') { defaultConfig.condition_field = 'last_message'; defaultConfig.condition_operator = 'equals'; }
 
     const newNode: Node = {
       id: crypto.randomUUID(),
