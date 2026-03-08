@@ -33,6 +33,13 @@ interface AgentProfile {
   avatar_url: string | null;
 }
 
+interface AssignmentHistory {
+  id: string;
+  agent_name: string;
+  assigned_at: string;
+  unassigned_at: string | null;
+}
+
 interface MessageData {
   id: string;
   content: string;
