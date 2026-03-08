@@ -5,6 +5,7 @@ import { sendWhatsAppMessage } from '@/lib/whatsapp';
 import StatusBadge from '@/components/shared/StatusBadge';
 import { ArrowLeft, Send, Paperclip, MoreVertical, User, Clock, CheckCheck, Check, Loader2, Phone, MessageSquare, Tag, Calendar, Hash } from 'lucide-react';
 import FlowTrigger from '@/components/automation/FlowTrigger';
+import QuickMessages from '@/components/chat/QuickMessages';
 import { motion } from 'framer-motion';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -213,6 +214,7 @@ export default function ChatView() {
             <button className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary transition-colors">
               <Paperclip className="h-4 w-4" />
             </button>
+            <QuickMessages onSelect={(content) => setInput(content)} />
             <FlowTrigger conversationId={id!} />
             <div className="flex-1 relative">
               <textarea
