@@ -196,7 +196,7 @@ export default function FlowEditor() {
         flow_id: id,
         node_type: n.data.nodeType as string,
         label: n.data.label as string,
-        config: (n.data.config as Record<string, unknown>) || {},
+        config: JSON.parse(JSON.stringify((n.data.config as Record<string, unknown>) || {})),
         position_x: n.position.x,
         position_y: n.position.y,
         sort_order: i,
