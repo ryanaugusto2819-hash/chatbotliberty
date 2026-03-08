@@ -1,13 +1,13 @@
-import { useState } from 'react';
-import { X, MessageSquare, Clock, Image, Music, Video, Upload, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import {
+  X, MessageSquare, Clock, Image, Music, Video, Upload, Loader2,
+  FileText, GitFork, Zap, Bot, ListOrdered, Trash2, Save
+} from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 interface NodeConfig {
-  content?: string;
-  delay_seconds?: number;
-  media_url?: string;
-  caption?: string;
+  [key: string]: unknown;
 }
 
 interface NodeEditorProps {
@@ -20,10 +20,40 @@ interface NodeEditorProps {
   onClose: () => void;
 }
 
+const triggerTypes = [
+  { value: 'manual', label: 'Disparo Manual', desc: 'O agente inicia manualmente na conversa' },
+  { value: 'message_received', label: 'Ao Receber Mensagem', desc: 'Dispara quando qualquer mensagem é recebida' },
+  { value: 'keyword', label: 'Palavra-chave', desc: 'Dispara quando uma palavra específica é detectada' },
+  { value: 'new_conversation', label: 'Nova Conversa', desc: 'Dispara quando um novo contato inicia conversa' },
+  { value: 'scheduled', label: 'Agendado', desc: 'Executa em horários programados' },
+];
+
+const conditionOperators = [
+  { value: 'equals', label: 'é igual a' },
+  { value: 'contains', label: 'contém' },
+  { value: 'starts_with', label: 'começa com' },
+  { value: 'not_equals', label: 'é diferente de' },
+];
+
+const conditionFields = [
+  { value: 'last_message', label: 'Última mensagem' },
+  { value: 'contact_name', label: 'Nome do contato' },
+  { value: 'status', label: 'Status da conversa' },
+  { value: 'tag', label: 'Tag' },
+];
+
 export default function NodeEditor({ nodeId, nodeType, label, config, onSave, onDelete, onClose }: NodeEditorProps) {
   const [editLabel, setEditLabel] = useState(label);
   const [editConfig, setEditConfig] = useState<NodeConfig>(config);
   const [uploading, setUploading] = useState(false);
+  const [newButton, setNewButton] = useState('');
+  const [newKeyword, setNewKeyword] = useState('');
+
+  // Reset state when nodeId changes
+  useEffect(() => {
+    setEditLabel(label);
+    setEditConfig(config);
+  }, [nodeId, label, config]);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -31,7 +61,7 @@ export default function NodeEditor({ nodeId, nodeType, label, config, onSave, on
 
     setUploading(true);
     const ext = file.name.split('.').pop();
-    const path = `${nodeId}.${ext}`;
+    const path = `${nodeId}-${Date.now()}.${ext}`;
 
     const { error } = await supabase.storage
       .from('automation-media')
@@ -57,125 +87,393 @@ export default function NodeEditor({ nodeId, nodeType, label, config, onSave, on
     onClose();
   };
 
+  const addButton = () => {
+    if (!newButton.trim()) return;
+    const buttons = ((editConfig.buttons as string[]) || []);
+    if (buttons.length >= 3) { toast.error('Máximo 3 botões'); return; }
+    setEditConfig((p) => ({ ...p, buttons: [...buttons, newButton.trim()] }));
+    setNewButton('');
+  };
+
+  const removeButton = (i: number) => {
+    setEditConfig((p) => ({
+      ...p,
+      buttons: ((p.buttons as string[]) || []).filter((_, idx) => idx !== i),
+    }));
+  };
+
+  const addKeyword = () => {
+    if (!newKeyword.trim()) return;
+    const keywords = ((editConfig.keywords as string[]) || []);
+    setEditConfig((p) => ({ ...p, keywords: [...keywords, newKeyword.trim()] }));
+    setNewKeyword('');
+  };
+
+  const removeKeyword = (i: number) => {
+    setEditConfig((p) => ({
+      ...p,
+      keywords: ((p.keywords as string[]) || []).filter((_, idx) => idx !== i),
+    }));
+  };
+
   const iconMap: Record<string, React.ElementType> = {
-    message: MessageSquare,
-    delay: Clock,
-    image: Image,
-    audio: Music,
-    video: Video,
+    trigger: Zap, message: MessageSquare, delay: Clock, image: Image,
+    audio: Music, video: Video, document: FileText, condition: GitFork,
+    quick_reply: ListOrdered, ai_reply: Bot,
   };
   const Icon = iconMap[nodeType] || MessageSquare;
 
+  const typeLabels: Record<string, string> = {
+    trigger: 'Gatilho', message: 'Mensagem', delay: 'Espera', image: 'Imagem',
+    audio: 'Áudio', video: 'Vídeo', document: 'Documento', condition: 'Condição',
+    quick_reply: 'Resposta Rápida', ai_reply: 'Resposta IA',
+  };
+
+  const inputClass = "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring";
+  const labelClass = "text-xs font-medium text-muted-foreground uppercase tracking-wider";
+  const selectClass = "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring appearance-none";
+
   return (
-    <div className="absolute right-0 top-0 h-full w-80 border-l border-border bg-card z-50 flex flex-col shadow-lg">
-      <div className="flex items-center justify-between p-4 border-b border-border">
-        <div className="flex items-center gap-2">
-          <Icon className="h-4 w-4 text-primary" />
-          <span className="text-sm font-semibold text-card-foreground">Editar Nó</span>
+    <div className="absolute right-0 top-0 h-full w-[340px] border-l border-border bg-card z-50 flex flex-col shadow-xl">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-secondary/30">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+            <Icon className="h-4 w-4 text-primary" />
+          </div>
+          <div>
+            <span className="text-sm font-bold text-card-foreground">{typeLabels[nodeType]}</span>
+            <p className="text-[10px] text-muted-foreground">Configurar nó</p>
+          </div>
         </div>
-        <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
+        <button onClick={onClose} className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary transition-colors">
           <X className="h-4 w-4" />
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {/* Label */}
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground">Nome</label>
-          <input
-            value={editLabel}
-            onChange={(e) => setEditLabel(e.target.value)}
-            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-          />
-        </div>
-
-        {/* Content for message */}
-        {nodeType === 'message' && (
+      {/* Body */}
+      <div className="flex-1 overflow-y-auto p-5 space-y-5">
+        {/* Label (not for trigger) */}
+        {nodeType !== 'trigger' && (
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Mensagem</label>
-            <textarea
-              value={editConfig.content || ''}
-              onChange={(e) => setEditConfig((p) => ({ ...p, content: e.target.value }))}
-              rows={4}
-              placeholder="Digite a mensagem..."
-              className="w-full resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-            />
+            <label className={labelClass}>Nome do nó</label>
+            <input value={editLabel} onChange={(e) => setEditLabel(e.target.value)} className={inputClass} placeholder="Nome..." />
           </div>
         )}
 
-        {/* Delay */}
-        {nodeType === 'delay' && (
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Tempo de espera (segundos)</label>
-            <input
-              type="number"
-              min={1}
-              value={editConfig.delay_seconds || 5}
-              onChange={(e) => setEditConfig((p) => ({ ...p, delay_seconds: parseInt(e.target.value) || 5 }))}
-              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-            />
-          </div>
-        )}
-
-        {/* Media types (image, audio, video) */}
-        {['image', 'audio', 'video'].includes(nodeType) && (
+        {/* === TRIGGER CONFIG === */}
+        {nodeType === 'trigger' && (
           <>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Arquivo</label>
-              {editConfig.media_url ? (
-                <div className="space-y-2">
-                  {nodeType === 'image' && (
-                    <img src={editConfig.media_url} alt="" className="w-full rounded-lg border border-border" />
-                  )}
-                  {nodeType === 'audio' && (
-                    <audio src={editConfig.media_url} controls className="w-full" />
-                  )}
-                  {nodeType === 'video' && (
-                    <video src={editConfig.media_url} controls className="w-full rounded-lg" />
-                  )}
-                  <p className="text-[11px] text-muted-foreground truncate">{editConfig.media_url}</p>
-                </div>
-              ) : (
-                <div className="rounded-lg border-2 border-dashed border-input p-6 text-center">
-                  <Upload className="h-6 w-6 text-muted-foreground mx-auto mb-2" />
-                  <p className="text-xs text-muted-foreground">Nenhum arquivo selecionado</p>
-                </div>
-              )}
-              <label className="flex items-center gap-2 rounded-lg bg-secondary px-3 py-2 text-xs font-medium text-secondary-foreground cursor-pointer hover:bg-secondary/80 transition-colors">
-                {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
-                {uploading ? 'Enviando...' : 'Fazer Upload'}
-                <input type="file" accept={nodeType === 'image' ? 'image/*' : nodeType === 'audio' ? 'audio/*' : 'video/*'} onChange={handleUpload} className="hidden" />
-              </label>
+            <div className="space-y-2">
+              <label className={labelClass}>Tipo de Gatilho</label>
+              <div className="space-y-1.5">
+                {triggerTypes.map((t) => (
+                  <button
+                    key={t.value}
+                    onClick={() => {
+                      setEditConfig((p) => ({ ...p, trigger_type: t.value }));
+                      setEditLabel(t.label);
+                    }}
+                    className={`w-full rounded-lg border p-3 text-left transition-all ${
+                      editConfig.trigger_type === t.value
+                        ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                        : 'border-border hover:border-primary/30 hover:bg-secondary/50'
+                    }`}
+                  >
+                    <p className="text-sm font-medium text-card-foreground">{t.label}</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">{t.desc}</p>
+                  </button>
+                ))}
+              </div>
             </div>
 
-            {nodeType !== 'audio' && (
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground">Legenda (opcional)</label>
+            {editConfig.trigger_type === 'keyword' && (
+              <div className="space-y-2">
+                <label className={labelClass}>Palavras-chave</label>
+                <div className="flex gap-2">
+                  <input
+                    value={newKeyword}
+                    onChange={(e) => setNewKeyword(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && addKeyword()}
+                    placeholder="Ex: oi, olá, menu..."
+                    className={inputClass}
+                  />
+                  <button onClick={addKeyword} className="shrink-0 rounded-lg bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
+                    +
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {((editConfig.keywords as string[]) || []).map((k, i) => (
+                    <span key={i} className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary">
+                      {k}
+                      <button onClick={() => removeKeyword(i)} className="hover:text-destructive"><X className="h-3 w-3" /></button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {editConfig.trigger_type === 'scheduled' && (
+              <div className="space-y-2">
+                <label className={labelClass}>Horário</label>
                 <input
-                  value={editConfig.caption || ''}
+                  type="time"
+                  value={(editConfig.schedule_time as string) || '09:00'}
+                  onChange={(e) => setEditConfig((p) => ({ ...p, schedule_time: e.target.value }))}
+                  className={inputClass}
+                />
+                <label className={labelClass}>Dias da semana</label>
+                <div className="flex gap-1.5">
+                  {['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'].map((d, i) => {
+                    const days = ((editConfig.schedule_days as number[]) || []);
+                    const active = days.includes(i);
+                    return (
+                      <button
+                        key={d}
+                        onClick={() => setEditConfig((p) => ({
+                          ...p,
+                          schedule_days: active ? days.filter((x) => x !== i) : [...days, i],
+                        }))}
+                        className={`flex h-8 w-8 items-center justify-center rounded-lg text-[10px] font-bold transition-colors ${
+                          active ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
+                        }`}
+                      >
+                        {d}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* === MESSAGE CONFIG === */}
+        {nodeType === 'message' && (
+          <div className="space-y-1.5">
+            <label className={labelClass}>Conteúdo da Mensagem</label>
+            <textarea
+              value={(editConfig.content as string) || ''}
+              onChange={(e) => setEditConfig((p) => ({ ...p, content: e.target.value }))}
+              rows={5}
+              placeholder="Digite a mensagem que será enviada..."
+              className={`${inputClass} resize-none`}
+            />
+            <p className="text-[10px] text-muted-foreground">Variáveis: {"{{nome}}"}, {"{{telefone}}"}</p>
+          </div>
+        )}
+
+        {/* === DELAY CONFIG === */}
+        {nodeType === 'delay' && (
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <label className={labelClass}>Tempo de espera</label>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  min={1}
+                  value={(editConfig.delay_value as number) || (editConfig.delay_seconds as number) || 5}
+                  onChange={(e) => setEditConfig((p) => ({ ...p, delay_value: parseInt(e.target.value) || 1 }))}
+                  className={inputClass}
+                />
+                <select
+                  value={(editConfig.delay_unit as string) || 'seconds'}
+                  onChange={(e) => setEditConfig((p) => ({ ...p, delay_unit: e.target.value }))}
+                  className={selectClass}
+                >
+                  <option value="seconds">Segundos</option>
+                  <option value="minutes">Minutos</option>
+                  <option value="hours">Horas</option>
+                </select>
+              </div>
+            </div>
+            <div className="rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 p-3">
+              <p className="text-[11px] text-amber-700 dark:text-amber-300">
+                ⏱ O fluxo aguardará {(editConfig.delay_value as number) || (editConfig.delay_seconds as number) || 5}{' '}
+                {(editConfig.delay_unit as string) === 'minutes' ? 'minutos' : (editConfig.delay_unit as string) === 'hours' ? 'horas' : 'segundos'} antes de continuar
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* === MEDIA CONFIGS (image, audio, video, document) === */}
+        {['image', 'audio', 'video', 'document'].includes(nodeType) && (
+          <>
+            <div className="space-y-2">
+              <label className={labelClass}>Arquivo de mídia</label>
+              {editConfig.media_url ? (
+                <div className="space-y-2">
+                  {nodeType === 'image' && <img src={editConfig.media_url as string} alt="" className="w-full rounded-lg border border-border" />}
+                  {nodeType === 'audio' && <audio src={editConfig.media_url as string} controls className="w-full" />}
+                  {nodeType === 'video' && <video src={editConfig.media_url as string} controls className="w-full rounded-lg" />}
+                  {nodeType === 'document' && (
+                    <div className="flex items-center gap-2 rounded-lg bg-secondary p-3">
+                      <FileText className="h-5 w-5 text-primary" />
+                      <p className="text-xs text-card-foreground truncate flex-1">{(editConfig.media_url as string).split('/').pop()}</p>
+                    </div>
+                  )}
+                  <button
+                    onClick={() => setEditConfig((p) => ({ ...p, media_url: undefined }))}
+                    className="text-xs text-destructive hover:underline"
+                  >
+                    Remover arquivo
+                  </button>
+                </div>
+              ) : (
+                <label className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-input p-8 cursor-pointer hover:border-primary/40 hover:bg-secondary/30 transition-all">
+                  <Upload className="h-8 w-8 text-muted-foreground/50 mb-2" />
+                  <p className="text-xs font-medium text-muted-foreground">Clique para enviar</p>
+                  <p className="text-[10px] text-muted-foreground/60 mt-0.5">
+                    {nodeType === 'image' ? 'JPG, PNG, WebP' : nodeType === 'audio' ? 'MP3, OGG, AAC' : nodeType === 'video' ? 'MP4, 3GP' : 'PDF, DOC, XLS'}
+                  </p>
+                  {uploading && <Loader2 className="h-4 w-4 animate-spin mt-2 text-primary" />}
+                  <input
+                    type="file"
+                    accept={nodeType === 'image' ? 'image/*' : nodeType === 'audio' ? 'audio/*' : nodeType === 'video' ? 'video/*' : '.pdf,.doc,.docx,.xls,.xlsx'}
+                    onChange={handleUpload}
+                    className="hidden"
+                  />
+                </label>
+              )}
+            </div>
+
+            {['image', 'video', 'document'].includes(nodeType) && (
+              <div className="space-y-1.5">
+                <label className={labelClass}>Legenda (opcional)</label>
+                <input
+                  value={(editConfig.caption as string) || ''}
                   onChange={(e) => setEditConfig((p) => ({ ...p, caption: e.target.value }))}
                   placeholder="Legenda da mídia..."
-                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  className={inputClass}
                 />
               </div>
             )}
           </>
         )}
+
+        {/* === CONDITION CONFIG === */}
+        {nodeType === 'condition' && (
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <label className={labelClass}>Campo</label>
+              <select
+                value={(editConfig.condition_field as string) || 'last_message'}
+                onChange={(e) => setEditConfig((p) => ({ ...p, condition_field: e.target.value }))}
+                className={selectClass}
+              >
+                {conditionFields.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className={labelClass}>Operador</label>
+              <select
+                value={(editConfig.condition_operator as string) || 'equals'}
+                onChange={(e) => setEditConfig((p) => ({ ...p, condition_operator: e.target.value }))}
+                className={selectClass}
+              >
+                {conditionOperators.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className={labelClass}>Valor</label>
+              <input
+                value={(editConfig.condition_value as string) || ''}
+                onChange={(e) => setEditConfig((p) => ({ ...p, condition_value: e.target.value }))}
+                placeholder="Valor para comparar..."
+                className={inputClass}
+              />
+            </div>
+            <div className="rounded-lg bg-cyan-50 dark:bg-cyan-900/10 border border-cyan-200 dark:border-cyan-800 p-3">
+              <p className="text-[11px] text-cyan-700 dark:text-cyan-300">
+                🔀 Conecte as saídas "Verdadeiro" e "Falso" aos próximos nós
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* === QUICK REPLY CONFIG === */}
+        {nodeType === 'quick_reply' && (
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <label className={labelClass}>Texto da mensagem</label>
+              <textarea
+                value={(editConfig.content as string) || ''}
+                onChange={(e) => setEditConfig((p) => ({ ...p, content: e.target.value }))}
+                rows={3}
+                placeholder="Escolha uma opção:"
+                className={`${inputClass} resize-none`}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className={labelClass}>Botões (máx 3)</label>
+              <div className="space-y-1.5">
+                {((editConfig.buttons as string[]) || []).map((b, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <div className="flex-1 rounded-lg bg-secondary px-3 py-2 text-sm text-secondary-foreground">{b}</div>
+                    <button onClick={() => removeButton(i)} className="text-muted-foreground hover:text-destructive transition-colors">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              {((editConfig.buttons as string[]) || []).length < 3 && (
+                <div className="flex gap-2">
+                  <input
+                    value={newButton}
+                    onChange={(e) => setNewButton(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && addButton()}
+                    placeholder="Texto do botão..."
+                    className={inputClass}
+                  />
+                  <button onClick={addButton} className="shrink-0 rounded-lg bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90">
+                    +
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* === AI REPLY CONFIG === */}
+        {nodeType === 'ai_reply' && (
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <label className={labelClass}>Prompt da IA</label>
+              <textarea
+                value={(editConfig.ai_prompt as string) || ''}
+                onChange={(e) => setEditConfig((p) => ({ ...p, ai_prompt: e.target.value }))}
+                rows={5}
+                placeholder="Instruções para a IA responder neste ponto do fluxo..."
+                className={`${inputClass} resize-none`}
+              />
+            </div>
+            <div className="rounded-lg bg-fuchsia-50 dark:bg-fuchsia-900/10 border border-fuchsia-200 dark:border-fuchsia-800 p-3">
+              <p className="text-[11px] text-fuchsia-700 dark:text-fuchsia-300">
+                🤖 A IA gerará uma resposta baseada no contexto da conversa e neste prompt
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
-      <div className="p-4 border-t border-border space-y-2">
+      {/* Footer */}
+      <div className="p-4 border-t border-border space-y-2 bg-secondary/20">
         <button
           onClick={handleSave}
-          className="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+          className="flex items-center justify-center gap-2 w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
         >
-          Salvar
+          <Save className="h-4 w-4" />
+          Salvar Alterações
         </button>
-        <button
-          onClick={() => { onDelete(nodeId); onClose(); }}
-          className="w-full rounded-lg bg-destructive/10 px-4 py-2.5 text-sm font-medium text-destructive hover:bg-destructive/20 transition-colors"
-        >
-          Excluir Nó
-        </button>
+        {nodeType !== 'trigger' && (
+          <button
+            onClick={() => { onDelete(nodeId); onClose(); }}
+            className="flex items-center justify-center gap-2 w-full rounded-lg border border-destructive/30 px-4 py-2.5 text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors"
+          >
+            <Trash2 className="h-4 w-4" />
+            Excluir Nó
+          </button>
+        )}
       </div>
     </div>
   );
