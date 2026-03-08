@@ -106,12 +106,16 @@ function ConnectionCard({ config }: { config: ConnectionConfig }) {
 
         if (data) {
           setConnected(data.is_connected);
-          // Pre-fill non-sensitive fields from saved config
           const savedConfig = data.config as Record<string, string> | null;
           if (savedConfig) {
             const prefill: Record<string, string> = {};
-            if (savedConfig.phone_number_id) prefill.whatsapp_phone_number_id = savedConfig.phone_number_id;
-            if (savedConfig.verify_token) prefill.whatsapp_verify_token = savedConfig.verify_token;
+            // Prefill non-sensitive fields based on connection type
+            if (config.id === 'whatsapp') {
+              if (savedConfig.phone_number_id) prefill.whatsapp_phone_number_id = savedConfig.phone_number_id;
+              if (savedConfig.verify_token) prefill.whatsapp_verify_token = savedConfig.verify_token;
+            } else if (config.id === 'zapi') {
+              if (savedConfig.instance_id) prefill.zapi_instance_id = savedConfig.instance_id;
+            }
             setValues(prefill);
           }
         }
