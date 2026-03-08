@@ -323,7 +323,7 @@ export default function FlowEditor() {
 
     if (edges.length > 0) {
       const edgeInserts = edges.map((e) => ({
-        id: e.id,
+        id: crypto.randomUUID(),
         flow_id: id,
         source_node_id: e.source,
         target_node_id: e.target,
