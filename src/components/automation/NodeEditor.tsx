@@ -48,7 +48,21 @@ export default function NodeEditor({ nodeId, nodeType, label, config, onSave, on
   const [uploading, setUploading] = useState(false);
   const [newButton, setNewButton] = useState('');
   const [newKeyword, setNewKeyword] = useState('');
+  const [connections, setConnections] = useState<any[]>([]);
 
+  // Load available connections for trigger nodes
+  useEffect(() => {
+    if (nodeType === 'trigger') {
+      const loadConnections = async () => {
+        const { data } = await supabase
+          .from('connection_configs')
+          .select('*')
+          .eq('is_connected', true);
+        if (data) setConnections(data);
+      };
+      loadConnections();
+    }
+  }, [nodeType]);
   // Reset state when nodeId changes
   useEffect(() => {
     setEditLabel(label);
