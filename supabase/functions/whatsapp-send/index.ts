@@ -80,13 +80,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get agent profile
-    const { data: profile } = await serviceClient
-      .from("profiles")
-      .select("id")
-      .eq("user_id", userId)
-      .single();
-
     // Save message to database
     const { data: savedMsg, error: msgError } = await serviceClient
       .from("messages")
