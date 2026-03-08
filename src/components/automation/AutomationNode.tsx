@@ -134,6 +134,18 @@ function AutomationNode({ data, selected }: NodeProps) {
           </p>
         )}
 
+        {/* Connection badges */}
+        {nodeType === 'trigger' && ((config?.connection_ids as string[])?.length > 0) && (
+          <div className="mt-1.5 flex items-center gap-1 flex-wrap">
+            <Link2 className="h-3 w-3 opacity-50" />
+            {((config.connection_ids as string[]) || []).map((id, i) => (
+              <span key={id} className="inline-flex items-center rounded-full bg-current/10 px-1.5 py-0.5 text-[9px] font-medium opacity-70">
+                Conexão {i + 1}
+              </span>
+            ))}
+          </div>
+        )}
+
         {preview && !triggerLabel && (
           <p className="text-[11px] mt-1 opacity-60 truncate">{preview}</p>
         )}
