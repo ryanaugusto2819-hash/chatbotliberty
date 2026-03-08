@@ -42,6 +42,16 @@ interface ToolCategory {
 
 const toolCategories: ToolCategory[] = [
   {
+    label: 'Gatilhos',
+    items: [
+      { type: 'trigger_manual', label: 'Disparo Manual', icon: Zap, desc: 'O agente inicia manualmente' },
+      { type: 'trigger_message_received', label: 'Ao Receber Mensagem', icon: Zap, desc: 'Quando qualquer mensagem chega' },
+      { type: 'trigger_keyword', label: 'Palavra-chave', icon: Zap, desc: 'Dispara com palavras específicas' },
+      { type: 'trigger_new_conversation', label: 'Nova Conversa', icon: Zap, desc: 'Novo contato inicia conversa' },
+      { type: 'trigger_scheduled', label: 'Agendado', icon: Zap, desc: 'Em horários programados' },
+    ],
+  },
+  {
     label: 'Mensagens',
     items: [
       { type: 'message', label: 'Texto', icon: MessageSquare, desc: 'Mensagem de texto simples' },
