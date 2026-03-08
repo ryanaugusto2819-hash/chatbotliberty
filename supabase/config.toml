@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.whatsapp-send]
 verify_jwt = false
+
+[functions.save-connection]
+verify_jwt = false
