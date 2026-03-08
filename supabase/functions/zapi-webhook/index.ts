@@ -58,13 +58,15 @@ async function processZapiWebhook(body: any) {
   const contactName = body.senderName || body.chatName || phone;
   const isFromMe = body.fromMe === true;
   const isGroup = body.isGroup === true;
+  // Z-API group phones contain "-group" or are old format like "number-number"
+  const isGroupPhone = phone.includes("-group") || phone.includes("@g.us");
 
   // Skip messages sent by us or from groups
   if (isFromMe) {
     console.log("Message from self, skipping");
     return;
   }
-  if (isGroup) {
+  if (isGroup || isGroupPhone) {
     console.log("Group message, skipping");
     return;
   }
