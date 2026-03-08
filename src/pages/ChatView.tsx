@@ -49,6 +49,8 @@ export default function ChatView() {
   const [messages, setMessages] = useState<MessageData[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [contactTags, setContactTags] = useState<ContactTag[]>([]);
+  const [assignedAgent, setAssignedAgent] = useState<AgentProfile | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
