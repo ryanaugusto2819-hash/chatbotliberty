@@ -64,7 +64,28 @@ export default function ChatView() {
       .select('*')
       .eq('id', id)
       .single();
-    if (data) setConversation(data);
+    if (data) {
+      setConversation(data);
+      // Fetch assigned agent
+      if (data.assigned_agent_id) {
+        const { data: agent } = await supabase
+          .from('profiles')
+          .select('id, full_name, avatar_url')
+          .eq('id', data.assigned_agent_id)
+          .single();
+        if (agent) setAssignedAgent(agent);
+      } else {
+        setAssignedAgent(null);
+      }
+      // Fetch contact tags
+      const { data: tags } = await supabase
+        .from('contact_tags')
+        .select('id, tag_id, tags(id, name, color)')
+        .eq('contact_phone', data.contact_phone);
+      if (tags) {
+        setContactTags(tags.map((t: any) => ({ id: t.id, tag: t.tags })));
+      }
+    }
   };
 
   const fetchMessages = async () => {
