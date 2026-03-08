@@ -152,7 +152,7 @@ export default function FlowEditor() {
       );
     } else {
       const triggerNode: Node = {
-        id: 'trigger-' + crypto.randomUUID(),
+        id: crypto.randomUUID(),
         type: 'automation',
         position: { x: 300, y: 50 },
         data: { nodeType: 'trigger', label: 'Gatilho', config: { trigger_type: 'manual' }, preview: '' },
