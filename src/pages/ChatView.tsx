@@ -214,6 +214,7 @@ export default function ChatView() {
             <button className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary transition-colors">
               <Paperclip className="h-4 w-4" />
             </button>
+            <QuickMessages onSelect={(content) => setInput(content)} />
             <FlowTrigger conversationId={id!} />
             <div className="flex-1 relative">
               <textarea
