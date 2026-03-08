@@ -84,6 +84,7 @@ async function processWebhook(body: any) {
         const referral = msg.referral || value?.metadata?.referral;
         const ctwaClid = referral?.ctwa_clid || null;
         const sourceId = referral?.source_id || null;
+        const adTitle = referral?.headline || referral?.body || referral?.source_url || null;
 
         // Upsert conversation (find or create by phone)
         let conversationId: string;
@@ -102,6 +103,7 @@ async function processWebhook(body: any) {
           const updateData: any = { updated_at: new Date().toISOString(), status: "active" };
           if (ctwaClid) updateData.ctwa_clid = ctwaClid;
           if (sourceId) updateData.source_id = sourceId;
+          if (adTitle) updateData.ad_title = adTitle;
           await supabase
             .from("conversations")
             .update(updateData)
@@ -116,6 +118,7 @@ async function processWebhook(body: any) {
               tags: [],
               ctwa_clid: ctwaClid,
               source_id: sourceId,
+              ad_title: adTitle,
             })
             .select("id")
             .single();

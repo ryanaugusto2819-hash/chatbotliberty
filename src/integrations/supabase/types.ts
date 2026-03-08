@@ -237,6 +237,7 @@ export type Database = {
       }
       conversations: {
         Row: {
+          ad_title: string | null
           assigned_agent_id: string | null
           contact_avatar: string | null
           contact_name: string
@@ -251,6 +252,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          ad_title?: string | null
           assigned_agent_id?: string | null
           contact_avatar?: string | null
           contact_name: string
@@ -265,6 +267,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          ad_title?: string | null
           assigned_agent_id?: string | null
           contact_avatar?: string | null
           contact_name?: string

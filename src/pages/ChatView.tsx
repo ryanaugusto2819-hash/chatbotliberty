@@ -22,6 +22,7 @@ interface ConversationData {
   assigned_agent_id: string | null;
   ctwa_clid: string | null;
   source_id: string | null;
+  ad_title: string | null;
 }
 
 interface ContactTag {
@@ -316,18 +317,27 @@ export default function ChatView() {
                 <span className="text-xs text-muted-foreground">Última atividade</span>
                 <span className="text-xs font-medium text-card-foreground">{format(new Date(conversation.updated_at), 'dd/MM HH:mm')}</span>
               </div>
-              {(conversation.ctwa_clid || conversation.source_id) && (
+              {(conversation.ctwa_clid || conversation.source_id || conversation.ad_title) && (
                 <>
                   <div className="h-px bg-border" />
-                  {conversation.ctwa_clid && (
+                  {conversation.ad_title && (
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">CTWA Click ID</span>
-                      <span className="text-[10px] font-mono text-card-foreground max-w-[120px] truncate" title={conversation.ctwa_clid}>{conversation.ctwa_clid}</span>
+                      <span className="text-xs text-muted-foreground">Anúncio</span>
+                      <span className="text-xs font-medium text-primary max-w-[140px] truncate" title={conversation.ad_title}>{conversation.ad_title}</span>
                     </div>
+                  )}
+                  {conversation.ctwa_clid && (
+                    <>
+                      {conversation.ad_title && <div className="h-px bg-border" />}
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">CTWA Click ID</span>
+                        <span className="text-[10px] font-mono text-card-foreground max-w-[120px] truncate" title={conversation.ctwa_clid}>{conversation.ctwa_clid}</span>
+                      </div>
+                    </>
                   )}
                   {conversation.source_id && (
                     <>
-                      {conversation.ctwa_clid && <div className="h-px bg-border" />}
+                      <div className="h-px bg-border" />
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-muted-foreground">Source ID</span>
                         <span className="text-[10px] font-mono text-card-foreground max-w-[120px] truncate" title={conversation.source_id}>{conversation.source_id}</span>
