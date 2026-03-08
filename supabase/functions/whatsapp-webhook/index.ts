@@ -84,6 +84,7 @@ async function processWebhook(body: any) {
         const referral = msg.referral || value?.metadata?.referral;
         const ctwaClid = referral?.ctwa_clid || null;
         const sourceId = referral?.source_id || null;
+        const adTitle = referral?.headline || referral?.body || referral?.source_url || null;
 
         // Upsert conversation (find or create by phone)
         let conversationId: string;

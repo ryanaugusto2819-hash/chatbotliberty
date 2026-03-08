@@ -22,6 +22,7 @@ interface ConversationData {
   assigned_agent_id: string | null;
   ctwa_clid: string | null;
   source_id: string | null;
+  ad_title: string | null;
 }
 
 interface ContactTag {
