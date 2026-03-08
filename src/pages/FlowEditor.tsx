@@ -100,10 +100,7 @@ export default function FlowEditor() {
         .from('connection_configs')
         .select('*')
         .eq('is_connected', true);
-      if (data) {
-        setConnections(data);
-        if (data.length === 1) setSelectedConnections([data[0].id]);
-      }
+      if (data) setConnections(data);
     };
     loadConnections();
   }, []);
