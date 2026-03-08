@@ -179,13 +179,16 @@ Deno.serve(async (req) => {
     }
 
     // Update trigger count
-    await supabase.rpc("increment_trigger_count" as never, { flow_id_param: flowId } as never).catch(() => {
-      // Fallback: manual update
-      supabase
-        .from("automation_flows")
-        .update({ trigger_count: nodes.length })
-        .eq("id", flowId);
-    });
+    const { data: currentFlow } = await supabase
+      .from("automation_flows")
+      .select("trigger_count")
+      .eq("id", flowId)
+      .single();
+
+    await supabase
+      .from("automation_flows")
+      .update({ trigger_count: (currentFlow?.trigger_count || 0) + 1 })
+      .eq("id", flowId);
 
     // Update conversation timestamp
     await supabase
