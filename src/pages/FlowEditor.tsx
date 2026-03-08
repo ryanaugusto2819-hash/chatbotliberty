@@ -152,7 +152,7 @@ export default function FlowEditor() {
       );
     } else {
       const triggerNode: Node = {
-        id: 'trigger-' + crypto.randomUUID(),
+        id: crypto.randomUUID(),
         type: 'automation',
         position: { x: 300, y: 50 },
         data: { nodeType: 'trigger', label: 'Gatilho', config: { trigger_type: 'manual' }, preview: '' },
@@ -323,7 +323,7 @@ export default function FlowEditor() {
 
     if (edges.length > 0) {
       const edgeInserts = edges.map((e) => ({
-        id: e.id,
+        id: crypto.randomUUID(),
         flow_id: id,
         source_node_id: e.source,
         target_node_id: e.target,
