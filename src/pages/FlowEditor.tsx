@@ -21,7 +21,7 @@ import NodeEditor from '@/components/automation/NodeEditor';
 import {
   ArrowLeft, Save, MessageSquare, Clock, Image, Music, Video,
   Loader2, FileText, GitFork, Bot, ListOrdered, Play, Pause,
-  Settings, Zap, Link2, ChevronDown, ChevronUp
+  Zap
 } from 'lucide-react';
 import { toast } from 'sonner';
 
