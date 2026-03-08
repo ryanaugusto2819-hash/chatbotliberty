@@ -20,11 +20,20 @@ import AutomationNode from '@/components/automation/AutomationNode';
 import NodeEditor from '@/components/automation/NodeEditor';
 import {
   ArrowLeft, Save, MessageSquare, Clock, Image, Music, Video,
-  Loader2, FileText, GitFork, Bot, ListOrdered, Play, Pause
+  Loader2, FileText, GitFork, Bot, ListOrdered, Play, Pause,
+  Settings, Zap, Link2, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 const nodeTypes = { automation: AutomationNode };
+
+const triggerOptions = [
+  { value: 'manual', label: 'Disparo Manual', desc: 'O agente inicia manualmente na conversa', icon: '🖱️' },
+  { value: 'message_received', label: 'Ao Receber Mensagem', desc: 'Dispara quando qualquer mensagem chega', icon: '📩' },
+  { value: 'keyword', label: 'Palavra-chave', desc: 'Dispara com palavras específicas', icon: '🔑' },
+  { value: 'new_conversation', label: 'Nova Conversa', desc: 'Quando um novo contato inicia conversa', icon: '🆕' },
+  { value: 'scheduled', label: 'Agendado', desc: 'Em horários programados', icon: '⏰' },
+];
 
 interface ToolCategory {
   label: string;
