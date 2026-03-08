@@ -46,9 +46,33 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Send via WhatsApp Cloud API
-    const phoneNumberId = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID");
+    // Resolve phone number ID (prefer saved connection config)
+    const { data: connectionConfig } = await serviceClient
+      .from("connection_configs")
+      .select("config")
+      .eq("connection_id", "whatsapp")
+      .eq("is_connected", true)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const configuredPhoneNumberId = (connectionConfig?.config as Record<string, unknown> | null)?.phone_number_id;
+    const phoneNumberId =
+      typeof configuredPhoneNumberId === "string" && configuredPhoneNumberId.trim().length > 0
+        ? configuredPhoneNumberId
+        : Deno.env.get("WHATSAPP_PHONE_NUMBER_ID");
+
     const accessToken = Deno.env.get("WHATSAPP_ACCESS_TOKEN");
+
+    if (!phoneNumberId || !accessToken) {
+      return new Response(
+        JSON.stringify({ error: "WhatsApp credentials are missing" }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
 
     const waResponse = await fetch(
       `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`,
