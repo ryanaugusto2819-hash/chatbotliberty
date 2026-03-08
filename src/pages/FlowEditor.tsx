@@ -91,19 +91,7 @@ export default function FlowEditor() {
   const [saving, setSaving] = useState(false);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [toolbarOpen, setToolbarOpen] = useState(true);
-  const [connections, setConnections] = useState<any[]>([]);
 
-  // Load available WhatsApp connections
-  useEffect(() => {
-    const loadConnections = async () => {
-      const { data } = await supabase
-        .from('connection_configs')
-        .select('*')
-        .eq('is_connected', true);
-      if (data) setConnections(data);
-    };
-    loadConnections();
-  }, []);
 
   useEffect(() => {
     if (id) loadFlow();
