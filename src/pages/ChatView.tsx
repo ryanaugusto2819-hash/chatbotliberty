@@ -171,7 +171,7 @@ export default function ChatView() {
         </div>
 
         {/* Input */}
-        <div className="border-t border-border bg-card p-4">
+        <div className="border-t border-border bg-card p-4 relative">
           <div className="flex items-end gap-2">
             <button className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary transition-colors">
               <Paperclip className="h-4 w-4" />
