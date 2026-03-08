@@ -49,18 +49,20 @@ export default function NodeEditor({ nodeId, nodeType, label, config, onSave, on
   const [newButton, setNewButton] = useState('');
   const [newKeyword, setNewKeyword] = useState('');
   const [connections, setConnections] = useState<any[]>([]);
+  const [availableTags, setAvailableTags] = useState<any[]>([]);
+  const [agents, setAgents] = useState<any[]>([]);
 
-  // Load available connections for trigger nodes
+  // Load connections, tags, agents as needed
   useEffect(() => {
     if (nodeType === 'trigger') {
-      const loadConnections = async () => {
-        const { data } = await supabase
-          .from('connection_configs')
-          .select('*')
-          .eq('is_connected', true);
-        if (data) setConnections(data);
-      };
-      loadConnections();
+      supabase.from('connection_configs').select('*').eq('is_connected', true)
+        .then(({ data }) => { if (data) setConnections(data); });
+    }
+    if (nodeType === 'action') {
+      supabase.from('tags').select('*').order('name')
+        .then(({ data }) => { if (data) setAvailableTags(data); });
+      supabase.from('profiles').select('id, full_name')
+        .then(({ data }) => { if (data) setAgents(data); });
     }
   }, [nodeType]);
   // Reset state when nodeId changes
