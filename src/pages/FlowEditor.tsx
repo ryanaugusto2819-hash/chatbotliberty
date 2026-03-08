@@ -4,6 +4,7 @@ import {
   ReactFlow,
   Controls,
   Background,
+  MiniMap,
   useNodesState,
   useEdgesState,
   addEdge,
@@ -11,34 +12,67 @@ import {
   type Node,
   type Edge,
   BackgroundVariant,
+  Panel,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { supabase } from '@/integrations/supabase/client';
 import AutomationNode from '@/components/automation/AutomationNode';
 import NodeEditor from '@/components/automation/NodeEditor';
-import { ArrowLeft, Save, MessageSquare, Clock, Image, Music, Video, Loader2, Play } from 'lucide-react';
+import {
+  ArrowLeft, Save, MessageSquare, Clock, Image, Music, Video,
+  Loader2, FileText, GitFork, Bot, ListOrdered, Play, Pause
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 const nodeTypes = { automation: AutomationNode };
 
-const addButtons = [
-  { type: 'message', label: 'Mensagem', icon: MessageSquare },
-  { type: 'delay', label: 'Delay', icon: Clock },
-  { type: 'image', label: 'Imagem', icon: Image },
-  { type: 'audio', label: 'Áudio', icon: Music },
-  { type: 'video', label: 'Vídeo', icon: Video },
+interface ToolCategory {
+  label: string;
+  items: { type: string; label: string; icon: React.ElementType; desc: string }[];
+}
+
+const toolCategories: ToolCategory[] = [
+  {
+    label: 'Mensagens',
+    items: [
+      { type: 'message', label: 'Texto', icon: MessageSquare, desc: 'Mensagem de texto simples' },
+      { type: 'image', label: 'Imagem', icon: Image, desc: 'Enviar uma imagem' },
+      { type: 'audio', label: 'Áudio', icon: Music, desc: 'Enviar um áudio' },
+      { type: 'video', label: 'Vídeo', icon: Video, desc: 'Enviar um vídeo' },
+      { type: 'document', label: 'Documento', icon: FileText, desc: 'Enviar um arquivo' },
+    ],
+  },
+  {
+    label: 'Interação',
+    items: [
+      { type: 'quick_reply', label: 'Resposta Rápida', icon: ListOrdered, desc: 'Botões de resposta rápida' },
+      { type: 'ai_reply', label: 'Resposta IA', icon: Bot, desc: 'Resposta gerada por IA' },
+    ],
+  },
+  {
+    label: 'Lógica',
+    items: [
+      { type: 'delay', label: 'Espera', icon: Clock, desc: 'Aguardar antes de continuar' },
+      { type: 'condition', label: 'Condição', icon: GitFork, desc: 'Caminho condicional' },
+    ],
+  },
 ];
+
+const allItems = toolCategories.flatMap((c) => c.items);
 
 export default function FlowEditor() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [flowName, setFlowName] = useState('');
   const [flowDescription, setFlowDescription] = useState('');
+  const [flowActive, setFlowActive] = useState(false);
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
+  const [toolbarOpen, setToolbarOpen] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
     if (id) loadFlow();
@@ -56,6 +90,7 @@ export default function FlowEditor() {
     if (flowRes.data) {
       setFlowName(flowRes.data.name);
       setFlowDescription(flowRes.data.description || '');
+      setFlowActive(flowRes.data.is_active);
     }
 
     if (nodesRes.data && nodesRes.data.length > 0) {
@@ -70,15 +105,15 @@ export default function FlowEditor() {
             preview: getPreview(n.node_type, n.config as Record<string, unknown>),
             config: n.config,
           },
+          deletable: n.node_type !== 'trigger',
         }))
       );
     } else {
-      // Create default trigger node
       const triggerNode: Node = {
         id: 'trigger-' + crypto.randomUUID(),
         type: 'automation',
-        position: { x: 250, y: 50 },
-        data: { nodeType: 'trigger', label: 'Início do Fluxo', config: {} },
+        position: { x: 300, y: 50 },
+        data: { nodeType: 'trigger', label: 'Gatilho', config: { trigger_type: 'manual' }, preview: '' },
         deletable: false,
       };
       setNodes([triggerNode]);
@@ -91,7 +126,7 @@ export default function FlowEditor() {
           source: e.source_node_id,
           target: e.target_node_id,
           animated: true,
-          style: { stroke: 'hsl(var(--primary))' },
+          style: { stroke: 'hsl(var(--primary))', strokeWidth: 2 },
         }))
       );
     }
@@ -100,17 +135,24 @@ export default function FlowEditor() {
   };
 
   const getPreview = (type: string, config: Record<string, unknown>): string => {
-    if (type === 'message') return (config?.content as string)?.slice(0, 40) || '';
-    if (type === 'delay') return `${config?.delay_seconds || 5}s de espera`;
-    if (type === 'image' || type === 'video') return (config?.caption as string) || 'Mídia';
-    if (type === 'audio') return 'Áudio';
+    if (type === 'message') return (config?.content as string)?.slice(0, 50) || '';
+    if (type === 'delay') {
+      const val = (config?.delay_value as number) || (config?.delay_seconds as number) || 5;
+      const unit = (config?.delay_unit as string) || 'seconds';
+      return `${val} ${unit === 'minutes' ? 'min' : unit === 'hours' ? 'h' : 's'}`;
+    }
+    if (type === 'image' || type === 'video' || type === 'document') return (config?.caption as string) || '';
+    if (type === 'audio') return config?.media_url ? 'Áudio anexado' : '';
+    if (type === 'quick_reply') return (config?.content as string)?.slice(0, 40) || '';
+    if (type === 'ai_reply') return (config?.ai_prompt as string)?.slice(0, 40) || '';
+    if (type === 'condition') return `${config?.condition_field || ''} ${config?.condition_operator || ''} ${config?.condition_value || ''}`;
     return '';
   };
 
   const onConnect = useCallback(
     (params: Connection) => {
       setEdges((eds) =>
-        addEdge({ ...params, animated: true, style: { stroke: 'hsl(var(--primary))' } }, eds)
+        addEdge({ ...params, animated: true, style: { stroke: 'hsl(var(--primary))', strokeWidth: 2 } }, eds)
       );
     },
     [setEdges]
@@ -118,37 +160,41 @@ export default function FlowEditor() {
 
   const addNode = (type: string) => {
     const lastNode = nodes[nodes.length - 1];
-    const yPos = lastNode ? lastNode.position.y + 140 : 200;
+    const yPos = lastNode ? lastNode.position.y + 160 : 200;
+    const xPos = lastNode ? lastNode.position.x : 300;
+
+    const item = allItems.find((b) => b.type === type);
+    const defaultConfig: Record<string, unknown> = {};
+    if (type === 'delay') { defaultConfig.delay_value = 5; defaultConfig.delay_unit = 'seconds'; }
+    if (type === 'condition') { defaultConfig.condition_field = 'last_message'; defaultConfig.condition_operator = 'equals'; }
 
     const newNode: Node = {
       id: crypto.randomUUID(),
       type: 'automation',
-      position: { x: 250, y: yPos },
+      position: { x: xPos, y: yPos },
       data: {
         nodeType: type,
-        label: addButtons.find((b) => b.type === type)?.label || type,
-        config: type === 'delay' ? { delay_seconds: 5 } : {},
-        preview: type === 'delay' ? '5s de espera' : '',
+        label: item?.label || type,
+        config: defaultConfig,
+        preview: getPreview(type, defaultConfig),
       },
     };
 
     setNodes((nds) => [...nds, newNode]);
 
-    // Auto-connect to last node
     if (lastNode) {
       const newEdge: Edge = {
         id: `e-${lastNode.id}-${newNode.id}`,
         source: lastNode.id,
         target: newNode.id,
         animated: true,
-        style: { stroke: 'hsl(var(--primary))' },
+        style: { stroke: 'hsl(var(--primary))', strokeWidth: 2 },
       };
       setEdges((eds) => [...eds, newEdge]);
     }
   };
 
   const handleNodeClick = (_: React.MouseEvent, node: Node) => {
-    if ((node.data.nodeType as string) === 'trigger') return;
     setSelectedNode(node);
   };
 
@@ -175,21 +221,26 @@ export default function FlowEditor() {
     setEdges((eds) => eds.filter((e) => e.source !== nodeId && e.target !== nodeId));
   };
 
+  const toggleActive = async () => {
+    if (!id) return;
+    const next = !flowActive;
+    await supabase.from('automation_flows').update({ is_active: next }).eq('id', id);
+    setFlowActive(next);
+    toast.success(next ? 'Fluxo ativado' : 'Fluxo desativado');
+  };
+
   const saveFlow = async () => {
     if (!id) return;
     setSaving(true);
 
-    // Update flow metadata
     await supabase
       .from('automation_flows')
       .update({ name: flowName, description: flowDescription })
       .eq('id', id);
 
-    // Delete existing nodes and edges, then re-insert
     await supabase.from('automation_edges').delete().eq('flow_id', id);
     await supabase.from('automation_nodes').delete().eq('flow_id', id);
 
-    // Insert nodes
     if (nodes.length > 0) {
       const nodeInserts = nodes.map((n, i) => ({
         id: n.id,
@@ -211,7 +262,6 @@ export default function FlowEditor() {
       }
     }
 
-    // Insert edges
     if (edges.length > 0) {
       const edgeInserts = edges.map((e) => ({
         id: e.id,
@@ -235,14 +285,14 @@ export default function FlowEditor() {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center">
+      <div className="flex h-screen items-center justify-center bg-background">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen flex-col">
+    <div className="flex h-screen flex-col bg-background">
       {/* Top bar */}
       <div className="flex h-14 items-center justify-between border-b border-border bg-card px-4 shrink-0">
         <div className="flex items-center gap-3">
@@ -252,35 +302,73 @@ export default function FlowEditor() {
           >
             <ArrowLeft className="h-4 w-4" />
           </button>
-          <input
-            value={flowName}
-            onChange={(e) => setFlowName(e.target.value)}
-            className="text-sm font-semibold text-card-foreground bg-transparent border-none focus:outline-none focus:ring-0 w-48"
-            placeholder="Nome do fluxo"
-          />
+          <div className="flex flex-col">
+            <input
+              value={flowName}
+              onChange={(e) => setFlowName(e.target.value)}
+              className="text-sm font-bold text-card-foreground bg-transparent border-none focus:outline-none w-48"
+              placeholder="Nome do fluxo"
+            />
+            <input
+              value={flowDescription}
+              onChange={(e) => setFlowDescription(e.target.value)}
+              className="text-[11px] text-muted-foreground bg-transparent border-none focus:outline-none w-64"
+              placeholder="Descrição do fluxo..."
+            />
+          </div>
         </div>
-        <button
-          onClick={saveFlow}
-          disabled={saving}
-          className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-        >
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          Salvar
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={toggleActive}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+              flowActive
+                ? 'bg-primary/10 text-primary border border-primary/30'
+                : 'bg-secondary text-muted-foreground border border-border'
+            }`}
+          >
+            {flowActive ? <Play className="h-3 w-3" /> : <Pause className="h-3 w-3" />}
+            {flowActive ? 'Ativo' : 'Inativo'}
+          </button>
+          <button
+            onClick={saveFlow}
+            disabled={saving}
+            className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            Salvar
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-1 relative overflow-hidden">
-        {/* Toolbar */}
-        <div className="w-14 border-r border-border bg-card flex flex-col items-center py-3 gap-2 shrink-0">
-          {addButtons.map((btn) => (
-            <button
-              key={btn.type}
-              onClick={() => addNode(btn.type)}
-              title={btn.label}
-              className="flex h-10 w-10 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
-            >
-              <btn.icon className="h-4 w-4" />
-            </button>
+        {/* Sidebar Toolbar */}
+        <div className="w-56 border-r border-border bg-card flex flex-col shrink-0 overflow-y-auto">
+          <div className="p-3 border-b border-border">
+            <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-muted-foreground">Componentes</p>
+          </div>
+          {toolCategories.map((cat) => (
+            <div key={cat.label} className="border-b border-border">
+              <p className="px-3 pt-3 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                {cat.label}
+              </p>
+              <div className="px-2 pb-2 space-y-0.5">
+                {cat.items.map((item) => (
+                  <button
+                    key={item.type}
+                    onClick={() => addNode(item.type)}
+                    className="flex items-center gap-2.5 w-full rounded-lg px-2.5 py-2 text-left hover:bg-secondary transition-colors group"
+                  >
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary group-hover:bg-primary/10 transition-colors">
+                      <item.icon className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-card-foreground">{item.label}</p>
+                      <p className="text-[10px] text-muted-foreground leading-tight">{item.desc}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
 
@@ -293,12 +381,31 @@ export default function FlowEditor() {
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             onNodeClick={handleNodeClick}
+            onPaneClick={() => setSelectedNode(null)}
             nodeTypes={nodeTypes}
             fitView
             className="bg-background"
+            defaultEdgeOptions={{
+              animated: true,
+              style: { stroke: 'hsl(var(--primary))', strokeWidth: 2 },
+            }}
           >
-            <Controls className="!bg-card !border-border !shadow-md [&>button]:!bg-card [&>button]:!border-border [&>button]:!text-foreground" />
-            <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="hsl(var(--border))" />
+            <Controls className="!bg-card !border-border !shadow-md !rounded-xl [&>button]:!bg-card [&>button]:!border-border [&>button]:!text-foreground [&>button]:!rounded-lg" />
+            <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="hsl(var(--border))" />
+            <MiniMap
+              className="!bg-card !border-border !rounded-xl !shadow-md"
+              maskColor="hsl(var(--background) / 0.7)"
+              nodeColor="hsl(var(--primary))"
+            />
+
+            {/* Node count panel */}
+            <Panel position="top-right" className="!m-3">
+              <div className="rounded-lg bg-card border border-border px-3 py-1.5 shadow-sm">
+                <span className="text-[11px] text-muted-foreground">
+                  {nodes.length} nós · {edges.length} conexões
+                </span>
+              </div>
+            </Panel>
           </ReactFlow>
         </div>
 
