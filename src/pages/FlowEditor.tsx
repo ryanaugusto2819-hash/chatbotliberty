@@ -202,7 +202,7 @@ export default function FlowEditor() {
       actualType = 'trigger';
       const triggerSubtype = type.replace('trigger_', '');
       defaultConfig.trigger_type = triggerSubtype;
-      defaultConfig.connection_ids = selectedConnections;
+      defaultConfig.connection_ids = [];
       label = triggerOptions.find(t => t.value === triggerSubtype)?.label || 'Gatilho';
 
       // Position triggers side by side at top
