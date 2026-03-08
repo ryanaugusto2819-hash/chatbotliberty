@@ -102,7 +102,7 @@ function ConnectionCard({ config }: { config: ConnectionConfig }) {
           .from('connection_configs')
           .select('is_connected, config')
           .eq('connection_id', config.id)
-          .single();
+          .maybeSingle();
 
         if (data) {
           setConnected(data.is_connected);
