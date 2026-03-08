@@ -12,32 +12,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Authenticate the request
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
-
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } =
-      await supabase.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const userId = claimsData.claims.sub;
     const { conversationId, message, type = "text" } = await req.json();
 
     if (!conversationId || !message) {
@@ -106,13 +80,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get agent profile
-    const { data: profile } = await serviceClient
-      .from("profiles")
-      .select("id")
-      .eq("user_id", userId)
-      .single();
-
     // Save message to database
     const { data: savedMsg, error: msgError } = await serviceClient
       .from("messages")
@@ -120,7 +87,7 @@ Deno.serve(async (req) => {
         conversation_id: conversationId,
         content: message,
         sender_type: "agent",
-        sender_agent_id: profile?.id || null,
+        sender_agent_id: null,
         message_type: type,
         status: "sent",
       })
