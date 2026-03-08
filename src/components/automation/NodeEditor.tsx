@@ -227,6 +227,64 @@ export default function NodeEditor({ nodeId, nodeType, label, config, onSave, on
               </div>
             )}
 
+            {editConfig.trigger_type === 'message_received' && (
+              <div className="space-y-2">
+                <label className={labelClass}>Filtro de mensagem</label>
+                <select
+                  value={(editConfig.message_filter as string) || 'any'}
+                  onChange={(e) => setEditConfig((p) => ({ ...p, message_filter: e.target.value }))}
+                  className={selectClass}
+                >
+                  <option value="any">Qualquer mensagem</option>
+                  <option value="contains">Contém texto específico</option>
+                  <option value="equals">É exatamente igual a</option>
+                  <option value="starts_with">Começa com</option>
+                  <option value="not_contains">Não contém</option>
+                </select>
+
+                {editConfig.message_filter && editConfig.message_filter !== 'any' && (
+                  <div className="space-y-1.5">
+                    <label className={labelClass}>
+                      {editConfig.message_filter === 'contains' ? 'Texto que deve conter' :
+                       editConfig.message_filter === 'equals' ? 'Texto exato' :
+                       editConfig.message_filter === 'starts_with' ? 'Texto inicial' :
+                       'Texto que não deve conter'}
+                    </label>
+                    <input
+                      value={(editConfig.message_filter_value as string) || ''}
+                      onChange={(e) => setEditConfig((p) => ({ ...p, message_filter_value: e.target.value }))}
+                      placeholder="Ex: oi, pedido, ajuda..."
+                      className={inputClass}
+                    />
+                    <div className="flex items-center gap-2 mt-1">
+                      <input
+                        type="checkbox"
+                        id="filter-case"
+                        checked={(editConfig.message_filter_case_sensitive as boolean) || false}
+                        onChange={(e) => setEditConfig((p) => ({ ...p, message_filter_case_sensitive: e.target.checked }))}
+                        className="rounded border-input"
+                      />
+                      <label htmlFor="filter-case" className="text-[11px] text-muted-foreground">Diferenciar maiúsculas/minúsculas</label>
+                    </div>
+                  </div>
+                )}
+
+                <div className="rounded-lg bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 p-3">
+                  <p className="text-[11px] text-blue-700 dark:text-blue-300">
+                    📩 {editConfig.message_filter === 'any' || !editConfig.message_filter
+                      ? 'Dispara com qualquer mensagem recebida'
+                      : editConfig.message_filter === 'contains'
+                      ? `Dispara quando a mensagem contém "${(editConfig.message_filter_value as string) || '...'}"`
+                      : editConfig.message_filter === 'equals'
+                      ? `Dispara quando a mensagem é "${(editConfig.message_filter_value as string) || '...'}"`
+                      : editConfig.message_filter === 'starts_with'
+                      ? `Dispara quando a mensagem começa com "${(editConfig.message_filter_value as string) || '...'}"`
+                      : `Dispara quando a mensagem NÃO contém "${(editConfig.message_filter_value as string) || '...'}"`}
+                  </p>
+                </div>
+              </div>
+            )}
+
             {editConfig.trigger_type === 'scheduled' && (
               <div className="space-y-2">
                 <label className={labelClass}>Horário</label>
