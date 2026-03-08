@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      connection_configs: {
+        Row: {
+          config: Json
+          connection_id: string
+          created_at: string
+          id: string
+          is_connected: boolean
+          updated_at: string
+        }
+        Insert: {
+          config?: Json
+          connection_id: string
+          created_at?: string
+          id?: string
+          is_connected?: boolean
+          updated_at?: string
+        }
+        Update: {
+          config?: Json
+          connection_id?: string
+          created_at?: string
+          id?: string
+          is_connected?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       conversations: {
         Row: {
           assigned_agent_id: string | null
