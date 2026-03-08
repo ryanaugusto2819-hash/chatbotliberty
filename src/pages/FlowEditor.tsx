@@ -125,6 +125,17 @@ export default function FlowEditor() {
     }
 
     if (nodesRes.data && nodesRes.data.length > 0) {
+      // Extract trigger config from trigger node
+      const triggerNode = nodesRes.data.find((n: any) => n.node_type === 'trigger');
+      if (triggerNode) {
+        const tc = triggerNode.config as Record<string, unknown>;
+        setTriggerType((tc.trigger_type as string) || 'manual');
+        setTriggerKeywords((tc.keywords as string[]) || []);
+        setTriggerScheduleTime((tc.schedule_time as string) || '09:00');
+        setTriggerScheduleDays((tc.schedule_days as number[]) || []);
+        if (tc.connection_id) setSelectedConnection(tc.connection_id as string);
+      }
+
       setNodes(
         nodesRes.data.map((n: any) => ({
           id: n.id,
