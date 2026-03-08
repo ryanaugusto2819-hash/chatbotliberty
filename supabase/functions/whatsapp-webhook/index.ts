@@ -80,6 +80,11 @@ async function processWebhook(body: any) {
         const phone = msg.from;
         const contactName = contact?.profile?.name || phone;
 
+        // Extract referral data (CTWA ads)
+        const referral = msg.referral || value?.metadata?.referral;
+        const ctwaClid = referral?.ctwa_clid || null;
+        const sourceId = referral?.source_id || null;
+
         // Upsert conversation (find or create by phone)
         let conversationId: string;
 
@@ -93,10 +98,13 @@ async function processWebhook(body: any) {
 
         if (existing) {
           conversationId = existing.id;
-          // Update last activity
+          // Update last activity + referral data if present
+          const updateData: any = { updated_at: new Date().toISOString(), status: "active" };
+          if (ctwaClid) updateData.ctwa_clid = ctwaClid;
+          if (sourceId) updateData.source_id = sourceId;
           await supabase
             .from("conversations")
-            .update({ updated_at: new Date().toISOString(), status: "active" })
+            .update(updateData)
             .eq("id", conversationId);
         } else {
           const { data: newConv, error: convError } = await supabase
@@ -106,6 +114,8 @@ async function processWebhook(body: any) {
               contact_phone: phone,
               status: "new",
               tags: [],
+              ctwa_clid: ctwaClid,
+              source_id: sourceId,
             })
             .select("id")
             .single();
