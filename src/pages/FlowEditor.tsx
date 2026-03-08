@@ -174,6 +174,14 @@ export default function FlowEditor() {
     if (type === 'quick_reply') return (config?.content as string)?.slice(0, 40) || '';
     if (type === 'ai_reply') return (config?.ai_prompt as string)?.slice(0, 40) || '';
     if (type === 'condition') return `${config?.condition_field || ''} ${config?.condition_operator || ''} ${config?.condition_value || ''}`;
+    if (type === 'action') {
+      const at = config?.action_type as string;
+      if (at === 'add_tag') return `+ ${(config?.tag_name as string) || 'etiqueta'}`;
+      if (at === 'remove_tag') return `- ${(config?.tag_name as string) || 'etiqueta'}`;
+      if (at === 'transfer_agent') return `→ ${(config?.agent_name as string) || 'agente'}`;
+      if (at === 'webhook') return (config?.webhook_url as string)?.slice(0, 30) || 'webhook';
+      return 'Ação';
+    }
     return '';
   };
 

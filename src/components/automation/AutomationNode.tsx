@@ -168,6 +168,22 @@ function AutomationNode({ data, selected }: NodeProps) {
             ))}
           </div>
         )}
+
+        {/* Action node preview */}
+        {nodeType === 'action' && config?.action_type && (
+          <div className="mt-1.5 flex items-center gap-1.5">
+            {(config.action_type as string) === 'add_tag' && <Tag className="h-3 w-3" />}
+            {(config.action_type as string) === 'remove_tag' && <Tag className="h-3 w-3" />}
+            {(config.action_type as string) === 'transfer_agent' && <ArrowRightLeft className="h-3 w-3" />}
+            {(config.action_type as string) === 'webhook' && <Globe className="h-3 w-3" />}
+            <span className="text-[10px] font-medium opacity-70">
+              {(config.action_type as string) === 'add_tag' ? `+ ${(config.tag_name as string) || 'etiqueta'}`
+                : (config.action_type as string) === 'remove_tag' ? `- ${(config.tag_name as string) || 'etiqueta'}`
+                : (config.action_type as string) === 'transfer_agent' ? `→ ${(config.agent_name as string) || 'agente'}`
+                : (config.webhook_url as string)?.slice(0, 25) || 'webhook'}
+            </span>
+          </div>
+        )}
       </div>
 
       <Handle
