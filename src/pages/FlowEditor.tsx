@@ -400,8 +400,153 @@ export default function FlowEditor() {
       </div>
 
       <div className="flex flex-1 relative overflow-hidden">
-        {/* Sidebar Toolbar */}
-        <div className="w-56 border-r border-border bg-card flex flex-col shrink-0 overflow-y-auto">
+        {/* Sidebar */}
+        <div className="w-64 border-r border-border bg-card flex flex-col shrink-0 overflow-y-auto">
+          {/* === SETTINGS SECTION === */}
+          <button
+            onClick={() => setShowSettings(!showSettings)}
+            className="flex items-center justify-between px-4 py-3 border-b border-border hover:bg-secondary/50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Settings className="h-4 w-4 text-primary" />
+              <p className="text-xs font-bold text-card-foreground">Configurações</p>
+            </div>
+            {showSettings ? <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />}
+          </button>
+
+          {showSettings && (
+            <div className="border-b border-border bg-secondary/20 p-3 space-y-4">
+              {/* Trigger Type */}
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-1.5">
+                  <Zap className="h-3.5 w-3.5 text-primary" />
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Gatilho</label>
+                </div>
+                <div className="space-y-1">
+                  {triggerOptions.map((t) => (
+                    <button
+                      key={t.value}
+                      onClick={() => setTriggerType(t.value)}
+                      className={`w-full rounded-lg border px-3 py-2 text-left transition-all ${
+                        triggerType === t.value
+                          ? 'border-primary bg-primary/5 ring-1 ring-primary/50'
+                          : 'border-border hover:border-primary/30 hover:bg-secondary/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">{t.icon}</span>
+                        <div>
+                          <p className="text-[11px] font-semibold text-card-foreground">{t.label}</p>
+                          <p className="text-[9px] text-muted-foreground leading-tight">{t.desc}</p>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Keyword config */}
+              {triggerType === 'keyword' && (
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Palavras-chave</label>
+                  <div className="flex gap-1.5">
+                    <input
+                      value={newKw}
+                      onChange={(e) => setNewKw(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && newKw.trim()) {
+                          setTriggerKeywords(prev => [...prev, newKw.trim()]);
+                          setNewKw('');
+                        }
+                      }}
+                      placeholder="Ex: oi, menu..."
+                      className="flex-1 rounded-lg border border-input bg-background px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                    />
+                    <button
+                      onClick={() => {
+                        if (newKw.trim()) {
+                          setTriggerKeywords(prev => [...prev, newKw.trim()]);
+                          setNewKw('');
+                        }
+                      }}
+                      className="shrink-0 rounded-lg bg-primary px-2.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+                    >+</button>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {triggerKeywords.map((k, i) => (
+                      <span key={i} className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                        {k}
+                        <button onClick={() => setTriggerKeywords(prev => prev.filter((_, idx) => idx !== i))} className="hover:text-destructive">×</button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Schedule config */}
+              {triggerType === 'scheduled' && (
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Horário</label>
+                  <input
+                    type="time"
+                    value={triggerScheduleTime}
+                    onChange={(e) => setTriggerScheduleTime(e.target.value)}
+                    className="w-full rounded-lg border border-input bg-background px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Dias</label>
+                  <div className="flex gap-1">
+                    {['S', 'T', 'Q', 'Q', 'S', 'S', 'D'].map((d, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setTriggerScheduleDays(prev =>
+                          prev.includes(i) ? prev.filter(x => x !== i) : [...prev, i]
+                        )}
+                        className={`flex h-7 w-7 items-center justify-center rounded-lg text-[10px] font-bold transition-colors ${
+                          triggerScheduleDays.includes(i) ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground'
+                        }`}
+                      >{d}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Connection selector */}
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-1.5">
+                  <Link2 className="h-3.5 w-3.5 text-primary" />
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Conexão WhatsApp</label>
+                </div>
+                {connections.length > 0 ? (
+                  <select
+                    value={selectedConnection}
+                    onChange={(e) => setSelectedConnection(e.target.value)}
+                    className="w-full rounded-lg border border-input bg-background px-2.5 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring appearance-none"
+                  >
+                    <option value="">Selecione uma conexão</option>
+                    {connections.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {(c.config as any)?.phone_number_id
+                          ? `WhatsApp (${(c.config as any).phone_number_id})`
+                          : c.connection_id}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="rounded-lg border border-dashed border-border p-3 text-center">
+                    <p className="text-[10px] text-muted-foreground">Nenhuma conexão configurada</p>
+                    <button
+                      onClick={() => navigate('/connections')}
+                      className="mt-1 text-[10px] font-semibold text-primary hover:underline"
+                    >
+                      Configurar conexão →
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* === COMPONENTS SECTION === */}
           <div className="p-3 border-b border-border">
             <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-muted-foreground">Componentes</p>
           </div>
