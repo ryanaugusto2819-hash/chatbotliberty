@@ -73,6 +73,7 @@ export default function Conversations() {
     const { data, error } = await supabase
       .from('conversations')
       .select('*')
+      .not('contact_phone', 'like', '%-group')
       .order('updated_at', { ascending: false });
 
     if (error) {
