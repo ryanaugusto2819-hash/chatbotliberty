@@ -109,6 +109,7 @@ function ConnectionCard({ config }: { config: ConnectionConfig }) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(true);
 
