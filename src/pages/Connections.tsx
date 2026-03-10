@@ -1,6 +1,17 @@
 import { useState, useEffect } from 'react';
 import TopBar from '@/components/layout/TopBar';
-import { MessageSquare, Plug, CheckCircle2, XCircle, ExternalLink, Copy, Eye, EyeOff, Save, Loader2 } from 'lucide-react';
+import { MessageSquare, Plug, CheckCircle2, XCircle, ExternalLink, Copy, Eye, EyeOff, Save, Loader2, Trash2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -98,6 +109,7 @@ function ConnectionCard({ config }: { config: ConnectionConfig }) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -159,6 +171,27 @@ function ConnectionCard({ config }: { config: ConnectionConfig }) {
       toast.error('Erro ao salvar configuração. Verifique suas permissões.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      const { error } = await supabase.functions.invoke('save-connection', {
+        body: {
+          connectionId: config.id,
+          action: 'delete',
+        },
+      });
+      if (error) throw error;
+      setConnected(false);
+      setValues({});
+      toast.success(`${config.name} desconectado com sucesso!`);
+    } catch (err: any) {
+      console.error('Delete error:', err);
+      toast.error('Erro ao excluir conexão.');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -263,14 +296,46 @@ function ConnectionCard({ config }: { config: ConnectionConfig }) {
                 Ver documentação
               </a>
             )}
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 ml-auto"
-            >
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              {saving ? 'Salvando...' : 'Salvar Configuração'}
-            </button>
+            <div className="flex items-center gap-2 ml-auto">
+              {connected && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <button
+                      disabled={deleting}
+                      className="flex items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-2.5 text-sm font-medium text-destructive hover:bg-destructive/20 transition-colors disabled:opacity-50"
+                    >
+                      {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                      Excluir
+                    </button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Excluir conexão</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Tem certeza que deseja excluir a conexão <strong>{config.name}</strong>? Todas as credenciais salvas serão removidas e a integração parará de funcionar.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handleDelete}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        Excluir
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+              >
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                {saving ? 'Salvando...' : 'Salvar Configuração'}
+              </button>
+            </div>
           </div>
         </div>
       )}

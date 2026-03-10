@@ -12,11 +12,47 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { connectionId, config } = await req.json();
+    const { connectionId, config, action } = await req.json();
 
-    if (!connectionId || !config) {
+    if (!connectionId) {
       return new Response(
-        JSON.stringify({ error: "connectionId and config are required" }),
+        JSON.stringify({ error: "connectionId is required" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const serviceClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    // Handle delete action
+    if (action === "delete") {
+      const { error: deleteError } = await serviceClient
+        .from("connection_configs")
+        .delete()
+        .eq("connection_id", connectionId);
+
+      if (deleteError) {
+        console.error("Error deleting connection:", deleteError);
+        return new Response(
+          JSON.stringify({ error: "Failed to delete connection" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      return new Response(
+        JSON.stringify({ success: true, message: "Connection deleted" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!config) {
+      return new Response(
+        JSON.stringify({ error: "config is required" }),
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
