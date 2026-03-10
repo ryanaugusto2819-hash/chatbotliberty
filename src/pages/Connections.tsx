@@ -1,6 +1,17 @@
 import { useState, useEffect } from 'react';
 import TopBar from '@/components/layout/TopBar';
-import { MessageSquare, Plug, CheckCircle2, XCircle, ExternalLink, Copy, Eye, EyeOff, Save, Loader2 } from 'lucide-react';
+import { MessageSquare, Plug, CheckCircle2, XCircle, ExternalLink, Copy, Eye, EyeOff, Save, Loader2, Trash2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
