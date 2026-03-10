@@ -50,6 +50,13 @@ const connections: ConnectionConfig[] = [
         type: 'password',
         helpText: 'Token da instância, visível no painel da Z-API.',
       },
+      {
+        key: 'zapi_client_token',
+        label: 'Client-Token',
+        placeholder: 'Ex: F1a2b3c4d5e6...',
+        type: 'password',
+        helpText: 'Token da conta Z-API. Encontrado em Configurações da conta no painel da Z-API.',
+      },
     ],
   },
   {

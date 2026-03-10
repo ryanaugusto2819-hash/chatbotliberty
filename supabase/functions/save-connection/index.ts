@@ -40,6 +40,7 @@ Deno.serve(async (req) => {
     } else if (connectionId === "zapi") {
       savedConfig = {
         instance_id: config.zapi_instance_id || "",
+        client_token: config.zapi_client_token || "",
         configured_at: new Date().toISOString(),
       };
     }
