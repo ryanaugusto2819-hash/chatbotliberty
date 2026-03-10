@@ -174,6 +174,27 @@ function ConnectionCard({ config }: { config: ConnectionConfig }) {
     }
   };
 
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      const { error } = await supabase.functions.invoke('save-connection', {
+        body: {
+          connectionId: config.id,
+          action: 'delete',
+        },
+      });
+      if (error) throw error;
+      setConnected(false);
+      setValues({});
+      toast.success(`${config.name} desconectado com sucesso!`);
+    } catch (err: any) {
+      console.error('Delete error:', err);
+      toast.error('Erro ao excluir conexão.');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const copyWebhook = () => {
     if (config.webhookUrl) {
       navigator.clipboard.writeText(config.webhookUrl);
