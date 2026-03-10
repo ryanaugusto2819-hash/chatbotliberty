@@ -41,6 +41,8 @@ Deno.serve(async (req) => {
       );
     }
 
+    const customInstructions = (selectorConfig?.instructions as string) || "";
+
     // Fetch active flows
     const { data: flows } = await supabase
       .from("automation_flows")
@@ -100,8 +102,9 @@ Deno.serve(async (req) => {
             role: "system",
             content: `Você é um selecionador inteligente de fluxos de automação para atendimento via WhatsApp.
 Analise a mensagem mais recente do cliente e o contexto da conversa, e decida qual fluxo de automação deve ser disparado.
-Se nenhum fluxo se encaixar no contexto da mensagem, retorne null como flow_id.
-Seja criterioso: só selecione um fluxo se realmente fizer sentido para a mensagem do cliente.`,
+Se nenhum fluxo se encaixar no contexto da mensagem, retorne null como flow_index.
+Seja criterioso: só selecione um fluxo se realmente fizer sentido para a mensagem do cliente.
+${customInstructions ? `\nInstruções adicionais do administrador:\n${customInstructions}` : ""}`,
           },
           {
             role: "user",
