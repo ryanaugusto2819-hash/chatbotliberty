@@ -41,6 +41,8 @@ Deno.serve(async (req) => {
       );
     }
 
+    const customInstructions = (selectorConfig?.instructions as string) || "";
+
     // Fetch active flows
     const { data: flows } = await supabase
       .from("automation_flows")
