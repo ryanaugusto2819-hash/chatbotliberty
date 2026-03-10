@@ -60,11 +60,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    const serviceClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
-
     // Build config based on connection type
     let savedConfig: Record<string, string> = {};
 
