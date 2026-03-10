@@ -154,11 +154,31 @@ async function processZapiWebhook(body: any) {
   if (msgError) {
     console.error("Error inserting message:", msgError);
   } else {
-    // Trigger AI auto-reply
+    // Trigger AI flow selector first, then auto-reply as fallback
+    triggerAiFlowSelector(conversationId).catch((err) =>
+      console.error("Flow selector trigger error:", err)
+    );
     triggerAutoReply(conversationId).catch((err) =>
       console.error("Auto-reply trigger error:", err)
     );
   }
+}
+
+async function triggerAiFlowSelector(conversationId: string) {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+  const response = await fetch(`${supabaseUrl}/functions/v1/ai-flow-selector`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${serviceRoleKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ conversationId }),
+  });
+
+  const result = await response.json();
+  console.log("Flow selector result:", result);
 }
 
 async function triggerAutoReply(conversationId: string) {
