@@ -70,33 +70,20 @@ export default function Conversations() {
   };
 
   const fetchConversations = async () => {
-    const { data, error } = await supabase
-      .from('conversations')
-      .select('*')
-      .not('contact_phone', 'like', '%-group')
-      .order('updated_at', { ascending: false });
+    const { data, error } = await supabase.rpc('get_conversations_with_last_message');
 
     if (error) {
       console.error('Error fetching conversations:', error);
+      setLoading(false);
       return;
     }
 
-    const convs: ConversationRow[] = [];
-    for (const c of data || []) {
-      const { data: msgs } = await supabase
-        .from('messages')
-        .select('content')
-        .eq('conversation_id', c.id)
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      convs.push({
+    setConversations(
+      (data || []).map((c: any) => ({
         ...c,
-        last_message: msgs?.[0]?.content || '',
         unread_count: 0,
-      });
-    }
-    setConversations(convs);
+      }))
+    );
     setLoading(false);
   };
 
