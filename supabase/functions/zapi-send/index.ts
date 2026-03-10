@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
     // Z-API send text message endpoint
     const phone = conversation.contact_phone.replace(/\D/g, "");
 
-    // Also check for client-token in connection_configs
+    // Get client-token from connection_configs or env
     const { data: zapiConfig } = await serviceClient
       .from("connection_configs")
       .select("config")
@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     const configData = zapiConfig?.config as Record<string, unknown> | null;
-    const clientToken = (configData?.client_token as string) || token;
+    const clientToken = (configData?.client_token as string) || Deno.env.get("ZAPI_CLIENT_TOKEN") || "";
 
     const zapiResponse = await fetch(
       `https://api.z-api.io/instances/${instanceId}/token/${token}/send-text`,
