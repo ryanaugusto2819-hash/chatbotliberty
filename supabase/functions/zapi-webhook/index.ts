@@ -45,6 +45,18 @@ async function processZapiWebhook(body: any) {
 
   console.log("Z-API webhook received:", JSON.stringify(body));
 
+  // Check if Z-API connection is active
+  const { data: connectionConfig } = await supabase
+    .from("connection_configs")
+    .select("is_connected")
+    .eq("connection_id", "zapi")
+    .maybeSingle();
+
+  if (!connectionConfig?.is_connected) {
+    console.log("Z-API connection is not active, ignoring webhook");
+    return;
+  }
+
   // Z-API webhook format: https://developer.z-api.io/webhooks/on-message-received
   // Check if it's a received message
   if (!body.phone && !body.chatId) {
