@@ -452,6 +452,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_conversations_with_last_message: {
+        Args: never
+        Returns: {
+          assigned_agent_id: string
+          contact_name: string
+          contact_phone: string
+          id: string
+          last_message: string
+          status: string
+          tags: string[]
+          updated_at: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
