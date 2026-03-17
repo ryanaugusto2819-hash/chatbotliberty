@@ -84,28 +84,18 @@ export default function AiSettings() {
     setSaving(true);
 
     const [r1, r2] = await Promise.all([
-      supabase
-        .from('connection_configs')
-        .upsert(
-          {
-            connection_id: 'ai-auto-reply',
-            is_connected: config.enabled,
-            config: { enabled: config.enabled, system_prompt: config.system_prompt },
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: 'connection_id' }
-        ),
-      supabase
-        .from('connection_configs')
-        .upsert(
-          {
-            connection_id: 'ai-flow-selector',
-            is_connected: flowSelector.enabled,
-            config: { enabled: flowSelector.enabled, instructions: flowSelector.instructions },
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: 'connection_id' }
-        ),
+      supabase.functions.invoke('save-connection', {
+        body: {
+          connectionId: 'ai-auto-reply',
+          config: { enabled: config.enabled, system_prompt: config.system_prompt },
+        },
+      }),
+      supabase.functions.invoke('save-connection', {
+        body: {
+          connectionId: 'ai-flow-selector',
+          config: { enabled: flowSelector.enabled, instructions: flowSelector.instructions },
+        },
+      }),
     ]);
 
     if (r1.error || r2.error) {
