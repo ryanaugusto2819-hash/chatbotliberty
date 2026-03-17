@@ -375,6 +375,7 @@ export type Database = {
           created_at: string
           full_name: string
           id: string
+          is_approved: boolean
           job_title: string | null
           status: string
           updated_at: string
@@ -385,6 +386,7 @@ export type Database = {
           created_at?: string
           full_name?: string
           id?: string
+          is_approved?: boolean
           job_title?: string | null
           status?: string
           updated_at?: string
@@ -395,6 +397,7 @@ export type Database = {
           created_at?: string
           full_name?: string
           id?: string
+          is_approved?: boolean
           job_title?: string | null
           status?: string
           updated_at?: string
