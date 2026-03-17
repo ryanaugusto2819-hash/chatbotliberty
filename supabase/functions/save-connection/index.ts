@@ -61,7 +61,7 @@ Deno.serve(async (req) => {
     }
 
     // Build config based on connection type
-    let savedConfig: Record<string, string> = {};
+    let savedConfig: Record<string, unknown> = {};
 
     if (connectionId === "whatsapp") {
       savedConfig = {
@@ -74,6 +74,8 @@ Deno.serve(async (req) => {
         client_token: config.zapi_client_token || "",
         configured_at: new Date().toISOString(),
       };
+    } else if (connectionId === "ai-auto-reply" || connectionId === "ai-flow-selector") {
+      savedConfig = config;
     }
 
     const { error: upsertError } = await serviceClient
