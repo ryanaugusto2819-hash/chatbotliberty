@@ -7,29 +7,32 @@ import {
   Bot,
   GitBranch,
   Plug,
-  BookOpen,
   BarChart3,
   Settings,
   Headphones,
   LogOut,
+  ShieldCheck,
 } from 'lucide-react';
 
-const navItems = [
-  { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/conversations', icon: MessageSquare, label: 'Conversas', badge: 6 },
-  { to: '/agents', icon: Users, label: 'Agentes' },
-  { to: '/automation', icon: GitBranch, label: 'Automação' },
-  { to: '/ai', icon: Bot, label: 'IA' },
-  { to: '/reports', icon: BarChart3, label: 'Relatórios' },
-  { to: '/connections', icon: Plug, label: 'Conexões' },
-  { to: '/settings', icon: Settings, label: 'Configurações' },
+const allNavItems = [
+  { to: '/', icon: LayoutDashboard, label: 'Dashboard', adminOnly: false },
+  { to: '/conversations', icon: MessageSquare, label: 'Conversas', badge: 6, adminOnly: false },
+  { to: '/agents', icon: Users, label: 'Agentes', adminOnly: true },
+  { to: '/automation', icon: GitBranch, label: 'Automação', adminOnly: true },
+  { to: '/ai', icon: Bot, label: 'IA', adminOnly: true },
+  { to: '/reports', icon: BarChart3, label: 'Relatórios', adminOnly: true },
+  { to: '/connections', icon: Plug, label: 'Conexões', adminOnly: true },
+  { to: '/users', icon: ShieldCheck, label: 'Usuários', adminOnly: true },
+  { to: '/settings', icon: Settings, label: 'Configurações', adminOnly: true },
 ];
 
 export default function AppSidebar() {
   const location = useLocation();
-  const { user, signOut } = useAuth();
+  const { user, signOut, isAdmin } = useAuth();
   const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Usuário';
   const initials = displayName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
+
+  const navItems = allNavItems.filter((item) => !item.adminOnly || isAdmin);
 
   return (
     <aside className="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col bg-sidebar border-r border-sidebar-border">

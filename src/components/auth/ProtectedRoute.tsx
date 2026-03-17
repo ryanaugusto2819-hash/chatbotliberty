@@ -1,8 +1,13 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 
-export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { session, loading } = useAuth();
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+  adminOnly?: boolean;
+}
+
+export default function ProtectedRoute({ children, adminOnly = false }: ProtectedRouteProps) {
+  const { session, loading, isApproved, isAdmin } = useAuth();
 
   if (loading) {
     return (
@@ -14,6 +19,14 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
 
   if (!session) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (!isApproved) {
+    return <Navigate to="/pending-approval" replace />;
+  }
+
+  if (adminOnly && !isAdmin) {
+    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;
