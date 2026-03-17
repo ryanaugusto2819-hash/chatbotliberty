@@ -20,7 +20,7 @@ const navItems = [
   { to: '/agents', icon: Users, label: 'Agentes' },
   { to: '/automation', icon: GitBranch, label: 'Automação' },
   { to: '/ai', icon: Bot, label: 'IA' },
-  { to: '/knowledge', icon: BookOpen, label: 'Base de Conhecimento' },
+  { to: '/ai', icon: Bot, label: 'IA' },
   { to: '/reports', icon: BarChart3, label: 'Relatórios' },
   { to: '/connections', icon: Plug, label: 'Conexões' },
   { to: '/settings', icon: Settings, label: 'Configurações' },
