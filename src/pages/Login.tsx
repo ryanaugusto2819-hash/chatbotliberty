@@ -28,10 +28,16 @@ export default function Login() {
           },
         });
         if (error) throw error;
-        toast.success('Conta criada! Verifique seu email para confirmar.');
+        toast.success('Conta criada com sucesso! Se necessário, confirme seu email para entrar.');
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+        if (error) {
+          if (error.message?.toLowerCase().includes('email not confirmed')) {
+            toast.error('Seu email ainda não foi confirmado. Clique em "Criar conta" e use o mesmo email para reenviar a confirmação, ou use "Esqueceu a senha?" se precisar redefinir a senha.');
+            return;
+          }
+          throw error;
+        }
         navigate('/');
       }
     } catch (error: any) {
