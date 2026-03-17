@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Bot, Save, Loader2, Sparkles, GitBranch, Pencil, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
+import KnowledgeBase from '@/components/ai/KnowledgeBase';
 
 interface AiConfig {
   enabled: boolean;
@@ -348,7 +349,9 @@ export default function AiSettings() {
           </div>
         </motion.div>
 
-        {/* Save Button */}
+        {/* Knowledge Base Section */}
+        <KnowledgeBase />
+
         <button
           onClick={handleSave}
           disabled={saving}

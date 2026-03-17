@@ -291,6 +291,36 @@ export type Database = {
           },
         ]
       }
+      knowledge_base_items: {
+        Row: {
+          content: string
+          created_at: string
+          file_url: string | null
+          id: string
+          title: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          content?: string
+          created_at?: string
+          file_url?: string | null
+          id?: string
+          title?: string
+          type?: string
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          file_url?: string | null
+          id?: string
+          title?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
           content: string

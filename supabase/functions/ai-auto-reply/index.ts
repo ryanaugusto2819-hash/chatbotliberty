@@ -44,6 +44,30 @@ Deno.serve(async (req) => {
     const systemPrompt = (aiConfig?.system_prompt as string) ||
       "Você é um assistente virtual amigável. Responda de forma concisa e útil em português brasileiro.";
 
+    // Fetch knowledge base items for context
+    const { data: kbItems } = await supabase
+      .from("knowledge_base_items")
+      .select("type, title, content")
+      .order("created_at", { ascending: true })
+      .limit(50);
+
+    let knowledgeContext = "";
+    if (kbItems && kbItems.length > 0) {
+      const sections: string[] = [];
+      for (const item of kbItems) {
+        if (item.type === "qa") {
+          sections.push(`Pergunta: ${item.title}\nResposta: ${item.content}`);
+        } else if (item.type === "text") {
+          sections.push(`[${item.title}]\n${item.content}`);
+        } else if (item.type === "file") {
+          sections.push(`[Arquivo: ${item.title}]\n${item.content}`);
+        }
+      }
+      knowledgeContext = "\n\n--- BASE DE CONHECIMENTO ---\nUse as informações abaixo para responder com precisão:\n\n" + sections.join("\n\n");
+    }
+
+    const fullSystemPrompt = systemPrompt + knowledgeContext;
+
     // Fetch last 20 messages for context
     const { data: messages } = await supabase
       .from("messages")
@@ -61,7 +85,7 @@ Deno.serve(async (req) => {
 
     // Build chat history for AI
     const chatMessages = [
-      { role: "system", content: systemPrompt },
+      { role: "system", content: fullSystemPrompt },
       ...messages.map((m) => ({
         role: m.sender_type === "customer" ? "user" : "assistant",
         content: m.content,
@@ -124,7 +148,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Send reply via WhatsApp using the whatsapp-send function logic inline
+    // Send reply via WhatsApp
     const { data: conversation } = await supabase
       .from("conversations")
       .select("contact_phone")
