@@ -349,7 +349,9 @@ export default function AiSettings() {
           </div>
         </motion.div>
 
-        {/* Save Button */}
+        {/* Knowledge Base Section */}
+        <KnowledgeBase />
+
         <button
           onClick={handleSave}
           disabled={saving}
