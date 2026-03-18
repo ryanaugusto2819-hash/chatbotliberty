@@ -65,7 +65,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get nodes sorted by edges (topological order via sort_order)
+    // Get nodes sorted by sort_order
     const { data: nodes } = await supabase
       .from("automation_nodes")
       .select("*")
@@ -79,12 +79,41 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Create flow execution record
+    const { data: execution } = await supabase
+      .from("flow_executions")
+      .insert({
+        flow_id: flowId,
+        conversation_id: conversationId,
+        status: "running",
+        total_nodes: nodes.length,
+        completed_nodes: 0,
+      })
+      .select("id")
+      .single();
+
+    const executionId = execution?.id;
+
     const results: { nodeId: string; status: string }[] = [];
+    let completedCount = 0;
+    let failed = false;
 
     for (const node of nodes) {
       const config = node.config as Record<string, unknown>;
 
       if (node.node_type === "trigger") {
+        // Log trigger step
+        if (executionId) {
+          await supabase.from("flow_step_logs").insert({
+            execution_id: executionId,
+            node_id: node.id,
+            node_type: node.node_type,
+            node_label: node.label || "Gatilho",
+            sort_order: node.sort_order,
+            status: "completed",
+          });
+        }
+        completedCount++;
         results.push({ nodeId: node.id, status: "started" });
         continue;
       }
@@ -92,6 +121,17 @@ Deno.serve(async (req) => {
       if (node.node_type === "delay") {
         const seconds = (config.delay_seconds as number) || 5;
         await new Promise((resolve) => setTimeout(resolve, seconds * 1000));
+        if (executionId) {
+          await supabase.from("flow_step_logs").insert({
+            execution_id: executionId,
+            node_id: node.id,
+            node_type: node.node_type,
+            node_label: node.label || `Esperar ${seconds}s`,
+            sort_order: node.sort_order,
+            status: "completed",
+          });
+        }
+        completedCount++;
         results.push({ nodeId: node.id, status: `delayed ${seconds}s` });
         continue;
       }
@@ -102,6 +142,17 @@ Deno.serve(async (req) => {
       if (node.node_type === "message") {
         const content = (config.content as string) || "";
         if (!content.trim()) {
+          if (executionId) {
+            await supabase.from("flow_step_logs").insert({
+              execution_id: executionId,
+              node_id: node.id,
+              node_type: node.node_type,
+              node_label: node.label || "Mensagem",
+              sort_order: node.sort_order,
+              status: "skipped",
+              error_message: "Conteúdo vazio",
+            });
+          }
           results.push({ nodeId: node.id, status: "skipped_empty" });
           continue;
         }
@@ -133,6 +184,16 @@ Deno.serve(async (req) => {
           video: { link: config.media_url, caption: config.caption || undefined },
         };
       } else {
+        if (executionId) {
+          await supabase.from("flow_step_logs").insert({
+            execution_id: executionId,
+            node_id: node.id,
+            node_type: node.node_type,
+            node_label: node.label || node.node_type,
+            sort_order: node.sort_order,
+            status: "skipped",
+          });
+        }
         results.push({ nodeId: node.id, status: "skipped" });
         continue;
       }
@@ -154,8 +215,30 @@ Deno.serve(async (req) => {
 
       if (!waResponse.ok) {
         console.error("WhatsApp send error:", waResult);
+        if (executionId) {
+          await supabase.from("flow_step_logs").insert({
+            execution_id: executionId,
+            node_id: node.id,
+            node_type: node.node_type,
+            node_label: node.label || node.node_type,
+            sort_order: node.sort_order,
+            status: "failed",
+            error_message: JSON.stringify(waResult.error || waResult).slice(0, 500),
+          });
+          // Mark execution as failed at this node
+          await supabase
+            .from("flow_executions")
+            .update({
+              status: "failed",
+              failed_at_node_id: node.id,
+              completed_nodes: completedCount,
+              completed_at: new Date().toISOString(),
+            })
+            .eq("id", executionId);
+        }
+        failed = true;
         results.push({ nodeId: node.id, status: "error" });
-        continue;
+        break; // Stop execution on failure
       }
 
       // Save message to DB
@@ -180,7 +263,31 @@ Deno.serve(async (req) => {
         status: "sent",
       });
 
+      // Log successful step
+      if (executionId) {
+        await supabase.from("flow_step_logs").insert({
+          execution_id: executionId,
+          node_id: node.id,
+          node_type: node.node_type,
+          node_label: node.label || node.node_type,
+          sort_order: node.sort_order,
+          status: "completed",
+        });
+      }
+      completedCount++;
       results.push({ nodeId: node.id, status: "sent" });
+    }
+
+    // Mark execution as completed if not already failed
+    if (executionId && !failed) {
+      await supabase
+        .from("flow_executions")
+        .update({
+          status: "completed",
+          completed_nodes: completedCount,
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", executionId);
     }
 
     // Update trigger count
@@ -202,7 +309,7 @@ Deno.serve(async (req) => {
       .eq("id", conversationId);
 
     return new Response(
-      JSON.stringify({ success: true, results }),
+      JSON.stringify({ success: true, executionId, results }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
