@@ -81,7 +81,7 @@ export default function Conversations() {
     setConversations(
       (data || []).map((c: any) => ({
         ...c,
-        unread_count: 0,
+        unread_count: c.unread_count || 0,
       }))
     );
     setLoading(false);
