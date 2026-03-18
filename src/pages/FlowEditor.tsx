@@ -218,7 +218,7 @@ export default function FlowEditor() {
         id: crypto.randomUUID(),
         type: 'automation',
         position: { x: xPos, y: 50 },
-        data: { nodeType: actualType, label, config: defaultConfig, preview: '' },
+        data: { nodeType: actualType, label, config: defaultConfig, preview: '', onDelete: handleNodeDelete },
         deletable: true,
       };
       setNodes((nds) => [...nds, newNode]);
