@@ -105,13 +105,24 @@ function AutomationNode({ data, selected, id }: NodeProps) {
       )}
 
       {/* Header */}
-      <div className="flex items-center gap-2 px-4 pt-3 pb-1">
-        <div className="flex h-6 w-6 items-center justify-center rounded-md bg-current/10">
-          <Icon className="h-3.5 w-3.5" />
+      <div className="flex items-center justify-between px-4 pt-3 pb-1">
+        <div className="flex items-center gap-2">
+          <div className="flex h-6 w-6 items-center justify-center rounded-md bg-current/10">
+            <Icon className="h-3.5 w-3.5" />
+          </div>
+          <span className="text-[10px] font-extrabold uppercase tracking-[0.1em] opacity-80">
+            {cfg.typeLabel}
+          </span>
         </div>
-        <span className="text-[10px] font-extrabold uppercase tracking-[0.1em] opacity-80">
-          {cfg.typeLabel}
-        </span>
+        {onDelete && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(id); }}
+            className="opacity-0 group-hover:opacity-100 flex h-5 w-5 items-center justify-center rounded-md hover:bg-destructive/20 text-destructive/70 hover:text-destructive transition-all"
+            title="Remover nó"
+          >
+            <Trash2 className="h-3 w-3" />
+          </button>
+        )}
       </div>
 
       {/* Body */}
