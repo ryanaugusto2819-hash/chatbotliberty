@@ -495,6 +495,7 @@ export type Database = {
           last_message: string
           status: string
           tags: string[]
+          unread_count: number
           updated_at: string
         }[]
       }
