@@ -3,7 +3,7 @@ import { Handle, Position, type NodeProps } from '@xyflow/react';
 import {
   MessageSquare, Clock, Image, Music, Video, Play, Zap, FileText,
   MapPin, Hash, GitFork, MousePointer, Inbox, MessageCircle, Send,
-  Bot, ListOrdered, Link2, Cog, Tag, ArrowRightLeft, Globe
+  Bot, ListOrdered, Link2, Cog, Tag, ArrowRightLeft, Globe, Trash2
 } from 'lucide-react';
 
 const nodeConfig: Record<string, { icon: React.ElementType; typeLabel: string; colors: string }> = {
@@ -72,13 +72,14 @@ const triggerLabels: Record<string, string> = {
   scheduled: '⏰ Agendado',
 };
 
-function AutomationNode({ data, selected }: NodeProps) {
+function AutomationNode({ data, selected, id }: NodeProps) {
   const nodeType = (data.nodeType as string) || 'message';
   const cfg = nodeConfig[nodeType] || nodeConfig.message;
   const Icon = cfg.icon;
   const label = (data.label as string) || '';
   const preview = data.preview as string;
   const config = data.config as Record<string, unknown>;
+  const onDelete = data.onDelete as ((nodeId: string) => void) | undefined;
 
   // For trigger nodes, show trigger types (supports multiple)
   const triggerType = config?.trigger_type as string;
@@ -104,13 +105,24 @@ function AutomationNode({ data, selected }: NodeProps) {
       )}
 
       {/* Header */}
-      <div className="flex items-center gap-2 px-4 pt-3 pb-1">
-        <div className="flex h-6 w-6 items-center justify-center rounded-md bg-current/10">
-          <Icon className="h-3.5 w-3.5" />
+      <div className="flex items-center justify-between px-4 pt-3 pb-1">
+        <div className="flex items-center gap-2">
+          <div className="flex h-6 w-6 items-center justify-center rounded-md bg-current/10">
+            <Icon className="h-3.5 w-3.5" />
+          </div>
+          <span className="text-[10px] font-extrabold uppercase tracking-[0.1em] opacity-80">
+            {cfg.typeLabel}
+          </span>
         </div>
-        <span className="text-[10px] font-extrabold uppercase tracking-[0.1em] opacity-80">
-          {cfg.typeLabel}
-        </span>
+        {onDelete && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(id); }}
+            className="opacity-0 group-hover:opacity-100 flex h-5 w-5 items-center justify-center rounded-md hover:bg-destructive/20 text-destructive/70 hover:text-destructive transition-all"
+            title="Remover nó"
+          >
+            <Trash2 className="h-3 w-3" />
+          </button>
+        )}
       </div>
 
       {/* Body */}

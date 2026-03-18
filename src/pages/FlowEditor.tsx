@@ -98,6 +98,10 @@ export default function FlowEditor() {
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [toolbarOpen, setToolbarOpen] = useState(true);
 
+  const handleNodeDelete = useCallback((nodeId: string) => {
+    setNodes((nds) => nds.filter((n) => n.id !== nodeId));
+    setEdges((eds) => eds.filter((e) => e.source !== nodeId && e.target !== nodeId));
+  }, [setNodes, setEdges]);
 
   useEffect(() => {
     if (id) loadFlow();
@@ -129,6 +133,7 @@ export default function FlowEditor() {
             label: n.label,
             preview: getPreview(n.node_type, n.config as Record<string, unknown>),
             config: n.config,
+            onDelete: handleNodeDelete,
           },
           deletable: true,
         }))
@@ -141,7 +146,7 @@ export default function FlowEditor() {
         id: crypto.randomUUID(),
         type: 'automation',
         position: { x: 300, y: 50 },
-        data: { nodeType: 'trigger', label: 'Disparo Manual', config: { trigger_type: 'manual' }, preview: '' },
+        data: { nodeType: 'trigger', label: 'Disparo Manual', config: { trigger_type: 'manual' }, preview: '', onDelete: handleNodeDelete },
         deletable: true,
       };
       setNodes([triggerNode]);
@@ -217,7 +222,7 @@ export default function FlowEditor() {
         id: crypto.randomUUID(),
         type: 'automation',
         position: { x: xPos, y: 50 },
-        data: { nodeType: actualType, label, config: defaultConfig, preview: '' },
+        data: { nodeType: actualType, label, config: defaultConfig, preview: '', onDelete: handleNodeDelete },
         deletable: true,
       };
       setNodes((nds) => [...nds, newNode]);
@@ -242,6 +247,7 @@ export default function FlowEditor() {
         label: item?.label || type,
         config: defaultConfig,
         preview: getPreview(type, defaultConfig),
+        onDelete: handleNodeDelete,
       },
     };
 
@@ -281,10 +287,6 @@ export default function FlowEditor() {
     );
   };
 
-  const handleNodeDelete = (nodeId: string) => {
-    setNodes((nds) => nds.filter((n) => n.id !== nodeId));
-    setEdges((eds) => eds.filter((e) => e.source !== nodeId && e.target !== nodeId));
-  };
 
   const toggleActive = async () => {
     if (!id) return;
