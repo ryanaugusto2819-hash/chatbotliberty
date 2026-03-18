@@ -353,6 +353,9 @@ export default function AiSettings() {
         {/* Knowledge Base Section */}
         <KnowledgeBase />
 
+        {/* AI Usage Control Section */}
+        <AiUsageControl />
+
         <button
           onClick={handleSave}
           disabled={saving}
