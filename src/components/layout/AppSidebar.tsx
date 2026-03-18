@@ -19,7 +19,7 @@ import {
 const allNavItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard', adminOnly: false },
   { to: '/conversations', icon: MessageSquare, label: 'Conversas', adminOnly: false },
-  { to: '/agents', icon: Users, label: 'Agentes', adminOnly: true },
+  { to: '/agents', icon: Users, label: 'Atendentes', adminOnly: true },
   { to: '/automation', icon: GitBranch, label: 'Automação', adminOnly: true },
   { to: '/ai', icon: Bot, label: 'IA', adminOnly: true },
   { to: '/reports', icon: BarChart3, label: 'Relatórios', adminOnly: true },

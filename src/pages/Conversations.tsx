@@ -205,7 +205,7 @@ export default function Conversations() {
                   onChange={(e) => setSelectedAgent(e.target.value)}
                   className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 >
-                  <option value="all">Todos os agentes</option>
+                  <option value="all">Todos os atendentes</option>
                   {agents.map((a) => (
                     <option key={a.id} value={a.id}>{a.full_name}</option>
                   ))}

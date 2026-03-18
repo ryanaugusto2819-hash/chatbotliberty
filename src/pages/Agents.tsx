@@ -9,7 +9,7 @@ const statusLabels = { online: 'Online', offline: 'Offline', away: 'Ausente' };
 export default function Agents() {
   return (
     <div>
-      <TopBar title="Agentes" subtitle={`${agents.length} agentes cadastrados`} />
+      <TopBar title="Atendentes" subtitle={`${agents.length} atendentes cadastrados`} />
       <div className="p-6 space-y-4">
         <div className="flex justify-end">
           <button className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">

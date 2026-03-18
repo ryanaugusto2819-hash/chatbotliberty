@@ -11,7 +11,7 @@ const metrics = [
   { title: 'Mensagens Recebidas', value: dashboardMetrics.messagesReceived.toLocaleString('pt-BR'), change: '+15% esta semana', changeType: 'positive' as const, icon: Inbox },
   { title: 'Tempo Médio de Resposta', value: dashboardMetrics.avgResponseTime, change: '-18% esta semana', changeType: 'positive' as const, icon: Clock },
   { title: 'Taxa de Resolução', value: `${dashboardMetrics.resolutionRate}%`, change: '+2.1% esta semana', changeType: 'positive' as const, icon: CheckCircle2 },
-  { title: 'Agentes Ativos', value: dashboardMetrics.activeAgents, change: '2 online agora', changeType: 'neutral' as const, icon: Users },
+  { title: 'Atendentes Ativos', value: dashboardMetrics.activeAgents, change: '2 online agora', changeType: 'neutral' as const, icon: Users },
 ];
 
 export default function Index() {
