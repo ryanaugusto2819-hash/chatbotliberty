@@ -283,10 +283,10 @@ export default function FlowEditor() {
     );
   };
 
-  const handleNodeDelete = (nodeId: string) => {
+  const handleNodeDelete = useCallback((nodeId: string) => {
     setNodes((nds) => nds.filter((n) => n.id !== nodeId));
     setEdges((eds) => eds.filter((e) => e.source !== nodeId && e.target !== nodeId));
-  };
+  }, [setNodes, setEdges]);
 
   const toggleActive = async () => {
     if (!id) return;
