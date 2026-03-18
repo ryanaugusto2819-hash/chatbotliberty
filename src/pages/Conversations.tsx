@@ -268,9 +268,7 @@ export default function Conversations() {
                           </span>
                         ))}
                         {c.unread_count != null && c.unread_count > 0 && (
-                          <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">
-                            {c.unread_count}
-                          </span>
+                          <span className="ml-auto h-2.5 w-2.5 rounded-full bg-primary shrink-0" />
                         )}
                       </div>
                     </div>
