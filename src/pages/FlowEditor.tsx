@@ -98,6 +98,10 @@ export default function FlowEditor() {
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [toolbarOpen, setToolbarOpen] = useState(true);
 
+  const handleNodeDelete = useCallback((nodeId: string) => {
+    setNodes((nds) => nds.filter((n) => n.id !== nodeId));
+    setEdges((eds) => eds.filter((e) => e.source !== nodeId && e.target !== nodeId));
+  }, [setNodes, setEdges]);
 
   useEffect(() => {
     if (id) loadFlow();
