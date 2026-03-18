@@ -39,7 +39,7 @@ export default function AppSidebar() {
     const fetchUnread = async () => {
       const { data } = await supabase.rpc('get_conversations_with_last_message');
       if (data) {
-        const total = (data as any[]).reduce((sum, c) => sum + (c.unread_count || 0), 0);
+        const total = (data as any[]).filter(c => (c.unread_count || 0) > 0).length;
         setTotalUnread(total);
       }
     };
