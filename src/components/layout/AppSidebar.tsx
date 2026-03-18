@@ -33,6 +33,26 @@ export default function AppSidebar() {
   const { user, signOut, isAdmin } = useAuth();
   const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Usuário';
   const initials = displayName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
+  const [totalUnread, setTotalUnread] = useState(0);
+
+  useEffect(() => {
+    const fetchUnread = async () => {
+      const { data } = await supabase.rpc('get_conversations_with_last_message');
+      if (data) {
+        const total = (data as any[]).reduce((sum, c) => sum + (c.unread_count || 0), 0);
+        setTotalUnread(total);
+      }
+    };
+    fetchUnread();
+
+    const channel = supabase
+      .channel('sidebar-unread')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => fetchUnread())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, () => fetchUnread())
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   const navItems = allNavItems.filter((item) => !item.adminOnly || isAdmin);
 
