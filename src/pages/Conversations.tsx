@@ -81,7 +81,7 @@ export default function Conversations() {
     setConversations(
       (data || []).map((c: any) => ({
         ...c,
-        unread_count: 0,
+        unread_count: c.unread_count || 0,
       }))
     );
     setLoading(false);
@@ -250,12 +250,12 @@ export default function Conversations() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-0.5">
-                        <p className="text-sm font-semibold text-card-foreground truncate">{c.contact_name}</p>
+                        <p className={`text-sm font-semibold truncate ${c.unread_count && c.unread_count > 0 ? 'text-card-foreground' : 'text-card-foreground/80'}`}>{c.contact_name}</p>
                         <span className="text-[11px] text-muted-foreground shrink-0 ml-2">
                           {formatDistanceToNow(new Date(c.updated_at), { addSuffix: true, locale: ptBR })}
                         </span>
                       </div>
-                      <p className="text-xs text-muted-foreground truncate">{c.last_message}</p>
+                      <p className={`text-xs truncate ${c.unread_count && c.unread_count > 0 ? 'text-card-foreground font-medium' : 'text-muted-foreground'}`}>{c.last_message}</p>
                       <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                         <StatusBadge status={c.status as 'new' | 'pending' | 'active' | 'resolved'} />
                         {cTags.map(t => (
@@ -267,6 +267,11 @@ export default function Conversations() {
                             {t.name}
                           </span>
                         ))}
+                        {c.unread_count != null && c.unread_count > 0 && (
+                          <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">
+                            {c.unread_count}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </motion.button>

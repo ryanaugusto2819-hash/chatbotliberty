@@ -125,14 +125,28 @@ export default function ChatView() {
     setLoading(false);
   };
 
+  const markMessagesAsRead = async () => {
+    if (!id) return;
+    await supabase
+      .from('messages')
+      .update({ status: 'read' })
+      .eq('conversation_id', id)
+      .eq('sender_type', 'customer')
+      .neq('status', 'read');
+  };
+
   useEffect(() => {
     fetchConversation();
-    fetchMessages();
+    fetchMessages().then(() => markMessagesAsRead());
 
     const channel = supabase
       .channel(`chat-${id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${id}` }, (payload) => {
         setMessages(prev => [...prev, payload.new as MessageData]);
+        // Mark incoming customer messages as read immediately since user is viewing
+        if ((payload.new as MessageData).sender_type === 'customer') {
+          markMessagesAsRead();
+        }
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations', filter: `id=eq.${id}` }, () => {
         fetchConversation();

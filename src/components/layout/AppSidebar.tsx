@@ -1,5 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 import logoImg from '@/assets/logo-group-liberty.jpg';
 import {
   LayoutDashboard,
@@ -16,7 +18,7 @@ import {
 
 const allNavItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard', adminOnly: false },
-  { to: '/conversations', icon: MessageSquare, label: 'Conversas', badge: 6, adminOnly: false },
+  { to: '/conversations', icon: MessageSquare, label: 'Conversas', adminOnly: false },
   { to: '/agents', icon: Users, label: 'Agentes', adminOnly: true },
   { to: '/automation', icon: GitBranch, label: 'Automação', adminOnly: true },
   { to: '/ai', icon: Bot, label: 'IA', adminOnly: true },
@@ -31,6 +33,26 @@ export default function AppSidebar() {
   const { user, signOut, isAdmin } = useAuth();
   const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Usuário';
   const initials = displayName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
+  const [totalUnread, setTotalUnread] = useState(0);
+
+  useEffect(() => {
+    const fetchUnread = async () => {
+      const { data } = await supabase.rpc('get_conversations_with_last_message');
+      if (data) {
+        const total = (data as any[]).reduce((sum, c) => sum + (c.unread_count || 0), 0);
+        setTotalUnread(total);
+      }
+    };
+    fetchUnread();
+
+    const channel = supabase
+      .channel('sidebar-unread')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => fetchUnread())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, () => fetchUnread())
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   const navItems = allNavItems.filter((item) => !item.adminOnly || isAdmin);
 
@@ -62,9 +84,9 @@ export default function AppSidebar() {
             >
               <item.icon className={`h-[18px] w-[18px] shrink-0 ${isActive ? 'text-sidebar-primary' : ''}`} />
               <span className="truncate">{item.label}</span>
-              {item.badge && (
+              {item.to === '/conversations' && totalUnread > 0 && (
                 <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-sidebar-primary px-1.5 text-[10px] font-bold text-sidebar-primary-foreground">
-                  {item.badge}
+                  {totalUnread}
                 </span>
               )}
             </NavLink>
