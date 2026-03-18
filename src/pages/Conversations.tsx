@@ -267,6 +267,11 @@ export default function Conversations() {
                             {t.name}
                           </span>
                         ))}
+                        {c.unread_count != null && c.unread_count > 0 && (
+                          <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">
+                            {c.unread_count}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </motion.button>
