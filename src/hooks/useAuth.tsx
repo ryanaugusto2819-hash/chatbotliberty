@@ -69,9 +69,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!mounted) return;
         setSession(session);
         if (session?.user) {
-          // Defer to avoid blocking the auth state change callback
-          setTimeout(() => {
-            if (mounted) fetchUserMeta(session.user.id);
+          setLoading(true);
+          setTimeout(async () => {
+            if (mounted) {
+              await fetchUserMeta(session.user.id);
+              if (mounted) setLoading(false);
+            }
           }, 0);
         } else {
           setRole(null);
