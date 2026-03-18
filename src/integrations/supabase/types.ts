@@ -53,6 +53,47 @@ export type Database = {
           },
         ]
       }
+      ai_usage_logs: {
+        Row: {
+          conversation_id: string | null
+          created_at: string
+          function_name: string
+          id: string
+          input_tokens: number
+          model: string
+          output_tokens: number
+          total_tokens: number
+        }
+        Insert: {
+          conversation_id?: string | null
+          created_at?: string
+          function_name: string
+          id?: string
+          input_tokens?: number
+          model?: string
+          output_tokens?: number
+          total_tokens?: number
+        }
+        Update: {
+          conversation_id?: string | null
+          created_at?: string
+          function_name?: string
+          id?: string
+          input_tokens?: number
+          model?: string
+          output_tokens?: number
+          total_tokens?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_usage_logs_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       automation_edges: {
         Row: {
           created_at: string
