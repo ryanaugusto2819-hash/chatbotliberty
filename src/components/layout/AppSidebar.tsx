@@ -1,5 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 import logoImg from '@/assets/logo-group-liberty.jpg';
 import {
   LayoutDashboard,
@@ -16,7 +18,7 @@ import {
 
 const allNavItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard', adminOnly: false },
-  { to: '/conversations', icon: MessageSquare, label: 'Conversas', badge: 6, adminOnly: false },
+  { to: '/conversations', icon: MessageSquare, label: 'Conversas', adminOnly: false },
   { to: '/agents', icon: Users, label: 'Agentes', adminOnly: true },
   { to: '/automation', icon: GitBranch, label: 'Automação', adminOnly: true },
   { to: '/ai', icon: Bot, label: 'IA', adminOnly: true },
