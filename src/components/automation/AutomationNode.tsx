@@ -72,13 +72,14 @@ const triggerLabels: Record<string, string> = {
   scheduled: '⏰ Agendado',
 };
 
-function AutomationNode({ data, selected }: NodeProps) {
+function AutomationNode({ data, selected, id }: NodeProps) {
   const nodeType = (data.nodeType as string) || 'message';
   const cfg = nodeConfig[nodeType] || nodeConfig.message;
   const Icon = cfg.icon;
   const label = (data.label as string) || '';
   const preview = data.preview as string;
   const config = data.config as Record<string, unknown>;
+  const onDelete = data.onDelete as ((nodeId: string) => void) | undefined;
 
   // For trigger nodes, show trigger types (supports multiple)
   const triggerType = config?.trigger_type as string;
