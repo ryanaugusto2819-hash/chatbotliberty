@@ -1,5 +1,6 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import logoImg from '@/assets/logo-group-liberty.jpg';
 import {
   LayoutDashboard,
   MessageSquare,
@@ -9,7 +10,6 @@ import {
   Plug,
   BarChart3,
   Settings,
-  Headphones,
   LogOut,
   ShieldCheck,
 } from 'lucide-react';
@@ -37,12 +37,10 @@ export default function AppSidebar() {
   return (
     <aside className="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col bg-sidebar border-r border-sidebar-border">
       {/* Logo */}
-      <div className="flex h-16 items-center gap-3 px-6 border-b border-sidebar-border">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sidebar-primary">
-          <Headphones className="h-5 w-5 text-sidebar-primary-foreground" />
-        </div>
+      <div className="flex h-16 items-center gap-3 px-5 border-b border-sidebar-border">
+        <img src={logoImg} alt="Group Liberty" className="h-9 w-9 rounded-lg object-cover" />
         <div>
-          <h1 className="text-sm font-bold text-sidebar-accent-foreground tracking-tight">ZapDesk</h1>
+          <h1 className="text-sm font-bold text-sidebar-accent-foreground tracking-tight">Group Liberty</h1>
           <p className="text-[10px] text-sidebar-foreground/60 uppercase tracking-widest">Atendimento</p>
         </div>
       </div>

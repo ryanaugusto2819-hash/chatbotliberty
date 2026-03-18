@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Headphones, Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
+import logoImg from '@/assets/logo-group-liberty.jpg';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -52,11 +53,9 @@ export default function Login() {
       <div className="w-full max-w-md space-y-8">
         {/* Logo */}
         <div className="flex flex-col items-center gap-3">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary">
-            <Headphones className="h-7 w-7 text-primary-foreground" />
-          </div>
+          <img src={logoImg} alt="Group Liberty" className="h-20 w-20 rounded-2xl object-cover" />
           <div className="text-center">
-            <h1 className="text-2xl font-bold text-foreground tracking-tight">ZapDesk</h1>
+            <h1 className="text-2xl font-bold text-foreground tracking-tight">Group Liberty</h1>
             <p className="text-sm text-muted-foreground mt-1">
               {isSignUp ? 'Crie sua conta' : 'Faça login para continuar'}
             </p>
