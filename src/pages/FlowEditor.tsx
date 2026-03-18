@@ -142,7 +142,7 @@ export default function FlowEditor() {
         id: crypto.randomUUID(),
         type: 'automation',
         position: { x: 300, y: 50 },
-        data: { nodeType: 'trigger', label: 'Disparo Manual', config: { trigger_type: 'manual' }, preview: '' },
+        data: { nodeType: 'trigger', label: 'Disparo Manual', config: { trigger_type: 'manual' }, preview: '', onDelete: handleNodeDelete },
         deletable: true,
       };
       setNodes([triggerNode]);
