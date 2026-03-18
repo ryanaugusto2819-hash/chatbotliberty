@@ -36,7 +36,7 @@ export default function Reports() {
         { title: 'Pendentes', value: metrics.pendingConversations, icon: Clock, changeType: 'neutral' as const },
         { title: 'Total de Mensagens', value: metrics.totalMessages, icon: Send },
         { title: 'Msgs de Clientes', value: metrics.customerMessages, icon: Inbox },
-        { title: 'Msgs de Agentes', value: metrics.agentMessages, icon: TrendingUp },
+        { title: 'Msgs de Atendentes', value: metrics.agentMessages, icon: TrendingUp },
         { title: 'Msgs do Bot', value: metrics.botMessages, icon: Bot },
         { title: 'Média Msgs/Conversa', value: metrics.avgMessagesPerConversation, icon: BarChart3 },
       ]
