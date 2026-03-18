@@ -5,6 +5,7 @@ import { Bot, Save, Loader2, Sparkles, GitBranch, Pencil, Check, X } from 'lucid
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import KnowledgeBase from '@/components/ai/KnowledgeBase';
+import AiUsageControl from '@/components/ai/AiUsageControl';
 
 interface AiConfig {
   enabled: boolean;
@@ -351,6 +352,9 @@ export default function AiSettings() {
 
         {/* Knowledge Base Section */}
         <KnowledgeBase />
+
+        {/* AI Usage Control Section */}
+        <AiUsageControl />
 
         <button
           onClick={handleSave}

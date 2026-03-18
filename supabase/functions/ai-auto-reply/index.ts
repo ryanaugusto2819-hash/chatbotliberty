@@ -141,6 +141,19 @@ Deno.serve(async (req) => {
     const aiResult = await aiResponse.json();
     const replyContent = aiResult.choices?.[0]?.message?.content;
 
+    // Log token usage
+    const usage = aiResult.usage;
+    if (usage) {
+      await supabase.from("ai_usage_logs").insert({
+        function_name: "ai-auto-reply",
+        model: "google/gemini-3-flash-preview",
+        input_tokens: usage.prompt_tokens || 0,
+        output_tokens: usage.completion_tokens || 0,
+        total_tokens: usage.total_tokens || 0,
+        conversation_id: conversationId,
+      });
+    }
+
     if (!replyContent) {
       return new Response(
         JSON.stringify({ error: "Empty AI response" }),

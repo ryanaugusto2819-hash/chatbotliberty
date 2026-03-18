@@ -165,6 +165,19 @@ ${customInstructions ? `\nInstruções adicionais do administrador:\n${customIns
 
     const aiResult = await aiResponse.json();
 
+    // Log token usage
+    const usage = aiResult.usage;
+    if (usage) {
+      await supabase.from("ai_usage_logs").insert({
+        function_name: "ai-flow-selector",
+        model: "google/gemini-3-flash-preview",
+        input_tokens: usage.prompt_tokens || 0,
+        output_tokens: usage.completion_tokens || 0,
+        total_tokens: usage.total_tokens || 0,
+        conversation_id: conversationId,
+      });
+    }
+
     // Extract tool call result
     const toolCall = aiResult.choices?.[0]?.message?.tool_calls?.[0];
     if (!toolCall) {
