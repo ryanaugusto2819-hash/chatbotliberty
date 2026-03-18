@@ -243,6 +243,7 @@ export default function FlowEditor() {
         label: item?.label || type,
         config: defaultConfig,
         preview: getPreview(type, defaultConfig),
+        onDelete: handleNodeDelete,
       },
     };
 
