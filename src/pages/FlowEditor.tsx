@@ -129,6 +129,7 @@ export default function FlowEditor() {
             label: n.label,
             preview: getPreview(n.node_type, n.config as Record<string, unknown>),
             config: n.config,
+            onDelete: handleNodeDelete,
           },
           deletable: true,
         }))
