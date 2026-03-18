@@ -12,6 +12,7 @@ import ChatView from "./pages/ChatView";
 import Agents from "./pages/Agents";
 import Automation from "./pages/Automation";
 import FlowEditor from "./pages/FlowEditor";
+import FlowMetrics from "./pages/FlowMetrics";
 import PlaceholderPage from "./pages/PlaceholderPage";
 import AiSettings from "./pages/AiSettings";
 import Reports from "./pages/Reports";
