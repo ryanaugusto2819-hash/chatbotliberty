@@ -34,37 +34,39 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AuthProvider>
-          <Routes>
-            {/* Public routes */}
-            <Route path="/login" element={<Login />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/pending-approval" element={<PendingApproval />} />
+    <ThemeProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AuthProvider>
+            <Routes>
+              {/* Public routes */}
+              <Route path="/login" element={<Login />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/pending-approval" element={<PendingApproval />} />
 
-            {/* Protected routes */}
-            <Route element={<AppLayout />}>
-              <Route path="/" element={<Index />} />
-              <Route path="/conversations" element={<Conversations />} />
-              <Route path="/conversations/:id" element={<ChatView />} />
-              <Route path="/agents" element={<AdminRoute><Agents /></AdminRoute>} />
-              <Route path="/automation" element={<AdminRoute><Automation /></AdminRoute>} />
-              <Route path="/automation/:id" element={<AdminRoute><FlowEditor /></AdminRoute>} />
-              <Route path="/ai" element={<AdminRoute><AiSettings /></AdminRoute>} />
-              <Route path="/reports" element={<AdminRoute><Reports /></AdminRoute>} />
-              <Route path="/connections" element={<AdminRoute><Connections /></AdminRoute>} />
-              <Route path="/users" element={<AdminRoute><UserManagement /></AdminRoute>} />
-              <Route path="/settings" element={<AdminRoute><PlaceholderPage title="Configurações" subtitle="Configurar conta e integrações" /></AdminRoute>} />
-            </Route>
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
+              {/* Protected routes */}
+              <Route element={<AppLayout />}>
+                <Route path="/" element={<Index />} />
+                <Route path="/conversations" element={<Conversations />} />
+                <Route path="/conversations/:id" element={<ChatView />} />
+                <Route path="/agents" element={<AdminRoute><Agents /></AdminRoute>} />
+                <Route path="/automation" element={<AdminRoute><Automation /></AdminRoute>} />
+                <Route path="/automation/:id" element={<AdminRoute><FlowEditor /></AdminRoute>} />
+                <Route path="/ai" element={<AdminRoute><AiSettings /></AdminRoute>} />
+                <Route path="/reports" element={<AdminRoute><Reports /></AdminRoute>} />
+                <Route path="/connections" element={<AdminRoute><Connections /></AdminRoute>} />
+                <Route path="/users" element={<AdminRoute><UserManagement /></AdminRoute>} />
+                <Route path="/settings" element={<AdminRoute><PlaceholderPage title="Configurações" subtitle="Configurar conta e integrações" /></AdminRoute>} />
+              </Route>
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </AuthProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </ThemeProvider>
   </QueryClientProvider>
 );
 
