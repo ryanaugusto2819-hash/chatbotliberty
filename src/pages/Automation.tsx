@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TopBar from '@/components/layout/TopBar';
 import { supabase } from '@/integrations/supabase/client';
-import { GitBranch, Plus, Play, Pause, MoreVertical, Trash2, Loader2 } from 'lucide-react';
+import { GitBranch, Plus, Play, Pause, Trash2, Loader2, BarChart3 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
@@ -130,12 +130,21 @@ export default function Automation() {
                       <p className="text-xs text-muted-foreground">{flow.description || 'Sem descrição'}</p>
                     </div>
                   </div>
-                  <button
-                    onClick={(e) => deleteFlow(flow.id, e)}
-                    className="text-muted-foreground hover:text-destructive transition-colors"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); navigate(`/automation/${flow.id}/metrics`); }}
+                      className="text-muted-foreground hover:text-primary transition-colors"
+                      title="Métricas do Funil"
+                    >
+                      <BarChart3 className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={(e) => deleteFlow(flow.id, e)}
+                      className="text-muted-foreground hover:text-destructive transition-colors"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4 text-xs text-muted-foreground">

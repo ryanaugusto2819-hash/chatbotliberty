@@ -332,6 +332,118 @@ export type Database = {
           },
         ]
       }
+      flow_executions: {
+        Row: {
+          completed_at: string | null
+          completed_nodes: number
+          conversation_id: string
+          created_at: string
+          failed_at_node_id: string | null
+          flow_id: string
+          id: string
+          started_at: string
+          status: string
+          total_nodes: number
+        }
+        Insert: {
+          completed_at?: string | null
+          completed_nodes?: number
+          conversation_id: string
+          created_at?: string
+          failed_at_node_id?: string | null
+          flow_id: string
+          id?: string
+          started_at?: string
+          status?: string
+          total_nodes?: number
+        }
+        Update: {
+          completed_at?: string | null
+          completed_nodes?: number
+          conversation_id?: string
+          created_at?: string
+          failed_at_node_id?: string | null
+          flow_id?: string
+          id?: string
+          started_at?: string
+          status?: string
+          total_nodes?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flow_executions_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flow_executions_failed_at_node_id_fkey"
+            columns: ["failed_at_node_id"]
+            isOneToOne: false
+            referencedRelation: "automation_nodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flow_executions_flow_id_fkey"
+            columns: ["flow_id"]
+            isOneToOne: false
+            referencedRelation: "automation_flows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      flow_step_logs: {
+        Row: {
+          error_message: string | null
+          executed_at: string
+          execution_id: string
+          id: string
+          node_id: string
+          node_label: string
+          node_type: string
+          sort_order: number
+          status: string
+        }
+        Insert: {
+          error_message?: string | null
+          executed_at?: string
+          execution_id: string
+          id?: string
+          node_id: string
+          node_label?: string
+          node_type: string
+          sort_order?: number
+          status?: string
+        }
+        Update: {
+          error_message?: string | null
+          executed_at?: string
+          execution_id?: string
+          id?: string
+          node_id?: string
+          node_label?: string
+          node_type?: string
+          sort_order?: number
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flow_step_logs_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "flow_executions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flow_step_logs_node_id_fkey"
+            columns: ["node_id"]
+            isOneToOne: false
+            referencedRelation: "automation_nodes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       knowledge_base_items: {
         Row: {
           content: string
