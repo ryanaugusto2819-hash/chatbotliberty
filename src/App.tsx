@@ -56,6 +56,7 @@ const App = () => (
                 <Route path="/agents" element={<AdminRoute><Agents /></AdminRoute>} />
                 <Route path="/automation" element={<AdminRoute><Automation /></AdminRoute>} />
                 <Route path="/automation/:id" element={<AdminRoute><FlowEditor /></AdminRoute>} />
+                <Route path="/automation/:id/metrics" element={<AdminRoute><FlowMetrics /></AdminRoute>} />
                 <Route path="/ai" element={<AdminRoute><AiSettings /></AdminRoute>} />
                 <Route path="/reports" element={<AdminRoute><Reports /></AdminRoute>} />
                 <Route path="/connections" element={<AdminRoute><Connections /></AdminRoute>} />
