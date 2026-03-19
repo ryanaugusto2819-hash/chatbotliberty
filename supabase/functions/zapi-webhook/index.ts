@@ -122,6 +122,7 @@ async function processZapiWebhook(body: any) {
   // Extract content based on Z-API message type
   let content = "";
   let messageType = "text";
+  let mediaUrl: string | null = null;
 
   if (body.text?.message) {
     content = body.text.message;
