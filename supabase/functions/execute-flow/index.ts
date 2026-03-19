@@ -330,7 +330,7 @@ Deno.serve(async (req) => {
         if (buttons.length > 0 && buttons.length <= 3) {
           waPayload = {
             messaging_product: "whatsapp",
-            to: conversation.contact_phone,
+            to: phone,
             type: "interactive",
             interactive: {
               type: "button",
