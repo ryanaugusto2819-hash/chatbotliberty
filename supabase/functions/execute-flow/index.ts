@@ -373,7 +373,7 @@ Deno.serve(async (req) => {
       } else if (node.node_type === "video") {
         msgContent = (config.caption as string) || "";
         msgMediaUrl = (config.media_url as string) || null;
-        normalizedType = "text";
+        normalizedType = "video";
       } else if (node.node_type === "quick_reply") {
         const qrContent = (config.content as string) || "";
         const qrButtons = (config.buttons as string[]) || [];
