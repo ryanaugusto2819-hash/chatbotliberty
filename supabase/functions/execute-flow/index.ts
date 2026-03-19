@@ -349,7 +349,7 @@ Deno.serve(async (req) => {
             : "";
           waPayload = {
             messaging_product: "whatsapp",
-            to: conversation.contact_phone,
+            to: phone,
             type: "text",
             text: { body: content + buttonText },
           };
