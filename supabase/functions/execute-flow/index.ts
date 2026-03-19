@@ -187,6 +187,53 @@ Deno.serve(async (req) => {
           type: "video",
           video: { link: config.media_url, caption: config.caption || undefined },
         };
+      } else if (node.node_type === "quick_reply") {
+        const content = (config.content as string) || "";
+        const buttons = (config.buttons as string[]) || [];
+        if (!content.trim()) {
+          if (executionId) {
+            await supabase.from("flow_step_logs").insert({
+              execution_id: executionId,
+              node_id: node.id,
+              node_type: node.node_type,
+              node_label: node.label || "Resposta Rápida",
+              sort_order: node.sort_order,
+              status: "skipped",
+              error_message: "Conteúdo vazio",
+            });
+          }
+          results.push({ nodeId: node.id, status: "skipped_empty" });
+          continue;
+        }
+        if (buttons.length > 0 && buttons.length <= 3) {
+          // Use WhatsApp interactive buttons (max 3)
+          waPayload = {
+            messaging_product: "whatsapp",
+            to: conversation.contact_phone,
+            type: "interactive",
+            interactive: {
+              type: "button",
+              body: { text: content },
+              action: {
+                buttons: buttons.map((btn, idx) => ({
+                  type: "reply",
+                  reply: { id: `btn_${idx}`, title: btn.slice(0, 20) },
+                })),
+              },
+            },
+          };
+        } else {
+          // Fallback to plain text if no buttons or more than 3
+          const buttonText = buttons.length > 0
+            ? "\n\n" + buttons.map((b, i) => `${i + 1}. ${b}`).join("\n")
+            : "";
+          waPayload = {
+            messaging_product: "whatsapp",
+            to: conversation.contact_phone,
+            type: "text",
+            text: { body: content + buttonText },
+          };
+        }
       } else {
         if (executionId) {
           await supabase.from("flow_step_logs").insert({
