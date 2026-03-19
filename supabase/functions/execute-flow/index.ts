@@ -420,7 +420,7 @@ Deno.serve(async (req) => {
           waResponse = await sendWhatsAppCloudMessage({
             accessToken,
             phoneNumberId,
-            conversationPhone: conversation.contact_phone,
+            conversationPhone: phone,
             nodeType: node.node_type,
             config,
             waPayload,
