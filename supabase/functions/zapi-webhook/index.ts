@@ -129,12 +129,17 @@ async function processZapiWebhook(body: any) {
   } else if (body.image) {
     content = body.image.caption || "[Imagem]";
     messageType = "image";
+    mediaUrl = body.image.imageUrl || body.image.url || null;
   } else if (body.audio) {
-    content = "[Áudio]";
+    content = "";
     messageType = "audio";
+    mediaUrl = body.audio.audioUrl || body.audio.url || null;
+    if (!mediaUrl) content = "[Áudio]";
   } else if (body.video) {
-    content = body.video.caption || "[Vídeo]";
-    messageType = "text"; // normalized
+    content = body.video.caption || "";
+    messageType = "video";
+    mediaUrl = body.video.videoUrl || body.video.url || null;
+    if (!content && !mediaUrl) content = "[Vídeo]";
   } else if (body.document) {
     content = body.document.fileName || "[Documento]";
     messageType = "document";
@@ -152,7 +157,7 @@ async function processZapiWebhook(body: any) {
   }
 
   // Normalize type
-  const allowedTypes = ["text", "image", "document", "audio"];
+  const allowedTypes = ["text", "image", "document", "audio", "video"];
   const normalizedType = allowedTypes.includes(messageType) ? messageType : "text";
 
   const { error: msgError } = await supabase.from("messages").insert({
@@ -160,6 +165,7 @@ async function processZapiWebhook(body: any) {
     content,
     sender_type: "customer",
     message_type: normalizedType,
+    media_url: mediaUrl,
     status: "delivered",
   });
 
