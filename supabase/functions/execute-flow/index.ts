@@ -298,7 +298,7 @@ Deno.serve(async (req) => {
       } else if (node.node_type === "audio") {
         waPayload = {
           messaging_product: "whatsapp",
-          to: conversation.contact_phone,
+          to: phone,
           type: "audio",
           audio: { link: config.media_url },
         };
