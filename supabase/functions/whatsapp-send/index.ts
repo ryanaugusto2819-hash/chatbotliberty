@@ -86,6 +86,7 @@ Deno.serve(async (req) => {
       }
     }
 
+    console.log(`[whatsapp-send] phoneNumberId=${phoneNumberId}, to=${phone}, original=${conversation.contact_phone}`);
     const waResponse = await fetch(
       `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`,
       {
