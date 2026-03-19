@@ -1,0 +1,1 @@
+ALTER TABLE public.messages ADD COLUMN media_url text DEFAULT NULL;

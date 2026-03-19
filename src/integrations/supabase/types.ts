@@ -480,6 +480,7 @@ export type Database = {
           conversation_id: string
           created_at: string
           id: string
+          media_url: string | null
           message_type: string
           sender_agent_id: string | null
           sender_type: string
@@ -490,6 +491,7 @@ export type Database = {
           conversation_id: string
           created_at?: string
           id?: string
+          media_url?: string | null
           message_type?: string
           sender_agent_id?: string | null
           sender_type: string
@@ -500,6 +502,7 @@ export type Database = {
           conversation_id?: string
           created_at?: string
           id?: string
+          media_url?: string | null
           message_type?: string
           sender_agent_id?: string | null
           sender_type?: string
