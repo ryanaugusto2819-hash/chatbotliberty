@@ -293,24 +293,40 @@ Deno.serve(async (req) => {
       }
 
       // Save message to DB
-      const msgContent =
-        node.node_type === "message"
-          ? (config.content as string)
-          : node.node_type === "image"
-          ? (config.caption as string) || "[Imagem]"
-          : node.node_type === "audio"
-          ? "[Áudio]"
-          : (config.caption as string) || "[Vídeo]";
+      let msgContent = "";
+      let msgMediaUrl: string | null = null;
+      let normalizedType = "text";
 
-      const normalizedType = ["text", "image", "audio"].includes(node.node_type)
-        ? node.node_type === "message" ? "text" : node.node_type
-        : "text";
+      if (node.node_type === "message") {
+        msgContent = (config.content as string) || "";
+        normalizedType = "text";
+      } else if (node.node_type === "image") {
+        msgContent = (config.caption as string) || "";
+        msgMediaUrl = (config.media_url as string) || null;
+        normalizedType = "image";
+      } else if (node.node_type === "audio") {
+        msgContent = "";
+        msgMediaUrl = (config.media_url as string) || null;
+        normalizedType = "audio";
+      } else if (node.node_type === "video") {
+        msgContent = (config.caption as string) || "";
+        msgMediaUrl = (config.media_url as string) || null;
+        normalizedType = "text";
+      } else if (node.node_type === "quick_reply") {
+        const qrContent = (config.content as string) || "";
+        const qrButtons = (config.buttons as string[]) || [];
+        msgContent = qrButtons.length > 0
+          ? qrContent + "\n\n" + qrButtons.map((b, i) => `${i + 1}. ${b}`).join("\n")
+          : qrContent;
+        normalizedType = "text";
+      }
 
       await supabase.from("messages").insert({
         conversation_id: conversationId,
         content: msgContent,
         sender_type: "agent",
         message_type: normalizedType,
+        media_url: msgMediaUrl,
         status: "sent",
       });
 

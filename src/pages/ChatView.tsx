@@ -50,6 +50,7 @@ interface MessageData {
   message_type: string;
   status: string;
   created_at: string;
+  media_url?: string | null;
 }
 
 export default function ChatView() {
@@ -234,7 +235,49 @@ export default function ChatView() {
                     : 'bg-card border border-border text-card-foreground rounded-bl-md'
                 }`}
               >
-                <p className="text-sm leading-relaxed">{msg.content}</p>
+                {/* Image */}
+                {msg.message_type === 'image' && msg.media_url && (
+                  <div className="mb-1.5">
+                    <img
+                      src={msg.media_url}
+                      alt="Imagem"
+                      className="rounded-lg max-w-full max-h-64 object-cover cursor-pointer"
+                      onClick={() => window.open(msg.media_url!, '_blank')}
+                      loading="lazy"
+                    />
+                  </div>
+                )}
+
+                {/* Audio */}
+                {msg.message_type === 'audio' && msg.media_url && (
+                  <div className="mb-1.5 min-w-[220px]">
+                    <audio controls preload="none" className="w-full h-10 rounded-lg" style={{ filter: msg.sender_type === 'agent' ? 'invert(1) hue-rotate(180deg)' : 'none' }}>
+                      <source src={msg.media_url} />
+                    </audio>
+                  </div>
+                )}
+
+                {/* Video */}
+                {msg.message_type === 'video' && msg.media_url && (
+                  <div className="mb-1.5">
+                    <video controls preload="none" className="rounded-lg max-w-full max-h-64">
+                      <source src={msg.media_url} />
+                    </video>
+                  </div>
+                )}
+
+                {/* Text content - show if not a media-only message */}
+                {msg.content && !(msg.message_type === 'audio' && msg.media_url && !msg.content.trim()) && (
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                )}
+
+                {/* Fallback for media without URL */}
+                {(['image', 'audio', 'video'].includes(msg.message_type)) && !msg.media_url && !msg.content && (
+                  <p className="text-sm leading-relaxed italic opacity-70">
+                    {msg.message_type === 'image' ? '📷 Imagem' : msg.message_type === 'audio' ? '🎵 Áudio' : '🎬 Vídeo'}
+                  </p>
+                )}
+
                 <div className={`flex items-center justify-end gap-1 mt-1 ${msg.sender_type === 'agent' ? 'text-primary-foreground/60' : 'text-muted-foreground'}`}>
                   <span className="text-[10px]">{format(new Date(msg.created_at), 'HH:mm')}</span>
                   {msg.sender_type === 'agent' && (
