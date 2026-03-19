@@ -291,7 +291,7 @@ Deno.serve(async (req) => {
       } else if (node.node_type === "image") {
         waPayload = {
           messaging_product: "whatsapp",
-          to: conversation.contact_phone,
+          to: phone,
           type: "image",
           image: { link: config.media_url, caption: config.caption || undefined },
         };
