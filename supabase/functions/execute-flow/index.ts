@@ -118,8 +118,12 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      if (node.node_type === "delay") {
-        const seconds = (config.delay_seconds as number) || 5;
+    if (node.node_type === "delay") {
+        const delayValue = (config.delay_value as number) || (config.delay_seconds as number) || 5;
+        const delayUnit = (config.delay_unit as string) || "seconds";
+        const seconds = delayUnit === "minutes" ? delayValue * 60
+          : delayUnit === "hours" ? delayValue * 3600
+          : delayValue;
         await new Promise((resolve) => setTimeout(resolve, seconds * 1000));
         if (executionId) {
           await supabase.from("flow_step_logs").insert({
