@@ -278,11 +278,11 @@ Deno.serve(async (req) => {
           zapiEndpoint = `${zapiBase}/send-ptts`;
           zapiBody = { phone, audio: config.media_url };
         } else if (node.node_type === "image") {
-          zapiEndpoint = `${zapiBase}/send-image`;
-          zapiBody = { phone, image: config.media_url, caption: (config.caption as string) || "" };
+          zapiEndpoint = `${zapiBase}/send-link-image`;
+          zapiBody = { phone, imageUrl: config.media_url, caption: (config.caption as string) || "" };
         } else if (node.node_type === "video") {
-          zapiEndpoint = `${zapiBase}/send-video`;
-          zapiBody = { phone, video: config.media_url, caption: (config.caption as string) || "" };
+          zapiEndpoint = `${zapiBase}/send-link-video`;
+          zapiBody = { phone, videoUrl: config.media_url, caption: (config.caption as string) || "" };
         } else {
           // Text, quick_reply fallback -> send-text
           const textBody = (waPayload as Record<string, unknown>).text as Record<string, unknown> | undefined;
@@ -373,7 +373,7 @@ Deno.serve(async (req) => {
       } else if (node.node_type === "video") {
         msgContent = (config.caption as string) || "";
         msgMediaUrl = (config.media_url as string) || null;
-        normalizedType = "text";
+        normalizedType = "video";
       } else if (node.node_type === "quick_reply") {
         const qrContent = (config.content as string) || "";
         const qrButtons = (config.buttons as string[]) || [];
