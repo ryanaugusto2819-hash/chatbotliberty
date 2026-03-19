@@ -52,7 +52,67 @@ Deno.serve(async (req) => {
   });
 });
 
-async function processWebhook(body: any) {
+async function downloadWhatsAppMedia(mediaId: string, accessToken: string): Promise<{ url: string; mimeType: string } | null> {
+  try {
+    // Step 1: Get the media URL from Graph API
+    const metaRes = await fetch(`https://graph.facebook.com/v21.0/${mediaId}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!metaRes.ok) {
+      console.error("Failed to get media metadata:", await metaRes.text());
+      return null;
+    }
+    const meta = await metaRes.json();
+    const downloadUrl = meta.url;
+    const mimeType = meta.mime_type || "application/octet-stream";
+
+    // Step 2: Download the binary
+    const fileRes = await fetch(downloadUrl, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!fileRes.ok) {
+      console.error("Failed to download media:", fileRes.status);
+      return null;
+    }
+    const blob = await fileRes.blob();
+
+    // Step 3: Determine extension
+    const extMap: Record<string, string> = {
+      "audio/ogg": "ogg", "audio/mpeg": "mp3", "audio/aac": "aac",
+      "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp",
+      "video/mp4": "mp4", "video/3gpp": "3gp",
+      "application/pdf": "pdf",
+    };
+    const ext = extMap[mimeType] || "bin";
+    const fileName = `incoming-${mediaId}.${ext}`;
+
+    // Step 4: Upload to Supabase storage
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    const { error: uploadError } = await supabase.storage
+      .from("automation-media")
+      .upload(fileName, blob, { contentType: mimeType, upsert: true });
+
+    if (uploadError) {
+      console.error("Storage upload error:", uploadError);
+      return null;
+    }
+
+    const { data: publicUrl } = supabase.storage
+      .from("automation-media")
+      .getPublicUrl(fileName);
+
+    return { url: publicUrl.publicUrl, mimeType };
+  } catch (err) {
+    console.error("downloadWhatsAppMedia error:", err);
+    return null;
+  }
+}
+
+
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
