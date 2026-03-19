@@ -353,3 +353,36 @@ async function triggerAutoReply(conversationId: string) {
   const result = await response.json();
   console.log("Auto-reply result:", result);
 }
+
+async function transcribeAudio(audioUrl: string, conversationId: string): Promise<string | null> {
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    console.log(`[transcribe] Requesting transcription for audio: ${audioUrl}`);
+
+    const response = await fetch(`${supabaseUrl}/functions/v1/transcribe-audio`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${serviceRoleKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ audioUrl, conversationId }),
+    });
+
+    if (!response.ok) {
+      console.error("Transcription failed:", response.status);
+      return null;
+    }
+
+    const result = await response.json();
+    if (result.success && result.transcription) {
+      console.log(`[transcribe] Success: "${result.transcription.substring(0, 80)}..."`);
+      return result.transcription;
+    }
+    return null;
+  } catch (err) {
+    console.error("transcribeAudio error:", err);
+    return null;
+  }
+}
