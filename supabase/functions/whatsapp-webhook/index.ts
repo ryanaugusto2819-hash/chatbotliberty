@@ -218,9 +218,16 @@ async function processWebhook(body: any) {
             const audioMediaId = msg.audio?.id;
             if (audioMediaId && accessToken) {
               const result = await downloadWhatsAppMedia(audioMediaId, accessToken);
-              if (result) mediaUrl = result.url;
+              if (result) {
+                mediaUrl = result.url;
+                // Transcribe audio for AI context
+                const transcription = await transcribeAudio(result.url, "pending-conversation-id");
+                if (transcription) {
+                  content = `[Áudio transcrito]: ${transcription}`;
+                }
+              }
             }
-            if (!mediaUrl) content = "[Áudio]";
+            if (!content && !mediaUrl) content = "[Áudio]";
             break;
           }
           case "video": {
