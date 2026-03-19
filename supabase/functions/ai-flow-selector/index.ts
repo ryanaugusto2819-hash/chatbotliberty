@@ -35,60 +35,129 @@ Deno.serve(async (req) => {
 
     const selectorConfig = config?.config as Record<string, unknown> | null;
     if (!selectorConfig?.enabled) {
-      return new Response(
-        JSON.stringify({ skipped: true, reason: "Flow selector disabled" }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ skipped: true, reason: "Flow selector disabled" });
     }
 
     const customInstructions = (selectorConfig?.instructions as string) || "";
 
-    // Fetch active flows
+    // Fetch active flows with their nodes (to understand flow content)
     const { data: flows } = await supabase
       .from("automation_flows")
       .select("id, name, description")
       .eq("is_active", true);
 
     if (!flows?.length) {
-      return new Response(
-        JSON.stringify({ skipped: true, reason: "No active flows" }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ skipped: true, reason: "No active flows" });
     }
 
-    // Fetch last 5 messages for context
+    // Fetch ALL nodes for active flows so AI understands their content
+    const flowIds = flows.map((f) => f.id);
+    const { data: allNodes } = await supabase
+      .from("automation_nodes")
+      .select("flow_id, node_type, label, config, sort_order")
+      .in("flow_id", flowIds)
+      .order("sort_order", { ascending: true });
+
+    // Group nodes by flow
+    const nodesByFlow: Record<string, typeof allNodes> = {};
+    for (const node of allNodes || []) {
+      if (!nodesByFlow[node.flow_id]) nodesByFlow[node.flow_id] = [];
+      nodesByFlow[node.flow_id].push(node);
+    }
+
+    // Fetch flows already executed in this conversation
+    const { data: pastExecutions } = await supabase
+      .from("flow_executions")
+      .select("flow_id, status, created_at")
+      .eq("conversation_id", conversationId)
+      .order("created_at", { ascending: true });
+
+    const executedFlowIds = (pastExecutions || []).map((e) => e.flow_id);
+    const executedFlowNames = executedFlowIds
+      .map((id) => flows.find((f) => f.id === id)?.name)
+      .filter(Boolean);
+
+    // Fetch last 20 messages for richer context
     const { data: messages } = await supabase
       .from("messages")
-      .select("content, sender_type, created_at")
+      .select("content, sender_type, message_type, created_at")
       .eq("conversation_id", conversationId)
       .order("created_at", { ascending: false })
-      .limit(5);
+      .limit(20);
 
     if (!messages?.length) {
-      return new Response(
-        JSON.stringify({ skipped: true, reason: "No messages" }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ skipped: true, reason: "No messages" });
     }
 
-    // Build flow list for AI
-    const flowList = flows.map((f, i) => `${i + 1}. "${f.name}" - ${f.description || "Sem descrição"}`).join("\n");
+    // Build detailed flow descriptions including node content
+    const flowDescriptions = flows.map((f, i) => {
+      const nodes = nodesByFlow[f.id] || [];
+      const nodeDetails = nodes.map((n) => {
+        const cfg = n.config as Record<string, unknown>;
+        let detail = `  - [${n.node_type}] ${n.label}`;
+        if (n.node_type === "message" && cfg?.message) {
+          detail += `: "${cfg.message}"`;
+        } else if (n.node_type === "quick_reply" && cfg?.message) {
+          const options = (cfg?.options as string[]) || [];
+          detail += `: "${cfg.message}" (opções: ${options.join(", ")})`;
+        } else if (n.node_type === "image" || n.node_type === "video" || n.node_type === "audio") {
+          detail += cfg?.caption ? `: "${cfg.caption}"` : "";
+        } else if (n.node_type === "delay") {
+          detail += `: ${cfg?.duration || "?"} ${cfg?.unit || "s"}`;
+        }
+        return detail;
+      }).join("\n");
+
+      const alreadySent = executedFlowIds.includes(f.id);
+
+      return `${i + 1}. "${f.name}" ${alreadySent ? "[JÁ ENVIADO]" : "[DISPONÍVEL]"}
+   Descrição: ${f.description || "Sem descrição"}
+   Etapas do fluxo:
+${nodeDetails || "   (sem etapas)"}`;
+    }).join("\n\n");
 
     const recentMessages = messages
       .reverse()
-      .map((m) => `${m.sender_type === "customer" ? "Cliente" : "Agente"}: ${m.content}`)
+      .map((m) => {
+        let prefix = m.sender_type === "customer" ? "Cliente" : "Agente/Bot";
+        if (m.message_type !== "text") prefix += ` [${m.message_type}]`;
+        return `${prefix}: ${m.content}`;
+      })
       .join("\n");
+
+    const executionHistory = executedFlowNames.length > 0
+      ? `Fluxos já enviados nesta conversa (em ordem): ${executedFlowNames.join(" → ")}`
+      : "Nenhum fluxo foi enviado nesta conversa ainda.";
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       console.error("LOVABLE_API_KEY not configured");
-      return new Response(
-        JSON.stringify({ error: "AI not configured" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: "AI not configured" }, 500);
     }
 
-    // Call AI to select flow using tool calling for structured output
+    const systemPrompt = `Você é um selecionador inteligente de fluxos de automação para atendimento via WhatsApp.
+Sua função é analisar a conversa completa e decidir qual fluxo disparar com base no contexto.
+
+REGRAS OBRIGATÓRIAS:
+1. NUNCA selecione um fluxo que já foi enviado nesta conversa (marcado como [JÁ ENVIADO]).
+2. RESPEITE A ORDEM DE PRIORIDADE: Se existem fluxos numerados por etapas (Etapa 1, Etapa 2, Etapa 3...), NUNCA envie uma etapa posterior sem que as anteriores já tenham sido enviadas.
+3. Analise o CONTEÚDO COMPLETO de cada fluxo (todas as mensagens, perguntas e mídias das etapas) para entender o que cada fluxo faz antes de decidir.
+4. Analise TODA a conversa, não apenas a última mensagem, para entender o contexto completo do atendimento.
+5. Se nenhum fluxo se encaixar ou se todos os fluxos aplicáveis já foram enviados, retorne null.
+6. Seja criterioso: só selecione um fluxo se ele realmente fizer sentido para o momento atual da conversa.
+${customInstructions ? `\nInstruções adicionais do administrador:\n${customInstructions}` : ""}`;
+
+    const userPrompt = `${executionHistory}
+
+Fluxos disponíveis (com conteúdo detalhado):
+${flowDescriptions}
+
+Conversa completa recente:
+${recentMessages}
+
+Qual fluxo deve ser disparado agora?`;
+
+    // Call AI
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -98,25 +167,15 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
         messages: [
-          {
-            role: "system",
-            content: `Você é um selecionador inteligente de fluxos de automação para atendimento via WhatsApp.
-Analise a mensagem mais recente do cliente e o contexto da conversa, e decida qual fluxo de automação deve ser disparado.
-Se nenhum fluxo se encaixar no contexto da mensagem, retorne null como flow_index.
-Seja criterioso: só selecione um fluxo se realmente fizer sentido para a mensagem do cliente.
-${customInstructions ? `\nInstruções adicionais do administrador:\n${customInstructions}` : ""}`,
-          },
-          {
-            role: "user",
-            content: `Fluxos disponíveis:\n${flowList}\n\nConversa recente:\n${recentMessages}\n\nQual fluxo deve ser disparado?`,
-          },
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
         ],
         tools: [
           {
             type: "function",
             function: {
               name: "select_flow",
-              description: "Seleciona o fluxo de automação mais adequado para a mensagem do cliente, ou null se nenhum se encaixar.",
+              description: "Seleciona o fluxo de automação mais adequado para o momento atual da conversa, respeitando ordem de prioridade e histórico. Retorna null se nenhum se encaixar ou se já foi enviado.",
               parameters: {
                 type: "object",
                 properties: {
@@ -126,7 +185,7 @@ ${customInstructions ? `\nInstruções adicionais do administrador:\n${customIns
                   },
                   reason: {
                     type: "string",
-                    description: "Breve justificativa da escolha",
+                    description: "Justificativa detalhada da escolha, mencionando o contexto da conversa e por que este fluxo é o mais adequado agora",
                   },
                 },
                 required: ["flow_index", "reason"],
@@ -144,23 +203,9 @@ ${customInstructions ? `\nInstruções adicionais do administrador:\n${customIns
       const errorText = await aiResponse.text();
       console.error("AI gateway error:", aiResponse.status, errorText);
 
-      if (aiResponse.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Rate limit exceeded" }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      if (aiResponse.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "AI credits exhausted" }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      return new Response(
-        JSON.stringify({ error: "AI generation failed" }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      if (aiResponse.status === 429) return jsonResponse({ error: "Rate limit exceeded" }, 429);
+      if (aiResponse.status === 402) return jsonResponse({ error: "AI credits exhausted" }, 402);
+      return jsonResponse({ error: "AI generation failed" }, 502);
     }
 
     const aiResult = await aiResponse.json();
@@ -182,10 +227,7 @@ ${customInstructions ? `\nInstruções adicionais do administrador:\n${customIns
     const toolCall = aiResult.choices?.[0]?.message?.tool_calls?.[0];
     if (!toolCall) {
       console.log("No tool call in AI response");
-      return new Response(
-        JSON.stringify({ skipped: true, reason: "AI did not select a flow" }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ skipped: true, reason: "AI did not select a flow" });
     }
 
     let selection: { flow_index: number | null; reason: string };
@@ -193,22 +235,23 @@ ${customInstructions ? `\nInstruções adicionais do administrador:\n${customIns
       selection = JSON.parse(toolCall.function.arguments);
     } catch {
       console.error("Failed to parse AI tool call:", toolCall.function.arguments);
-      return new Response(
-        JSON.stringify({ skipped: true, reason: "Invalid AI response" }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ skipped: true, reason: "Invalid AI response" });
     }
 
     console.log("AI flow selection:", JSON.stringify(selection));
 
     if (selection.flow_index === null || selection.flow_index < 1 || selection.flow_index > flows.length) {
-      return new Response(
-        JSON.stringify({ skipped: true, reason: selection.reason || "No matching flow" }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ skipped: true, reason: selection.reason || "No matching flow" });
     }
 
     const selectedFlow = flows[selection.flow_index - 1];
+
+    // Double-check: don't re-send an already executed flow
+    if (executedFlowIds.includes(selectedFlow.id)) {
+      console.log(`Flow "${selectedFlow.name}" already executed, skipping despite AI selection.`);
+      return jsonResponse({ skipped: true, reason: `Flow "${selectedFlow.name}" already sent in this conversation` });
+    }
+
     console.log(`Executing flow "${selectedFlow.name}" (${selectedFlow.id}). Reason: ${selection.reason}`);
 
     // Execute the selected flow
@@ -226,20 +269,21 @@ ${customInstructions ? `\nInstruções adicionais do administrador:\n${customIns
 
     const execResult = await execResponse.json();
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        selectedFlow: { id: selectedFlow.id, name: selectedFlow.name },
-        reason: selection.reason,
-        execution: execResult,
-      }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return jsonResponse({
+      success: true,
+      selectedFlow: { id: selectedFlow.id, name: selectedFlow.name },
+      reason: selection.reason,
+      execution: execResult,
+    });
   } catch (error) {
     console.error("Flow selector error:", error);
-    return new Response(
-      JSON.stringify({ error: "Internal server error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return jsonResponse({ error: "Internal server error" }, 500);
   }
 });
+
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
