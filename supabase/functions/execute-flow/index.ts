@@ -40,30 +40,45 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get WhatsApp credentials
-    const { data: waConfig } = await supabase
+    // Check which provider is connected
+    const { data: connections } = await supabase
       .from("connection_configs")
-      .select("config")
-      .eq("connection_id", "whatsapp")
-      .eq("is_connected", true)
-      .order("updated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .select("connection_id, config, is_connected")
+      .in("connection_id", ["zapi", "whatsapp"])
+      .eq("is_connected", true);
 
-    const waConfigData = waConfig?.config as Record<string, unknown> | null;
+    const zapiConnection = connections?.find((c) => c.connection_id === "zapi");
+    const waConnection = connections?.find((c) => c.connection_id === "whatsapp");
+    const useZapi = !!zapiConnection;
+
+    // Z-API credentials
+    const zapiInstanceId = Deno.env.get("ZAPI_INSTANCE_ID");
+    const zapiToken = Deno.env.get("ZAPI_TOKEN");
+    const zapiConfigData = zapiConnection?.config as Record<string, unknown> | null;
+    const zapiClientToken = (zapiConfigData?.client_token as string) || Deno.env.get("ZAPI_CLIENT_TOKEN") || "";
+
+    // WhatsApp Cloud API credentials
+    const waConfigData = waConnection?.config as Record<string, unknown> | null;
     const phoneNumberId =
       (typeof waConfigData?.phone_number_id === "string" && waConfigData.phone_number_id.trim())
         ? waConfigData.phone_number_id
         : Deno.env.get("WHATSAPP_PHONE_NUMBER_ID");
-
     const accessToken = Deno.env.get("WHATSAPP_ACCESS_TOKEN");
 
-    if (!phoneNumberId || !accessToken) {
+    if (useZapi && (!zapiInstanceId || !zapiToken)) {
+      return new Response(
+        JSON.stringify({ error: "Z-API not configured" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    if (!useZapi && (!phoneNumberId || !accessToken)) {
       return new Response(
         JSON.stringify({ error: "WhatsApp not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    const phone = conversation.contact_phone.replace(/\D/g, "");
 
     // Get nodes sorted by sort_order
     const { data: nodes } = await supabase
