@@ -21,8 +21,9 @@ import NodeEditor from '@/components/automation/NodeEditor';
 import {
   ArrowLeft, Save, MessageSquare, Clock, Image, Music, Video,
   Loader2, FileText, GitFork, Bot, ListOrdered, Play, Pause,
-  Zap, Cog
+  Zap, Cog, Upload
 } from 'lucide-react';
+import { parseDcFile } from '@/lib/dcParser';
 import { toast } from 'sonner';
 
 const nodeTypes = { automation: AutomationNode };
@@ -265,6 +266,27 @@ export default function FlowEditor() {
     }
   };
 
+  const handleImportDc = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string;
+        const { nodes: importedNodes, edges: importedEdges } = parseDcFile(content, handleNodeDelete, getPreview);
+        setNodes(importedNodes);
+        setEdges(importedEdges);
+        toast.success(`Importado com sucesso: ${importedNodes.length} nós`);
+      } catch (err) {
+        console.error('Import error:', err);
+        toast.error('Erro ao importar arquivo .dc');
+      }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+  }, [handleNodeDelete, setNodes, setEdges]);
+
   const handleNodeClick = (_: React.MouseEvent, node: Node) => {
     setSelectedNode(node);
   };
@@ -441,6 +463,20 @@ export default function FlowEditor() {
               </div>
             </div>
           ))}
+
+          {/* Import .dc */}
+          <div className="p-3 border-t border-border">
+            <label className="flex items-center gap-2.5 w-full rounded-lg px-2.5 py-2 text-left hover:bg-secondary transition-colors cursor-pointer group">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary group-hover:bg-primary/10 transition-colors">
+                <Upload className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-card-foreground">Importar .dc</p>
+                <p className="text-[10px] text-muted-foreground leading-tight">Importar fluxo externo</p>
+              </div>
+              <input type="file" accept=".dc,.json" onChange={handleImportDc} className="hidden" />
+            </label>
+          </div>
         </div>
 
         {/* Canvas */}
