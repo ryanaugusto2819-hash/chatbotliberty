@@ -182,7 +182,16 @@ Deno.serve(async (req) => {
       return createJsonResponse({ error: "WhatsApp not configured" }, 500);
     }
 
-    const phone = conversation.contact_phone.replace(/\D/g, "");
+    let phone = conversation.contact_phone.replace(/\D/g, "");
+    // Normalize Brazilian phone numbers (add 9th digit if missing)
+    if (phone.startsWith("55") && phone.length === 12) {
+      const ddd = phone.substring(2, 4);
+      const localNumber = phone.substring(4);
+      if (!localNumber.startsWith("9")) {
+        phone = `55${ddd}9${localNumber}`;
+        console.log(`Normalized phone: ${conversation.contact_phone} -> ${phone}`);
+      }
+    }
 
     const { data: nodes } = await supabase
       .from("automation_nodes")
@@ -275,28 +284,28 @@ Deno.serve(async (req) => {
         }
         waPayload = {
           messaging_product: "whatsapp",
-          to: conversation.contact_phone,
+          to: phone,
           type: "text",
           text: { body: content },
         };
       } else if (node.node_type === "image") {
         waPayload = {
           messaging_product: "whatsapp",
-          to: conversation.contact_phone,
+          to: phone,
           type: "image",
           image: { link: config.media_url, caption: config.caption || undefined },
         };
       } else if (node.node_type === "audio") {
         waPayload = {
           messaging_product: "whatsapp",
-          to: conversation.contact_phone,
+          to: phone,
           type: "audio",
           audio: { link: config.media_url },
         };
       } else if (node.node_type === "video") {
         waPayload = {
           messaging_product: "whatsapp",
-          to: conversation.contact_phone,
+          to: phone,
           type: "video",
           video: { link: config.media_url, caption: config.caption || undefined },
         };
@@ -321,7 +330,7 @@ Deno.serve(async (req) => {
         if (buttons.length > 0 && buttons.length <= 3) {
           waPayload = {
             messaging_product: "whatsapp",
-            to: conversation.contact_phone,
+            to: phone,
             type: "interactive",
             interactive: {
               type: "button",
@@ -340,7 +349,7 @@ Deno.serve(async (req) => {
             : "";
           waPayload = {
             messaging_product: "whatsapp",
-            to: conversation.contact_phone,
+            to: phone,
             type: "text",
             text: { body: content + buttonText },
           };
@@ -411,7 +420,7 @@ Deno.serve(async (req) => {
           waResponse = await sendWhatsAppCloudMessage({
             accessToken,
             phoneNumberId,
-            conversationPhone: conversation.contact_phone,
+            conversationPhone: phone,
             nodeType: node.node_type,
             config,
             waPayload,

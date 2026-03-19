@@ -74,6 +74,18 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Normalize Brazilian phone numbers (add 9th digit if missing)
+    let phone = conversation.contact_phone.replace(/\D/g, "");
+    if (phone.startsWith("55") && phone.length === 12) {
+      const ddd = phone.substring(2, 4);
+      const localNumber = phone.substring(4);
+      // Brazilian mobile numbers should have 9 digits (starting with 9)
+      if (!localNumber.startsWith("9")) {
+        phone = `55${ddd}9${localNumber}`;
+        console.log(`Normalized phone: ${conversation.contact_phone} -> ${phone}`);
+      }
+    }
+
     const waResponse = await fetch(
       `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`,
       {
@@ -84,7 +96,7 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({
           messaging_product: "whatsapp",
-          to: conversation.contact_phone,
+          to: phone,
           type: "text",
           text: { body: message },
         }),
