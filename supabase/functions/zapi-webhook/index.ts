@@ -127,6 +127,12 @@ async function processZapiWebhook(body: any) {
   if (body.text?.message) {
     content = body.text.message;
     messageType = "text";
+  } else if (body.buttonsResponseMessage) {
+    content = body.buttonsResponseMessage.selectedDisplayText || body.buttonsResponseMessage.selectedButtonId || "[Botão]";
+    messageType = "text";
+  } else if (body.listResponseMessage) {
+    content = body.listResponseMessage.title || body.listResponseMessage.singleSelectReply?.selectedRowId || "[Lista]";
+    messageType = "text";
   } else if (body.image) {
     content = body.image.caption || "[Imagem]";
     messageType = "image";

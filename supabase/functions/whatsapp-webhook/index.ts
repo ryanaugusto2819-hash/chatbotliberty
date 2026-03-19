@@ -254,6 +254,22 @@ async function processWebhook(body: any) {
             content = msg.reaction?.emoji || "[Reação]";
             messageType = "reaction";
             break;
+          case "interactive": {
+            const interactive = msg.interactive;
+            if (interactive?.type === "button_reply") {
+              content = interactive.button_reply?.title || "[Botão]";
+            } else if (interactive?.type === "list_reply") {
+              content = interactive.list_reply?.title || interactive.list_reply?.description || "[Lista]";
+            } else {
+              content = interactive?.button_reply?.title || interactive?.list_reply?.title || "[Interativo]";
+            }
+            messageType = "text";
+            break;
+          }
+          case "button":
+            content = msg.button?.text || msg.button?.payload || "[Botão]";
+            messageType = "text";
+            break;
           default:
             content = `[${msg.type || "Desconhecido"}]`;
         }
