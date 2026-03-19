@@ -182,7 +182,16 @@ Deno.serve(async (req) => {
       return createJsonResponse({ error: "WhatsApp not configured" }, 500);
     }
 
-    const phone = conversation.contact_phone.replace(/\D/g, "");
+    let phone = conversation.contact_phone.replace(/\D/g, "");
+    // Normalize Brazilian phone numbers (add 9th digit if missing)
+    if (phone.startsWith("55") && phone.length === 12) {
+      const ddd = phone.substring(2, 4);
+      const localNumber = phone.substring(4);
+      if (!localNumber.startsWith("9")) {
+        phone = `55${ddd}9${localNumber}`;
+        console.log(`Normalized phone: ${conversation.contact_phone} -> ${phone}`);
+      }
+    }
 
     const { data: nodes } = await supabase
       .from("automation_nodes")
