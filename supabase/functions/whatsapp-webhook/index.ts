@@ -52,6 +52,66 @@ Deno.serve(async (req) => {
   });
 });
 
+async function downloadWhatsAppMedia(mediaId: string, accessToken: string): Promise<{ url: string; mimeType: string } | null> {
+  try {
+    // Step 1: Get the media URL from Graph API
+    const metaRes = await fetch(`https://graph.facebook.com/v21.0/${mediaId}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!metaRes.ok) {
+      console.error("Failed to get media metadata:", await metaRes.text());
+      return null;
+    }
+    const meta = await metaRes.json();
+    const downloadUrl = meta.url;
+    const mimeType = meta.mime_type || "application/octet-stream";
+
+    // Step 2: Download the binary
+    const fileRes = await fetch(downloadUrl, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!fileRes.ok) {
+      console.error("Failed to download media:", fileRes.status);
+      return null;
+    }
+    const blob = await fileRes.blob();
+
+    // Step 3: Determine extension
+    const extMap: Record<string, string> = {
+      "audio/ogg": "ogg", "audio/mpeg": "mp3", "audio/aac": "aac",
+      "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp",
+      "video/mp4": "mp4", "video/3gpp": "3gp",
+      "application/pdf": "pdf",
+    };
+    const ext = extMap[mimeType] || "bin";
+    const fileName = `incoming-${mediaId}.${ext}`;
+
+    // Step 4: Upload to Supabase storage
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    const { error: uploadError } = await supabase.storage
+      .from("automation-media")
+      .upload(fileName, blob, { contentType: mimeType, upsert: true });
+
+    if (uploadError) {
+      console.error("Storage upload error:", uploadError);
+      return null;
+    }
+
+    const { data: publicUrl } = supabase.storage
+      .from("automation-media")
+      .getPublicUrl(fileName);
+
+    return { url: publicUrl.publicUrl, mimeType };
+  } catch (err) {
+    console.error("downloadWhatsAppMedia error:", err);
+    return null;
+  }
+}
+
 async function processWebhook(body: any) {
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
@@ -133,23 +193,47 @@ async function processWebhook(body: any) {
         // Extract message content based on type
         let content = "";
         let messageType = msg.type || "text";
+        let mediaUrl: string | null = null;
+
+        // Get access token for media downloads
+        const accessToken = Deno.env.get("WHATSAPP_ACCESS_TOKEN") || "";
 
         switch (msg.type) {
           case "text":
             content = msg.text?.body || "";
             break;
-          case "image":
-            content = msg.image?.caption || "[Imagem]";
+          case "image": {
+            content = msg.image?.caption || "";
             messageType = "image";
+            const imgMediaId = msg.image?.id;
+            if (imgMediaId && accessToken) {
+              const result = await downloadWhatsAppMedia(imgMediaId, accessToken);
+              if (result) mediaUrl = result.url;
+            }
+            if (!content && !mediaUrl) content = "[Imagem]";
             break;
-          case "audio":
-            content = "[Áudio]";
+          }
+          case "audio": {
             messageType = "audio";
+            const audioMediaId = msg.audio?.id;
+            if (audioMediaId && accessToken) {
+              const result = await downloadWhatsAppMedia(audioMediaId, accessToken);
+              if (result) mediaUrl = result.url;
+            }
+            if (!mediaUrl) content = "[Áudio]";
             break;
-          case "video":
-            content = msg.video?.caption || "[Vídeo]";
+          }
+          case "video": {
+            content = msg.video?.caption || "";
             messageType = "video";
+            const videoMediaId = msg.video?.id;
+            if (videoMediaId && accessToken) {
+              const result = await downloadWhatsAppMedia(videoMediaId, accessToken);
+              if (result) mediaUrl = result.url;
+            }
+            if (!content && !mediaUrl) content = "[Vídeo]";
             break;
+          }
           case "document":
             content = msg.document?.filename || "[Documento]";
             messageType = "document";
@@ -175,8 +259,7 @@ async function processWebhook(body: any) {
         }
 
         // Insert message
-        // Normalize message type to match check constraint
-        const allowedTypes = ["text", "image", "document", "audio"];
+        const allowedTypes = ["text", "image", "document", "audio", "video"];
         const normalizedType = allowedTypes.includes(messageType) ? messageType : "text";
 
         const { error: msgError } = await supabase.from("messages").insert({
@@ -184,6 +267,7 @@ async function processWebhook(body: any) {
           content,
           sender_type: "customer",
           message_type: normalizedType,
+          media_url: mediaUrl,
           status: "delivered",
         });
 
