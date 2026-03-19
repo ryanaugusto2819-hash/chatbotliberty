@@ -266,6 +266,27 @@ export default function FlowEditor() {
     }
   };
 
+  const handleImportDc = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string;
+        const { nodes: importedNodes, edges: importedEdges } = parseDcFile(content, handleNodeDelete, getPreview);
+        setNodes(importedNodes);
+        setEdges(importedEdges);
+        toast.success(`Importado com sucesso: ${importedNodes.length} nós`);
+      } catch (err) {
+        console.error('Import error:', err);
+        toast.error('Erro ao importar arquivo .dc');
+      }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+  }, [handleNodeDelete, setNodes, setEdges]);
+
   const handleNodeClick = (_: React.MouseEvent, node: Node) => {
     setSelectedNode(node);
   };
