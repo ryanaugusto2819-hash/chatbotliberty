@@ -21,8 +21,9 @@ import NodeEditor from '@/components/automation/NodeEditor';
 import {
   ArrowLeft, Save, MessageSquare, Clock, Image, Music, Video,
   Loader2, FileText, GitFork, Bot, ListOrdered, Play, Pause,
-  Zap, Cog
+  Zap, Cog, Upload
 } from 'lucide-react';
+import { parseDcFile } from '@/lib/dcParser';
 import { toast } from 'sonner';
 
 const nodeTypes = { automation: AutomationNode };
