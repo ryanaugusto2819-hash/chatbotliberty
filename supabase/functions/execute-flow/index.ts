@@ -264,18 +264,65 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // Send via WhatsApp API
-      const waResponse = await fetch(
-        `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`,
-        {
+      // Send via the appropriate provider
+      let waResponse: Response;
+
+      if (useZapi) {
+        // Determine Z-API endpoint based on node type
+        let zapiEndpoint: string;
+        let zapiBody: Record<string, unknown>;
+        const zapiBase = `https://api.z-api.io/instances/${zapiInstanceId}/token/${zapiToken}`;
+
+        if (node.node_type === "audio") {
+          // Send as PTT (voice message) via Z-API
+          zapiEndpoint = `${zapiBase}/send-ptts`;
+          zapiBody = { phone, audio: config.media_url };
+        } else if (node.node_type === "image") {
+          zapiEndpoint = `${zapiBase}/send-image`;
+          zapiBody = { phone, image: config.media_url, caption: (config.caption as string) || "" };
+        } else if (node.node_type === "video") {
+          zapiEndpoint = `${zapiBase}/send-video`;
+          zapiBody = { phone, video: config.media_url, caption: (config.caption as string) || "" };
+        } else {
+          // Text, quick_reply fallback -> send-text
+          const textBody = (waPayload as Record<string, unknown>).text as Record<string, unknown> | undefined;
+          const interactiveBody = (waPayload as Record<string, unknown>).interactive as Record<string, unknown> | undefined;
+          let textContent = "";
+          if (textBody) {
+            textContent = (textBody.body as string) || "";
+          } else if (interactiveBody) {
+            const body = (interactiveBody.body as Record<string, unknown>)?.text as string || "";
+            const action = interactiveBody.action as Record<string, unknown>;
+            const buttons = (action?.buttons as Array<Record<string, unknown>>) || [];
+            const btnText = buttons.map((b, i) => `${i + 1}. ${(b.reply as Record<string, unknown>)?.title || ""}`).join("\n");
+            textContent = body + (btnText ? "\n\n" + btnText : "");
+          }
+          zapiEndpoint = `${zapiBase}/send-text`;
+          zapiBody = { phone, message: textContent };
+        }
+
+        waResponse = await fetch(zapiEndpoint, {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${accessToken}`,
             "Content-Type": "application/json",
+            "Client-Token": zapiClientToken,
           },
-          body: JSON.stringify(waPayload),
-        }
-      );
+          body: JSON.stringify(zapiBody),
+        });
+      } else {
+        // WhatsApp Cloud API
+        waResponse = await fetch(
+          `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(waPayload),
+          }
+        );
+      }
 
       const waResult = await waResponse.json();
 
