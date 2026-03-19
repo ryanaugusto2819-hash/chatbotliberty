@@ -305,7 +305,7 @@ Deno.serve(async (req) => {
       } else if (node.node_type === "video") {
         waPayload = {
           messaging_product: "whatsapp",
-          to: conversation.contact_phone,
+          to: phone,
           type: "video",
           video: { link: config.media_url, caption: config.caption || undefined },
         };
