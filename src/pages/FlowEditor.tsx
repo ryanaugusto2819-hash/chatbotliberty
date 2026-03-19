@@ -459,8 +459,21 @@ export default function FlowEditor() {
                       <p className="text-[10px] text-muted-foreground leading-tight">{item.desc}</p>
                     </div>
                   </button>
-                ))}
+          ))}
+
+          {/* Import .dc */}
+          <div className="p-3 border-t border-border">
+            <label className="flex items-center gap-2.5 w-full rounded-lg px-2.5 py-2 text-left hover:bg-secondary transition-colors cursor-pointer group">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary group-hover:bg-primary/10 transition-colors">
+                <Upload className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
               </div>
+              <div>
+                <p className="text-xs font-semibold text-card-foreground">Importar .dc</p>
+                <p className="text-[10px] text-muted-foreground leading-tight">Importar fluxo externo</p>
+              </div>
+              <input type="file" accept=".dc,.json" onChange={handleImportDc} className="hidden" />
+            </label>
+          </div>
             </div>
           ))}
         </div>
