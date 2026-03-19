@@ -112,7 +112,7 @@ async function downloadWhatsAppMedia(mediaId: string, accessToken: string): Prom
   }
 }
 
-
+async function processWebhook(body: any) {
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
