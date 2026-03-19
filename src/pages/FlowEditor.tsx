@@ -459,6 +459,9 @@ export default function FlowEditor() {
                       <p className="text-[10px] text-muted-foreground leading-tight">{item.desc}</p>
                     </div>
                   </button>
+                ))}
+              </div>
+            </div>
           ))}
 
           {/* Import .dc */}
@@ -474,8 +477,6 @@ export default function FlowEditor() {
               <input type="file" accept=".dc,.json" onChange={handleImportDc} className="hidden" />
             </label>
           </div>
-            </div>
-          ))}
         </div>
 
         {/* Canvas */}
