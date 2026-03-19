@@ -50,6 +50,7 @@ interface MessageData {
   message_type: string;
   status: string;
   created_at: string;
+  media_url?: string | null;
 }
 
 export default function ChatView() {
