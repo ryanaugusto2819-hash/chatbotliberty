@@ -24,15 +24,15 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get conversation to find phone number
     const serviceClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    // Get conversation with niche info
     const { data: conversation, error: convError } = await serviceClient
       .from("conversations")
-      .select("contact_phone")
+      .select("contact_phone, niche_id")
       .eq("id", conversationId)
       .single();
 
@@ -46,23 +46,62 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Resolve phone number ID (prefer saved connection config)
-    const { data: connectionConfig } = await serviceClient
-      .from("connection_configs")
-      .select("config")
-      .eq("connection_id", "whatsapp")
-      .eq("is_connected", true)
-      .order("updated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    // Resolve the correct WhatsApp connection for this conversation
+    let phoneNumberId: string | null = null;
+    let accessToken: string | null = null;
 
-    const configuredPhoneNumberId = (connectionConfig?.config as Record<string, unknown> | null)?.phone_number_id;
-    const phoneNumberId =
-      typeof configuredPhoneNumberId === "string" && configuredPhoneNumberId.trim().length > 0
-        ? configuredPhoneNumberId
-        : Deno.env.get("WHATSAPP_PHONE_NUMBER_ID");
+    // Strategy 1: If conversation has a niche, use the niche's phone_number_id to find the connection
+    if (conversation.niche_id) {
+      const { data: niche } = await serviceClient
+        .from("niches")
+        .select("whatsapp_phone_number_id")
+        .eq("id", conversation.niche_id)
+        .single();
 
-    const accessToken = Deno.env.get("WHATSAPP_ACCESS_TOKEN");
+      if (niche?.whatsapp_phone_number_id) {
+        // Find the connection_config that has this phone_number_id
+        const { data: connections } = await serviceClient
+          .from("connection_configs")
+          .select("config")
+          .eq("connection_id", "whatsapp")
+          .eq("is_connected", true);
+
+        const match = connections?.find((c: any) => {
+          const cfg = c.config as Record<string, string>;
+          return cfg?.phone_number_id === niche.whatsapp_phone_number_id;
+        });
+
+        if (match) {
+          const cfg = match.config as Record<string, string>;
+          phoneNumberId = cfg.phone_number_id;
+          accessToken = cfg.access_token || null;
+          console.log(`[whatsapp-send] Resolved connection via niche: phoneNumberId=${phoneNumberId}`);
+        }
+      }
+    }
+
+    // Strategy 2: Fallback — pick the most recently updated whatsapp connection
+    if (!phoneNumberId || !accessToken) {
+      const { data: fallbackConn } = await serviceClient
+        .from("connection_configs")
+        .select("config")
+        .eq("connection_id", "whatsapp")
+        .eq("is_connected", true)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (fallbackConn) {
+        const cfg = fallbackConn.config as Record<string, string>;
+        if (cfg?.phone_number_id) phoneNumberId = cfg.phone_number_id;
+        if (cfg?.access_token) accessToken = cfg.access_token;
+        console.log(`[whatsapp-send] Using fallback connection: phoneNumberId=${phoneNumberId}`);
+      }
+    }
+
+    // Strategy 3: Final fallback to env vars
+    if (!phoneNumberId) phoneNumberId = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID") || null;
+    if (!accessToken) accessToken = Deno.env.get("WHATSAPP_ACCESS_TOKEN") || null;
 
     if (!phoneNumberId || !accessToken) {
       return new Response(
@@ -79,7 +118,6 @@ Deno.serve(async (req) => {
     if (phone.startsWith("55") && phone.length === 12) {
       const ddd = phone.substring(2, 4);
       const localNumber = phone.substring(4);
-      // Brazilian mobile numbers should have 9 digits (starting with 9)
       if (!localNumber.startsWith("9")) {
         phone = `55${ddd}9${localNumber}`;
         console.log(`Normalized phone: ${conversation.contact_phone} -> ${phone}`);
