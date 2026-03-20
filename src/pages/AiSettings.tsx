@@ -78,14 +78,16 @@ export default function AiSettings() {
   }, [selectedNicheId, niches]);
 
   const fetchData = async () => {
-    const [nichesRes, flowsRes] = await Promise.all([
+    const [nichesRes, flowsRes, connectionsRes] = await Promise.all([
       supabase.from('niches').select('*').order('created_at', { ascending: true }),
       supabase.from('automation_flows').select('id, name, description, is_active, niche_id').order('name'),
+      supabase.from('connection_configs').select('id, connection_id, label, status, is_connected').order('created_at'),
     ]);
 
     const nicheList = (nichesRes.data || []) as unknown as Niche[];
     setNiches(nicheList);
     setFlows((flowsRes.data || []) as unknown as FlowItem[]);
+    setConnections((connectionsRes.data || []) as unknown as ConnectionConfig[]);
 
     if (nicheList.length > 0 && !selectedNicheId) {
       setSelectedNicheId(nicheList[0].id);
@@ -93,12 +95,40 @@ export default function AiSettings() {
     setLoading(false);
   };
 
-  const createNiche = async () => {
-    if (!newNicheName.trim()) {
-      toast.error('Digite o nome do nicho');
-      return;
+  const fetchNicheConnections = async (nicheId: string) => {
+    const { data } = await supabase
+      .from('niche_connections')
+      .select('connection_config_id')
+      .eq('niche_id', nicheId);
+    setNicheConnectionIds((data || []).map((r: any) => r.connection_config_id));
+  };
+
+  useEffect(() => {
+    if (selectedNicheId) fetchNicheConnections(selectedNicheId);
+  }, [selectedNicheId]);
+
+  const toggleNicheConnection = async (connectionConfigId: string) => {
+    if (!selectedNicheId) return;
+    const isLinked = nicheConnectionIds.includes(connectionConfigId);
+
+    if (isLinked) {
+      const { error } = await supabase
+        .from('niche_connections')
+        .delete()
+        .eq('niche_id', selectedNicheId)
+        .eq('connection_config_id', connectionConfigId);
+      if (error) { toast.error('Erro ao desvincular'); return; }
+      setNicheConnectionIds(prev => prev.filter(id => id !== connectionConfigId));
+      toast.success('Conexão desvinculada');
+    } else {
+      const { error } = await supabase
+        .from('niche_connections')
+        .insert({ niche_id: selectedNicheId, connection_config_id: connectionConfigId });
+      if (error) { toast.error('Erro ao vincular'); return; }
+      setNicheConnectionIds(prev => [...prev, connectionConfigId]);
+      toast.success('Conexão vinculada');
     }
-    setCreating(true);
+  };
     const { data, error } = await supabase
       .from('niches')
       .insert({ name: newNicheName.trim(), system_prompt: defaultPrompt })
