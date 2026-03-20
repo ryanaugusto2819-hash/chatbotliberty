@@ -566,6 +566,42 @@ export type Database = {
           },
         ]
       }
+      niche_connections: {
+        Row: {
+          connection_config_id: string
+          created_at: string
+          id: string
+          niche_id: string
+        }
+        Insert: {
+          connection_config_id: string
+          created_at?: string
+          id?: string
+          niche_id: string
+        }
+        Update: {
+          connection_config_id?: string
+          created_at?: string
+          id?: string
+          niche_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "niche_connections_connection_config_id_fkey"
+            columns: ["connection_config_id"]
+            isOneToOne: false
+            referencedRelation: "connection_configs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "niche_connections_niche_id_fkey"
+            columns: ["niche_id"]
+            isOneToOne: false
+            referencedRelation: "niches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       niches: {
         Row: {
           auto_reply_enabled: boolean
