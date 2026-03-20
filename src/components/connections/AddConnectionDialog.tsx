@@ -1,12 +1,20 @@
 import { useState } from 'react';
-import { MessageSquare, Plus, Loader2, Eye, EyeOff } from 'lucide-react';
+import { MessageSquare, Plus, Loader2, Eye, EyeOff, Zap } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import EmbeddedSignup from './EmbeddedSignup';
 
 const PROVIDERS = [
+  {
+    id: 'embedded_signup',
+    name: 'WhatsApp Cloud API (Automático)',
+    description: 'Conecte com um clique via Facebook. Recomendado.',
+    fields: [],
+    isEmbedded: true,
+  },
   {
     id: 'zapi',
     name: 'Z-API (WhatsApp via QR Code)',
@@ -16,16 +24,18 @@ const PROVIDERS = [
       { key: 'token', label: 'Token', placeholder: 'A1B2C3D4E5F6...', sensitive: true },
       { key: 'client_token', label: 'Client-Token', placeholder: 'F1a2b3c4d5e6...', sensitive: true },
     ],
+    isEmbedded: false,
   },
   {
     id: 'whatsapp',
-    name: 'WhatsApp Cloud API (Meta)',
-    description: 'API oficial da Meta. Requer conta Business verificada.',
+    name: 'WhatsApp Cloud API (Manual)',
+    description: 'Configure manualmente com suas credenciais da Meta.',
     fields: [
       { key: 'phone_number_id', label: 'Phone Number ID', placeholder: '123456789012345', sensitive: false },
       { key: 'access_token', label: 'Access Token', placeholder: 'EAAxxxxxxx...', sensitive: true },
       { key: 'verify_token', label: 'Verify Token', placeholder: 'meu_token_secreto', sensitive: false },
     ],
+    isEmbedded: false,
   },
 ];
 
@@ -35,7 +45,7 @@ interface AddConnectionDialogProps {
 
 export default function AddConnectionDialog({ onCreated }: AddConnectionDialogProps) {
   const [open, setOpen] = useState(false);
-  const [step, setStep] = useState<'select' | 'form'>('select');
+  const [step, setStep] = useState<'select' | 'form' | 'embedded'>('select');
   const [selectedProvider, setSelectedProvider] = useState<typeof PROVIDERS[0] | null>(null);
   const [label, setLabel] = useState('');
   const [values, setValues] = useState<Record<string, string>>({});
@@ -48,6 +58,15 @@ export default function AddConnectionDialog({ onCreated }: AddConnectionDialogPr
     setLabel('');
     setValues({});
     setShowSecrets({});
+  };
+
+  const handleSelectProvider = (p: typeof PROVIDERS[0]) => {
+    setSelectedProvider(p);
+    if (p.isEmbedded) {
+      setStep('embedded');
+    } else {
+      setStep('form');
+    }
   };
 
   const handleCreate = async () => {
@@ -88,11 +107,15 @@ export default function AddConnectionDialog({ onCreated }: AddConnectionDialogPr
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{step === 'select' ? 'Escolha o provedor' : `Configurar ${selectedProvider?.name}`}</DialogTitle>
+          <DialogTitle>
+            {step === 'select' && 'Escolha o provedor'}
+            {step === 'form' && `Configurar ${selectedProvider?.name}`}
+            {step === 'embedded' && 'Conectar WhatsApp via Facebook'}
+          </DialogTitle>
           <DialogDescription>
-            {step === 'select'
-              ? 'Selecione o tipo de conexão WhatsApp que deseja adicionar.'
-              : 'Preencha as credenciais para conectar este número.'}
+            {step === 'select' && 'Selecione o tipo de conexão WhatsApp que deseja adicionar.'}
+            {step === 'form' && 'Preencha as credenciais para conectar este número.'}
+            {step === 'embedded' && 'Faça login com o Facebook para conectar automaticamente.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -101,19 +124,39 @@ export default function AddConnectionDialog({ onCreated }: AddConnectionDialogPr
             {PROVIDERS.map(p => (
               <button
                 key={p.id}
-                onClick={() => { setSelectedProvider(p); setStep('form'); }}
-                className="flex items-center gap-3 rounded-xl border border-border p-4 text-left hover:bg-secondary/50 transition-colors active:scale-[0.98]"
+                onClick={() => handleSelectProvider(p)}
+                className="flex items-center gap-3 rounded-xl border border-border p-4 text-left hover:bg-secondary/50 transition-colors active:scale-[0.98] relative"
               >
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <MessageSquare className="h-5 w-5" />
+                <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
+                  p.isEmbedded ? 'bg-[#1877F2]/10 text-[#1877F2]' : 'bg-primary/10 text-primary'
+                }`}>
+                  {p.isEmbedded ? <Zap className="h-5 w-5" /> : <MessageSquare className="h-5 w-5" />}
                 </div>
-                <div>
-                  <p className="text-sm font-semibold text-card-foreground">{p.name}</p>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-card-foreground">{p.name}</p>
+                    {p.isEmbedded && (
+                      <span className="text-[10px] font-bold uppercase tracking-wider bg-[#1877F2]/10 text-[#1877F2] px-1.5 py-0.5 rounded">
+                        Recomendado
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground">{p.description}</p>
                 </div>
               </button>
             ))}
           </div>
+        ) : step === 'embedded' ? (
+          <EmbeddedSignup
+            onSuccess={() => {
+              setOpen(false);
+              reset();
+              onCreated();
+            }}
+            onCancel={() => {
+              setStep('select');
+            }}
+          />
         ) : selectedProvider ? (
           <div className="space-y-4 pt-2">
             <div className="space-y-1.5">
