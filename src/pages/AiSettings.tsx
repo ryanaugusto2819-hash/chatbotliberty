@@ -3,7 +3,7 @@ import TopBar from '@/components/layout/TopBar';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Layers, Plus, Trash2, Save, Loader2, Bot, GitBranch, BookOpen,
-  Pencil, Check, X, MessageSquare, Sparkles, Phone,
+  Pencil, Check, X, MessageSquare, Sparkles, Phone, Wifi, WifiOff,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
@@ -34,12 +34,27 @@ interface FlowItem {
   niche_id: string | null;
 }
 
+interface ConnectionConfig {
+  id: string;
+  connection_id: string;
+  label: string;
+  status: string;
+  is_connected: boolean;
+}
+
+const PROVIDER_NAMES: Record<string, string> = {
+  whatsapp: 'WhatsApp Cloud API',
+  zapi: 'Z-API (QR Code)',
+};
+
 const defaultPrompt =
   'Você é um assistente virtual amigável de atendimento ao cliente via WhatsApp. Responda de forma concisa, útil e educada em português brasileiro. Se não souber a resposta, diga que vai encaminhar para um atendente humano.';
 
 export default function AiSettings() {
   const [niches, setNiches] = useState<Niche[]>([]);
   const [flows, setFlows] = useState<FlowItem[]>([]);
+  const [connections, setConnections] = useState<ConnectionConfig[]>([]);
+  const [nicheConnectionIds, setNicheConnectionIds] = useState<string[]>([]);
   const [selectedNicheId, setSelectedNicheId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -63,19 +78,56 @@ export default function AiSettings() {
   }, [selectedNicheId, niches]);
 
   const fetchData = async () => {
-    const [nichesRes, flowsRes] = await Promise.all([
+    const [nichesRes, flowsRes, connectionsRes] = await Promise.all([
       supabase.from('niches').select('*').order('created_at', { ascending: true }),
       supabase.from('automation_flows').select('id, name, description, is_active, niche_id').order('name'),
+      supabase.from('connection_configs').select('id, connection_id, label, status, is_connected').order('created_at'),
     ]);
 
     const nicheList = (nichesRes.data || []) as unknown as Niche[];
     setNiches(nicheList);
     setFlows((flowsRes.data || []) as unknown as FlowItem[]);
+    setConnections((connectionsRes.data || []) as unknown as ConnectionConfig[]);
 
     if (nicheList.length > 0 && !selectedNicheId) {
       setSelectedNicheId(nicheList[0].id);
     }
     setLoading(false);
+  };
+
+  const fetchNicheConnections = async (nicheId: string) => {
+    const { data } = await supabase
+      .from('niche_connections')
+      .select('connection_config_id')
+      .eq('niche_id', nicheId);
+    setNicheConnectionIds((data || []).map((r: any) => r.connection_config_id));
+  };
+
+  useEffect(() => {
+    if (selectedNicheId) fetchNicheConnections(selectedNicheId);
+  }, [selectedNicheId]);
+
+  const toggleNicheConnection = async (connectionConfigId: string) => {
+    if (!selectedNicheId) return;
+    const isLinked = nicheConnectionIds.includes(connectionConfigId);
+
+    if (isLinked) {
+      const { error } = await supabase
+        .from('niche_connections')
+        .delete()
+        .eq('niche_id', selectedNicheId)
+        .eq('connection_config_id', connectionConfigId);
+      if (error) { toast.error('Erro ao desvincular'); return; }
+      setNicheConnectionIds(prev => prev.filter(id => id !== connectionConfigId));
+      toast.success('Conexão desvinculada');
+    } else {
+      const { error } = await supabase
+        .from('niche_connections')
+        .insert({ niche_id: selectedNicheId, connection_config_id: connectionConfigId });
+      if (error) { toast.error('Erro ao vincular'); return; }
+      setNicheConnectionIds(prev => [...prev, connectionConfigId]);
+      toast.success('Conexão vinculada');
+    }
   };
 
   const createNiche = async () => {
@@ -418,51 +470,71 @@ export default function AiSettings() {
                 className="rounded-xl border border-border bg-card p-6 shadow-elevated space-y-6"
               >
                 <div>
-                  <p className="text-sm font-semibold text-card-foreground mb-1">Número de WhatsApp</p>
+                  <p className="text-sm font-semibold text-card-foreground mb-1">Conexões vinculadas</p>
                   <p className="text-xs text-muted-foreground">
-                    Associe o número de WhatsApp que atende este nicho. As mensagens recebidas neste número serão classificadas automaticamente.
+                    Selecione quais conexões (números de WhatsApp) atendem este nicho. Mensagens recebidas nessas conexões serão automaticamente classificadas.
                   </p>
                 </div>
 
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">Phone Number ID (Meta Cloud API)</label>
-                    <input
-                      value={editForm.whatsapp_phone_number_id || ''}
-                      onChange={(e) => setEditForm((prev) => ({ ...prev, whatsapp_phone_number_id: e.target.value }))}
-                      placeholder="Ex: 123456789012345"
-                      className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm text-foreground font-mono placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                    />
-                    <p className="text-[11px] text-muted-foreground">Encontrado em Meta for Developers → WhatsApp → API Setup</p>
+                {connections.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-border p-6 text-center">
+                    <MessageSquare className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" />
+                    <p className="text-sm text-muted-foreground">Nenhuma conexão cadastrada.</p>
+                    <p className="text-xs text-muted-foreground mt-1">Vá em <strong>Conexões</strong> para criar uma primeiro.</p>
                   </div>
-
+                ) : (
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">Instance ID (Z-API)</label>
-                    <input
-                      value={editForm.zapi_instance_id || ''}
-                      onChange={(e) => setEditForm((prev) => ({ ...prev, zapi_instance_id: e.target.value }))}
-                      placeholder="Ex: 3C2A7F8B9D1E..."
-                      className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm text-foreground font-mono placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                    />
-                    <p className="text-[11px] text-muted-foreground">Encontrado no painel da Z-API ao criar a instância</p>
+                    {connections.map((conn) => {
+                      const isLinked = nicheConnectionIds.includes(conn.id);
+                      const providerName = PROVIDER_NAMES[conn.connection_id] || conn.connection_id;
+                      const isActive = conn.status === 'active';
+                      return (
+                        <button
+                          key={conn.id}
+                          onClick={() => toggleNicheConnection(conn.id)}
+                          className={`w-full flex items-center gap-3 rounded-xl border p-4 transition-all text-left ${
+                            isLinked
+                              ? 'border-primary bg-primary/5 shadow-sm'
+                              : 'border-border bg-background hover:border-primary/30 hover:bg-primary/5'
+                          }`}
+                        >
+                          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+                            isLinked ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                          }`}>
+                            <MessageSquare className="h-4 w-4" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-foreground truncate">
+                                {conn.label || providerName}
+                              </span>
+                              <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full border ${
+                                isActive
+                                  ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                                  : 'bg-muted text-muted-foreground border-border'
+                              }`}>
+                                {isActive ? <Wifi className="h-2.5 w-2.5" /> : <WifiOff className="h-2.5 w-2.5" />}
+                                {isActive ? 'Ativo' : conn.status === 'pending_setup' ? 'Pendente' : 'Inativo'}
+                              </span>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-0.5">{providerName}</p>
+                          </div>
+                          <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors ${
+                            isLinked ? 'bg-primary border-primary text-primary-foreground' : 'border-input bg-background'
+                          }`}>
+                            {isLinked && <Check className="h-3 w-3" />}
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
-                </div>
+                )}
 
                 <div className="rounded-lg border border-border/50 bg-muted/30 p-3">
                   <p className="text-xs text-muted-foreground">
-                    <strong className="text-foreground">Dica:</strong> Preencha apenas o campo do provedor que você usa.
-                    Se usar Meta Cloud API, preencha o Phone Number ID. Se usar Z-API, preencha o Instance ID.
+                    <strong className="text-foreground">Dica:</strong> Um nicho pode ter várias conexões. Cada conexão só pode estar vinculada a um nicho por vez para evitar conflitos.
                   </p>
                 </div>
-
-                <button
-                  onClick={saveNiche}
-                  disabled={saving}
-                  className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-                >
-                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                  Salvar Conexão
-                </button>
               </motion.div>
             </TabsContent>
           </Tabs>
