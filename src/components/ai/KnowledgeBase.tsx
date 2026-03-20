@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { BookOpen, Plus, Trash2, Upload, FileText, MessageSquare, Loader2, X } from 'lucide-react';
+import { BookOpen, Plus, Trash2, Upload, FileText, MessageSquare, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 
@@ -10,18 +10,22 @@ interface KBItem {
   title: string;
   content: string;
   file_url: string | null;
+  niche_id: string | null;
   created_at: string;
 }
 
 type TabType = 'text' | 'qa' | 'file';
 
-export default function KnowledgeBase() {
+interface Props {
+  nicheId?: string;
+}
+
+export default function KnowledgeBase({ nicheId }: Props) {
   const [items, setItems] = useState<KBItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>('text');
   const [uploading, setUploading] = useState(false);
 
-  // Form states
   const [textTitle, setTextTitle] = useState('');
   const [textContent, setTextContent] = useState('');
   const [qaQuestion, setQaQuestion] = useState('');
@@ -31,14 +35,23 @@ export default function KnowledgeBase() {
 
   useEffect(() => {
     fetchItems();
-  }, []);
+  }, [nicheId]);
 
   const fetchItems = async () => {
-    const { data } = await supabase
+    setLoading(true);
+    let query = supabase
       .from('knowledge_base_items')
       .select('*')
       .order('created_at', { ascending: false });
-    setItems(data || []);
+
+    if (nicheId) {
+      query = query.eq('niche_id', nicheId);
+    } else {
+      query = query.is('niche_id', null);
+    }
+
+    const { data } = await query;
+    setItems((data || []) as unknown as KBItem[]);
     setLoading(false);
   };
 
@@ -51,6 +64,7 @@ export default function KnowledgeBase() {
       type: 'text',
       title: textTitle.trim(),
       content: textContent.trim(),
+      niche_id: nicheId || null,
     });
     if (error) {
       toast.error('Erro ao adicionar');
@@ -71,6 +85,7 @@ export default function KnowledgeBase() {
       type: 'qa',
       title: qaQuestion.trim(),
       content: qaAnswer.trim(),
+      niche_id: nicheId || null,
     });
     if (error) {
       toast.error('Erro ao adicionar');
@@ -86,7 +101,7 @@ export default function KnowledgeBase() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const maxSize = 10 * 1024 * 1024; // 10MB
+    const maxSize = 10 * 1024 * 1024;
     if (file.size > maxSize) {
       toast.error('Arquivo muito grande (máx 10MB)');
       return;
@@ -109,7 +124,6 @@ export default function KnowledgeBase() {
       .from('knowledge-base')
       .getPublicUrl(fileName);
 
-    // Read text content from file if it's a text-based file
     let content = '';
     const textTypes = ['text/plain', 'text/markdown', 'text/csv', 'application/json'];
     if (textTypes.includes(file.type) || file.name.endsWith('.txt') || file.name.endsWith('.md')) {
@@ -121,8 +135,9 @@ export default function KnowledgeBase() {
     const { error } = await supabase.from('knowledge_base_items').insert({
       type: 'file',
       title: file.name,
-      content: content.substring(0, 50000), // Limit content size
+      content: content.substring(0, 50000),
       file_url: urlData.publicUrl,
+      niche_id: nicheId || null,
     });
 
     if (error) {
@@ -136,7 +151,6 @@ export default function KnowledgeBase() {
   };
 
   const deleteItem = async (item: KBItem) => {
-    // Delete file from storage if applicable
     if (item.file_url) {
       const fileName = item.file_url.split('/').pop();
       if (fileName) {

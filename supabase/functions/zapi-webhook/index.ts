@@ -11,19 +11,15 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Z-API sends POST for incoming messages
   if (req.method === "POST") {
     const body = await req.json();
-
     const processPromise = processZapiWebhook(body);
     processPromise.catch((err) =>
       console.error("Z-API webhook processing error:", err)
     );
-
     return new Response("OK", { status: 200, headers: corsHeaders });
   }
 
-  // GET for health check
   if (req.method === "GET") {
     return new Response(JSON.stringify({ status: "ok", provider: "z-api" }), {
       status: 200,
@@ -31,11 +27,29 @@ Deno.serve(async (req) => {
     });
   }
 
-  return new Response("Method not allowed", {
-    status: 405,
-    headers: corsHeaders,
-  });
+  return new Response("Method not allowed", { status: 405, headers: corsHeaders });
 });
+
+async function resolveNicheByZapi(supabase: any): Promise<string | null> {
+  // For Z-API, resolve niche by the configured zapi_instance_id
+  const { data: zapiConfig } = await supabase
+    .from("connection_configs")
+    .select("config")
+    .eq("connection_id", "zapi")
+    .eq("is_connected", true)
+    .maybeSingle();
+
+  const instanceId = (zapiConfig?.config as any)?.instance_id;
+  if (!instanceId) return null;
+
+  const { data } = await supabase
+    .from("niches")
+    .select("id")
+    .eq("zapi_instance_id", instanceId)
+    .maybeSingle();
+
+  return data?.id || null;
+}
 
 async function processZapiWebhook(body: any) {
   const supabase = createClient(
@@ -45,7 +59,6 @@ async function processZapiWebhook(body: any) {
 
   console.log("Z-API webhook received:", JSON.stringify(body));
 
-  // Check if Z-API connection is active
   const { data: connectionConfig } = await supabase
     .from("connection_configs")
     .select("is_connected")
@@ -57,8 +70,6 @@ async function processZapiWebhook(body: any) {
     return;
   }
 
-  // Z-API webhook format: https://developer.z-api.io/webhooks/on-message-received
-  // Check if it's a received message
   if (!body.phone && !body.chatId) {
     console.log("Not a message event, skipping");
     return;
@@ -70,10 +81,8 @@ async function processZapiWebhook(body: any) {
   const contactName = body.senderName || body.chatName || phone;
   const isFromMe = body.fromMe === true;
   const isGroup = body.isGroup === true;
-  // Z-API group phones contain "-group" or are old format like "number-number"
   const isGroupPhone = phone.includes("-group") || phone.includes("@g.us");
 
-  // Skip messages sent by us or from groups
   if (isFromMe) {
     console.log("Message from self, skipping");
     return;
@@ -83,7 +92,9 @@ async function processZapiWebhook(body: any) {
     return;
   }
 
-  // Upsert conversation
+  // Resolve niche
+  const nicheId = await resolveNicheByZapi(supabase);
+
   let conversationId: string;
 
   const { data: existing } = await supabase
@@ -96,9 +107,11 @@ async function processZapiWebhook(body: any) {
 
   if (existing) {
     conversationId = existing.id;
+    const updateData: any = { updated_at: new Date().toISOString(), status: "active" };
+    if (nicheId) updateData.niche_id = nicheId;
     await supabase
       .from("conversations")
-      .update({ updated_at: new Date().toISOString(), status: "active" })
+      .update(updateData)
       .eq("id", conversationId);
   } else {
     const { data: newConv, error: convError } = await supabase
@@ -108,6 +121,7 @@ async function processZapiWebhook(body: any) {
         contact_phone: phone,
         status: "new",
         tags: [],
+        niche_id: nicheId,
       })
       .select("id")
       .single();
@@ -119,7 +133,6 @@ async function processZapiWebhook(body: any) {
     conversationId = newConv.id;
   }
 
-  // Extract content based on Z-API message type
   let content = "";
   let messageType = "text";
   let mediaUrl: string | null = null;
@@ -163,7 +176,6 @@ async function processZapiWebhook(body: any) {
     content = body.body || "[Mensagem]";
   }
 
-  // Normalize type
   const allowedTypes = ["text", "image", "document", "audio", "video"];
   const normalizedType = allowedTypes.includes(messageType) ? messageType : "text";
 
@@ -179,7 +191,6 @@ async function processZapiWebhook(body: any) {
   if (msgError) {
     console.error("Error inserting message:", msgError);
   } else {
-    // Trigger AI flow selector first, then auto-reply as fallback
     triggerAiFlowSelector(conversationId).catch((err) =>
       console.error("Flow selector trigger error:", err)
     );

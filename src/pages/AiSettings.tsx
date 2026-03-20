@@ -1,20 +1,29 @@
 import { useState, useEffect } from 'react';
 import TopBar from '@/components/layout/TopBar';
 import { supabase } from '@/integrations/supabase/client';
-import { Bot, Save, Loader2, Sparkles, GitBranch, Pencil, Check, X } from 'lucide-react';
+import {
+  Layers, Plus, Trash2, Save, Loader2, Bot, GitBranch, BookOpen,
+  Pencil, Check, X, MessageSquare, Sparkles, Phone,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import KnowledgeBase from '@/components/ai/KnowledgeBase';
-import AiUsageControl from '@/components/ai/AiUsageControl';
 
-interface AiConfig {
-  enabled: boolean;
+interface Niche {
+  id: string;
+  name: string;
+  whatsapp_phone_number_id: string | null;
+  zapi_instance_id: string | null;
   system_prompt: string;
-}
-
-interface FlowSelectorConfig {
-  enabled: boolean;
-  instructions: string;
+  flow_selector_instructions: string;
+  auto_reply_enabled: boolean;
+  flow_selector_enabled: boolean;
+  created_at: string;
 }
 
 interface FlowItem {
@@ -22,96 +31,131 @@ interface FlowItem {
   name: string;
   description: string | null;
   is_active: boolean;
+  niche_id: string | null;
 }
 
 const defaultPrompt =
   'Você é um assistente virtual amigável de atendimento ao cliente via WhatsApp. Responda de forma concisa, útil e educada em português brasileiro. Se não souber a resposta, diga que vai encaminhar para um atendente humano.';
 
-const defaultSelectorInstructions =
-  'Analise a mensagem do cliente e selecione o fluxo mais adequado. Só selecione um fluxo se realmente fizer sentido para a mensagem. Se nenhum se encaixar, não dispare nada.';
-
 export default function AiSettings() {
-  const [config, setConfig] = useState<AiConfig>({ enabled: false, system_prompt: defaultPrompt });
-  const [flowSelector, setFlowSelector] = useState<FlowSelectorConfig>({ enabled: false, instructions: defaultSelectorInstructions });
+  const [niches, setNiches] = useState<Niche[]>([]);
   const [flows, setFlows] = useState<FlowItem[]>([]);
-  const [editingFlow, setEditingFlow] = useState<string | null>(null);
-  const [editDesc, setEditDesc] = useState('');
+  const [selectedNicheId, setSelectedNicheId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [newNicheName, setNewNicheName] = useState('');
+
+  // Editing state
+  const [editForm, setEditForm] = useState<Partial<Niche>>({});
+  const [editingFlow, setEditingFlow] = useState<string | null>(null);
+  const [editDesc, setEditDesc] = useState('');
 
   useEffect(() => {
-    fetchConfig();
+    fetchData();
   }, []);
 
-  const fetchConfig = async () => {
-    const [autoReply, flowSel, flowsData] = await Promise.all([
-      supabase
-        .from('connection_configs')
-        .select('config')
-        .eq('connection_id', 'ai-auto-reply')
-        .maybeSingle(),
-      supabase
-        .from('connection_configs')
-        .select('config')
-        .eq('connection_id', 'ai-flow-selector')
-        .maybeSingle(),
-      supabase
-        .from('automation_flows')
-        .select('id, name, description, is_active')
-        .order('is_active', { ascending: false })
-        .order('name', { ascending: true }),
+  useEffect(() => {
+    if (selectedNicheId && niches.length) {
+      const niche = niches.find((n) => n.id === selectedNicheId);
+      if (niche) setEditForm(niche);
+    }
+  }, [selectedNicheId, niches]);
+
+  const fetchData = async () => {
+    const [nichesRes, flowsRes] = await Promise.all([
+      supabase.from('niches').select('*').order('created_at', { ascending: true }),
+      supabase.from('automation_flows').select('id, name, description, is_active, niche_id').order('name'),
     ]);
 
-    if (autoReply.data?.config) {
-      const c = autoReply.data.config as Record<string, unknown>;
-      setConfig({
-        enabled: !!c.enabled,
-        system_prompt: (c.system_prompt as string) || defaultPrompt,
-      });
-    }
+    const nicheList = (nichesRes.data || []) as unknown as Niche[];
+    setNiches(nicheList);
+    setFlows((flowsRes.data || []) as unknown as FlowItem[]);
 
-    if (flowSel.data?.config) {
-      const c = flowSel.data.config as Record<string, unknown>;
-      setFlowSelector({
-        enabled: !!c.enabled,
-        instructions: (c.instructions as string) || defaultSelectorInstructions,
-      });
+    if (nicheList.length > 0 && !selectedNicheId) {
+      setSelectedNicheId(nicheList[0].id);
     }
-
-    setFlows(flowsData.data || []);
     setLoading(false);
   };
 
-  const handleSave = async () => {
+  const createNiche = async () => {
+    if (!newNicheName.trim()) {
+      toast.error('Digite o nome do nicho');
+      return;
+    }
+    setCreating(true);
+    const { data, error } = await supabase
+      .from('niches')
+      .insert({ name: newNicheName.trim(), system_prompt: defaultPrompt })
+      .select()
+      .single();
+
+    if (error) {
+      toast.error('Erro ao criar nicho');
+    } else {
+      const newNiche = data as unknown as Niche;
+      setNiches((prev) => [...prev, newNiche]);
+      setSelectedNicheId(newNiche.id);
+      setNewNicheName('');
+      toast.success('Nicho criado!');
+    }
+    setCreating(false);
+  };
+
+  const deleteNiche = async (id: string) => {
+    const { error } = await supabase.from('niches').delete().eq('id', id);
+    if (error) {
+      toast.error('Erro ao excluir nicho');
+    } else {
+      setNiches((prev) => prev.filter((n) => n.id !== id));
+      if (selectedNicheId === id) {
+        const remaining = niches.filter((n) => n.id !== id);
+        setSelectedNicheId(remaining.length > 0 ? remaining[0].id : null);
+      }
+      toast.success('Nicho excluído');
+    }
+  };
+
+  const saveNiche = async () => {
+    if (!selectedNicheId || !editForm) return;
     setSaving(true);
 
-    const [r1, r2] = await Promise.all([
-      supabase.functions.invoke('save-connection', {
-        body: {
-          connectionId: 'ai-auto-reply',
-          config: { enabled: config.enabled, system_prompt: config.system_prompt },
-        },
-      }),
-      supabase.functions.invoke('save-connection', {
-        body: {
-          connectionId: 'ai-flow-selector',
-          config: { enabled: flowSelector.enabled, instructions: flowSelector.instructions },
-        },
-      }),
-    ]);
+    const { error } = await supabase
+      .from('niches')
+      .update({
+        name: editForm.name,
+        whatsapp_phone_number_id: editForm.whatsapp_phone_number_id || null,
+        zapi_instance_id: editForm.zapi_instance_id || null,
+        system_prompt: editForm.system_prompt,
+        flow_selector_instructions: editForm.flow_selector_instructions,
+        auto_reply_enabled: editForm.auto_reply_enabled,
+        flow_selector_enabled: editForm.flow_selector_enabled,
+      })
+      .eq('id', selectedNicheId);
 
-    if (r1.error || r2.error) {
-      toast.error('Erro ao salvar configurações');
-      console.error(r1.error, r2.error);
+    if (error) {
+      toast.error('Erro ao salvar');
     } else {
-      toast.success('Configurações salvas com sucesso');
+      setNiches((prev) =>
+        prev.map((n) => (n.id === selectedNicheId ? { ...n, ...editForm } : n))
+      );
+      toast.success('Nicho salvo!');
     }
     setSaving(false);
   };
 
-  const startEditDesc = (flow: FlowItem) => {
-    setEditingFlow(flow.id);
-    setEditDesc(flow.description || '');
+  const assignFlowToNiche = async (flowId: string, nicheId: string | null) => {
+    const { error } = await supabase
+      .from('automation_flows')
+      .update({ niche_id: nicheId })
+      .eq('id', flowId);
+
+    if (error) {
+      toast.error('Erro ao vincular fluxo');
+    } else {
+      setFlows((prev) => prev.map((f) => (f.id === flowId ? { ...f, niche_id: nicheId } : f)));
+      toast.success('Fluxo atualizado');
+    }
   };
 
   const saveFlowDesc = async (flowId: string) => {
@@ -129,10 +173,14 @@ export default function AiSettings() {
     setEditingFlow(null);
   };
 
+  const selectedNiche = niches.find((n) => n.id === selectedNicheId);
+  const nicheFlows = flows.filter((f) => f.niche_id === selectedNicheId);
+  const unassignedFlows = flows.filter((f) => !f.niche_id);
+
   if (loading) {
     return (
       <div>
-        <TopBar title="Integração IA" subtitle="Chatbot inteligente com IA" />
+        <TopBar title="Nichos de Atendimento" subtitle="Configure IA e fluxos por nicho" />
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
@@ -142,229 +190,399 @@ export default function AiSettings() {
 
   return (
     <div>
-      <TopBar title="Integração IA" subtitle="Chatbot inteligente com IA" />
-      <div className="p-6 max-w-2xl space-y-6">
-        {/* Auto-reply Section */}
+      <TopBar title="Nichos de Atendimento" subtitle="Configure IA, fluxos e base de conhecimento por nicho" />
+      <div className="p-6 max-w-4xl">
+        {/* Niche selector / creator */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          className="rounded-xl border border-border bg-card p-6 shadow-elevated"
+          className="rounded-xl border border-border bg-card p-5 shadow-elevated mb-6"
         >
-          <div className="flex items-center gap-3 mb-6">
+          <div className="flex items-center gap-3 mb-4">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent">
-              <Bot className="h-5 w-5 text-accent-foreground" />
+              <Layers className="h-5 w-5 text-accent-foreground" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-card-foreground">Resposta Automática com IA</p>
-              <p className="text-xs text-muted-foreground">
-                Responde automaticamente mensagens de clientes usando inteligência artificial
-              </p>
+              <p className="text-sm font-semibold text-card-foreground">Seus Nichos</p>
+              <p className="text-xs text-muted-foreground">Cada nicho tem sua própria IA, fluxos e base de conhecimento</p>
             </div>
           </div>
 
-          <div className="flex items-center justify-between rounded-lg border border-border bg-background p-4 mb-6">
-            <div className="flex items-center gap-3">
-              <Sparkles className="h-4 w-4 text-primary" />
-              <div>
-                <p className="text-sm font-medium text-foreground">Ativar respostas automáticas</p>
-                <p className="text-xs text-muted-foreground">
-                  A IA responderá automaticamente todas as mensagens recebidas
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => setConfig((prev) => ({ ...prev, enabled: !prev.enabled }))}
-              className={`relative h-6 w-11 rounded-full transition-colors ${
-                config.enabled ? 'bg-primary' : 'bg-muted'
-              }`}
-            >
-              <span
-                className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                  config.enabled ? 'translate-x-5' : ''
+          {/* Niche tabs */}
+          <div className="flex flex-wrap gap-2 mb-4">
+            {niches.map((niche) => (
+              <button
+                key={niche.id}
+                onClick={() => setSelectedNicheId(niche.id)}
+                className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                  selectedNicheId === niche.id
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
                 }`}
-              />
-            </button>
+              >
+                <Layers className="h-3.5 w-3.5" />
+                {niche.name}
+              </button>
+            ))}
           </div>
 
-          <div className="space-y-2 mb-6">
-            <label className="text-sm font-medium text-foreground">Prompt do Sistema</label>
-            <p className="text-xs text-muted-foreground">
-              Instruções que definem como a IA deve se comportar e responder
-            </p>
-            <textarea
-              value={config.system_prompt}
-              onChange={(e) => setConfig((prev) => ({ ...prev, system_prompt: e.target.value }))}
-              rows={6}
-              className="w-full resize-none rounded-lg border border-input bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+          {/* Create new niche */}
+          <div className="flex gap-2">
+            <input
+              value={newNicheName}
+              onChange={(e) => setNewNicheName(e.target.value)}
+              placeholder="Nome do novo nicho (ex: Clínica, Imobiliária...)"
+              className="flex-1 rounded-lg border border-input bg-background px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              onKeyDown={(e) => e.key === 'Enter' && createNiche()}
             />
+            <button
+              onClick={createNiche}
+              disabled={creating}
+              className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              Criar
+            </button>
           </div>
         </motion.div>
 
-        {/* Flow Selector Section */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.1 }}
-          className="rounded-xl border border-border bg-card p-6 shadow-elevated"
-        >
-          <div className="flex items-center gap-3 mb-6">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent">
-              <GitBranch className="h-5 w-5 text-accent-foreground" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-card-foreground">Selecionador de Fluxo por IA</p>
-              <p className="text-xs text-muted-foreground">
-                A IA analisa a mensagem do cliente e dispara automaticamente o fluxo de automação mais adequado
-              </p>
-            </div>
-          </div>
+        {/* Selected niche config */}
+        {selectedNiche && (
+          <Tabs defaultValue="ai" className="space-y-4">
+            <TabsList className="w-full">
+              <TabsTrigger value="ai" className="flex-1 gap-2">
+                <Bot className="h-4 w-4" /> IA & Prompt
+              </TabsTrigger>
+              <TabsTrigger value="flows" className="flex-1 gap-2">
+                <GitBranch className="h-4 w-4" /> Fluxos
+              </TabsTrigger>
+              <TabsTrigger value="knowledge" className="flex-1 gap-2">
+                <BookOpen className="h-4 w-4" /> Conhecimento
+              </TabsTrigger>
+              <TabsTrigger value="connection" className="flex-1 gap-2">
+                <Phone className="h-4 w-4" /> Conexão
+              </TabsTrigger>
+            </TabsList>
 
-          {/* Toggle */}
-          <div className="flex items-center justify-between rounded-lg border border-border bg-background p-4 mb-6">
-            <div className="flex items-center gap-3">
-              <GitBranch className="h-4 w-4 text-primary" />
-              <div>
-                <p className="text-sm font-medium text-foreground">Ativar seleção automática de fluxo</p>
-                <p className="text-xs text-muted-foreground">
-                  A cada mensagem recebida, a IA decide se deve disparar um fluxo
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => setFlowSelector((prev) => ({ ...prev, enabled: !prev.enabled }))}
-              className={`relative h-6 w-11 rounded-full transition-colors ${
-                flowSelector.enabled ? 'bg-primary' : 'bg-muted'
-              }`}
-            >
-              <span
-                className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                  flowSelector.enabled ? 'translate-x-5' : ''
-                }`}
-              />
-            </button>
-          </div>
-
-          {/* Instructions */}
-          <div className="space-y-2 mb-6">
-            <label className="text-sm font-medium text-foreground">Instruções para a IA</label>
-            <p className="text-xs text-muted-foreground">
-              Orientações adicionais sobre como a IA deve decidir qual fluxo disparar
-            </p>
-            <textarea
-              value={flowSelector.instructions}
-              onChange={(e) => setFlowSelector((prev) => ({ ...prev, instructions: e.target.value }))}
-              rows={4}
-              placeholder="Ex: Priorize o fluxo de vendas quando o cliente perguntar sobre preços..."
-              className="w-full resize-none rounded-lg border border-input bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-            />
-          </div>
-
-          {/* Flows list */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground">Fluxos e Descrições</label>
-            <p className="text-xs text-muted-foreground mb-3">
-              A IA usa o nome e a descrição de cada fluxo para decidir quando ativá-lo. Adicione descrições claras.
-            </p>
-
-            {flows.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-border p-4 text-center">
-                <p className="text-xs text-muted-foreground">Nenhum fluxo criado. Crie fluxos na página de Automações.</p>
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-80 overflow-y-auto">
-                {flows.map((flow) => (
-                  <div
-                    key={flow.id}
-                    className="rounded-lg border border-border bg-background p-3"
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-2">
-                        <GitBranch className="h-3.5 w-3.5 text-primary shrink-0" />
-                        <span className="text-sm font-medium text-foreground">{flow.name}</span>
-                      </div>
-                      <span
-                        className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                          flow.is_active
-                            ? 'bg-primary/10 text-primary'
-                            : 'bg-secondary text-muted-foreground'
-                        }`}
-                      >
-                        {flow.is_active ? 'Ativo' : 'Inativo'}
-                      </span>
+            {/* AI & Prompt Tab */}
+            <TabsContent value="ai">
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="rounded-xl border border-border bg-card p-6 shadow-elevated space-y-6"
+              >
+                {/* Auto-reply toggle */}
+                <div className="flex items-center justify-between rounded-lg border border-border bg-background p-4">
+                  <div className="flex items-center gap-3">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Resposta Automática com IA</p>
+                      <p className="text-xs text-muted-foreground">A IA responde automaticamente neste nicho</p>
                     </div>
-
-                    {editingFlow === flow.id ? (
-                      <div className="flex gap-2 mt-2">
-                        <input
-                          value={editDesc}
-                          onChange={(e) => setEditDesc(e.target.value)}
-                          placeholder="Descreva quando este fluxo deve ser ativado..."
-                          className="flex-1 rounded-md border border-input bg-background px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                          autoFocus
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') saveFlowDesc(flow.id);
-                            if (e.key === 'Escape') setEditingFlow(null);
-                          }}
-                        />
-                        <button
-                          onClick={() => saveFlowDesc(flow.id)}
-                          className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
-                        >
-                          <Check className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          onClick={() => setEditingFlow(null)}
-                          className="flex h-7 w-7 items-center justify-center rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex items-start gap-2 mt-1">
-                        <p className="text-xs text-muted-foreground flex-1">
-                          {flow.description || (
-                            <span className="italic text-destructive/70">Sem descrição — a IA não saberá quando usar este fluxo</span>
-                          )}
-                        </p>
-                        <button
-                          onClick={() => startEditDesc(flow)}
-                          className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
-                          title="Editar descrição"
-                        >
-                          <Pencil className="h-3 w-3" />
-                        </button>
-                      </div>
-                    )}
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+                  <button
+                    onClick={() => setEditForm((prev) => ({ ...prev, auto_reply_enabled: !prev.auto_reply_enabled }))}
+                    className={`relative h-6 w-11 rounded-full transition-colors ${editForm.auto_reply_enabled ? 'bg-primary' : 'bg-muted'}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${editForm.auto_reply_enabled ? 'translate-x-5' : ''}`} />
+                  </button>
+                </div>
 
-          <div className="rounded-lg border border-border/50 bg-muted/30 p-3 mt-4">
+                {/* System Prompt */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Prompt do Sistema</label>
+                  <p className="text-xs text-muted-foreground">Como a IA deste nicho deve se comportar</p>
+                  <textarea
+                    value={editForm.system_prompt || ''}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, system_prompt: e.target.value }))}
+                    rows={6}
+                    className="w-full resize-none rounded-lg border border-input bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+
+                {/* Flow selector toggle */}
+                <div className="flex items-center justify-between rounded-lg border border-border bg-background p-4">
+                  <div className="flex items-center gap-3">
+                    <GitBranch className="h-4 w-4 text-primary" />
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Seletor de Fluxo por IA</p>
+                      <p className="text-xs text-muted-foreground">A IA dispara fluxos automaticamente neste nicho</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setEditForm((prev) => ({ ...prev, flow_selector_enabled: !prev.flow_selector_enabled }))}
+                    className={`relative h-6 w-11 rounded-full transition-colors ${editForm.flow_selector_enabled ? 'bg-primary' : 'bg-muted'}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${editForm.flow_selector_enabled ? 'translate-x-5' : ''}`} />
+                  </button>
+                </div>
+
+                {/* Flow selector instructions */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Instruções do Seletor de Fluxo</label>
+                  <textarea
+                    value={editForm.flow_selector_instructions || ''}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, flow_selector_instructions: e.target.value }))}
+                    rows={3}
+                    placeholder="Ex: Priorize o fluxo de vendas quando o cliente perguntar sobre preços..."
+                    className="w-full resize-none rounded-lg border border-input bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+
+                <button
+                  onClick={saveNiche}
+                  disabled={saving}
+                  className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+                >
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  Salvar Configurações
+                </button>
+              </motion.div>
+            </TabsContent>
+
+            {/* Flows Tab */}
+            <TabsContent value="flows">
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="rounded-xl border border-border bg-card p-6 shadow-elevated space-y-4"
+              >
+                <div>
+                  <p className="text-sm font-semibold text-card-foreground mb-1">Fluxos deste nicho</p>
+                  <p className="text-xs text-muted-foreground mb-4">
+                    A IA só considerará estes fluxos para conversas do nicho "{selectedNiche.name}"
+                  </p>
+                </div>
+
+                {nicheFlows.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-border p-4 text-center">
+                    <p className="text-xs text-muted-foreground">Nenhum fluxo vinculado a este nicho. Vincule fluxos abaixo.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {nicheFlows.map((flow) => (
+                      <FlowCard
+                        key={flow.id}
+                        flow={flow}
+                        editingFlow={editingFlow}
+                        editDesc={editDesc}
+                        setEditDesc={setEditDesc}
+                        onStartEdit={() => { setEditingFlow(flow.id); setEditDesc(flow.description || ''); }}
+                        onSaveDesc={() => saveFlowDesc(flow.id)}
+                        onCancelEdit={() => setEditingFlow(null)}
+                        onUnassign={() => assignFlowToNiche(flow.id, null)}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* Unassigned flows */}
+                {unassignedFlows.length > 0 && (
+                  <div className="pt-4 border-t border-border">
+                    <p className="text-sm font-medium text-foreground mb-2">Fluxos sem nicho</p>
+                    <p className="text-xs text-muted-foreground mb-3">Clique para vincular ao nicho "{selectedNiche.name}"</p>
+                    <div className="space-y-2">
+                      {unassignedFlows.map((flow) => (
+                        <button
+                          key={flow.id}
+                          onClick={() => assignFlowToNiche(flow.id, selectedNicheId)}
+                          className="w-full flex items-center gap-3 rounded-lg border border-dashed border-border bg-background p-3 hover:border-primary/50 hover:bg-primary/5 transition-colors text-left"
+                        >
+                          <GitBranch className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <span className="text-sm font-medium text-foreground">{flow.name}</span>
+                            <p className="text-xs text-muted-foreground truncate">{flow.description || 'Sem descrição'}</p>
+                          </div>
+                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${flow.is_active ? 'bg-primary/10 text-primary' : 'bg-secondary text-muted-foreground'}`}>
+                            {flow.is_active ? 'Ativo' : 'Inativo'}
+                          </span>
+                          <Plus className="h-4 w-4 text-primary shrink-0" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+            </TabsContent>
+
+            {/* Knowledge Base Tab */}
+            <TabsContent value="knowledge">
+              <KnowledgeBase nicheId={selectedNicheId || undefined} />
+            </TabsContent>
+
+            {/* Connection Tab */}
+            <TabsContent value="connection">
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="rounded-xl border border-border bg-card p-6 shadow-elevated space-y-6"
+              >
+                <div>
+                  <p className="text-sm font-semibold text-card-foreground mb-1">Número de WhatsApp</p>
+                  <p className="text-xs text-muted-foreground">
+                    Associe o número de WhatsApp que atende este nicho. As mensagens recebidas neste número serão classificadas automaticamente.
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Phone Number ID (Meta Cloud API)</label>
+                    <input
+                      value={editForm.whatsapp_phone_number_id || ''}
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, whatsapp_phone_number_id: e.target.value }))}
+                      placeholder="Ex: 123456789012345"
+                      className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm text-foreground font-mono placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                    <p className="text-[11px] text-muted-foreground">Encontrado em Meta for Developers → WhatsApp → API Setup</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Instance ID (Z-API)</label>
+                    <input
+                      value={editForm.zapi_instance_id || ''}
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, zapi_instance_id: e.target.value }))}
+                      placeholder="Ex: 3C2A7F8B9D1E..."
+                      className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm text-foreground font-mono placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                    <p className="text-[11px] text-muted-foreground">Encontrado no painel da Z-API ao criar a instância</p>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-border/50 bg-muted/30 p-3">
+                  <p className="text-xs text-muted-foreground">
+                    <strong className="text-foreground">Dica:</strong> Preencha apenas o campo do provedor que você usa.
+                    Se usar Meta Cloud API, preencha o Phone Number ID. Se usar Z-API, preencha o Instance ID.
+                  </p>
+                </div>
+
+                <button
+                  onClick={saveNiche}
+                  disabled={saving}
+                  className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+                >
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  Salvar Conexão
+                </button>
+              </motion.div>
+            </TabsContent>
+          </Tabs>
+        )}
+
+        {/* Delete niche */}
+        {selectedNiche && (
+          <div className="mt-6 flex justify-end">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <button className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-2 text-sm font-medium text-destructive hover:bg-destructive/20 transition-colors">
+                  <Trash2 className="h-4 w-4" />
+                  Excluir nicho "{selectedNiche.name}"
+                </button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Excluir nicho</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Tem certeza? A base de conhecimento vinculada será excluída. Os fluxos ficarão sem nicho.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => deleteNiche(selectedNiche.id)}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Excluir
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        )}
+
+        {niches.length === 0 && (
+          <div className="rounded-xl border border-dashed border-border p-8 text-center">
+            <Layers className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
+            <p className="text-sm font-medium text-foreground mb-1">Nenhum nicho criado</p>
             <p className="text-xs text-muted-foreground">
-              <strong className="text-foreground">Dica:</strong> Quanto mais clara a descrição do fluxo, melhor a IA acerta.
-              Ex: "Ativar quando o cliente perguntar sobre preços, planos ou valores dos serviços."
+              Crie seu primeiro nicho acima para começar a separar o atendimento por área.
             </p>
           </div>
-        </motion.div>
-
-        {/* Knowledge Base Section */}
-        <KnowledgeBase />
-
-        {/* AI Usage Control Section */}
-        <AiUsageControl />
-
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-        >
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          Salvar Configurações
-        </button>
+        )}
       </div>
+    </div>
+  );
+}
+
+function FlowCard({
+  flow,
+  editingFlow,
+  editDesc,
+  setEditDesc,
+  onStartEdit,
+  onSaveDesc,
+  onCancelEdit,
+  onUnassign,
+}: {
+  flow: FlowItem;
+  editingFlow: string | null;
+  editDesc: string;
+  setEditDesc: (v: string) => void;
+  onStartEdit: () => void;
+  onSaveDesc: () => void;
+  onCancelEdit: () => void;
+  onUnassign: () => void;
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-background p-3">
+      <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center gap-2">
+          <GitBranch className="h-3.5 w-3.5 text-primary shrink-0" />
+          <span className="text-sm font-medium text-foreground">{flow.name}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${flow.is_active ? 'bg-primary/10 text-primary' : 'bg-secondary text-muted-foreground'}`}>
+            {flow.is_active ? 'Ativo' : 'Inativo'}
+          </span>
+          <button
+            onClick={onUnassign}
+            className="text-muted-foreground hover:text-destructive transition-colors"
+            title="Desvincular"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+
+      {editingFlow === flow.id ? (
+        <div className="flex gap-2 mt-2">
+          <input
+            value={editDesc}
+            onChange={(e) => setEditDesc(e.target.value)}
+            placeholder="Descreva quando este fluxo deve ser ativado..."
+            className="flex-1 rounded-md border border-input bg-background px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') onSaveDesc();
+              if (e.key === 'Escape') onCancelEdit();
+            }}
+          />
+          <button onClick={onSaveDesc} className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground hover:bg-primary/90">
+            <Check className="h-3.5 w-3.5" />
+          </button>
+          <button onClick={onCancelEdit} className="flex h-7 w-7 items-center justify-center rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80">
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      ) : (
+        <div className="flex items-start gap-2 mt-1">
+          <p className="text-xs text-muted-foreground flex-1">
+            {flow.description || <span className="italic text-destructive/70">Sem descrição</span>}
+          </p>
+          <button onClick={onStartEdit} className="shrink-0 text-muted-foreground hover:text-foreground transition-colors" title="Editar">
+            <Pencil className="h-3 w-3" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

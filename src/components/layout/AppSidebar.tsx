@@ -21,7 +21,7 @@ const allNavItems = [
   { to: '/conversations', icon: MessageSquare, label: 'Conversas', adminOnly: false },
   { to: '/agents', icon: Users, label: 'Atendentes', adminOnly: true },
   { to: '/automation', icon: GitBranch, label: 'Automação', adminOnly: true },
-  { to: '/ai', icon: Bot, label: 'IA', adminOnly: true },
+  { to: '/ai', icon: Bot, label: 'Nichos & IA', adminOnly: true },
   { to: '/reports', icon: BarChart3, label: 'Relatórios', adminOnly: true },
   { to: '/connections', icon: Plug, label: 'Conexões', adminOnly: true },
   { to: '/users', icon: ShieldCheck, label: 'Usuários', adminOnly: true },

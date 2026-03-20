@@ -148,6 +148,7 @@ export type Database = {
           id: string
           is_active: boolean
           name: string
+          niche_id: string | null
           trigger_count: number
           updated_at: string
         }
@@ -158,6 +159,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           name?: string
+          niche_id?: string | null
           trigger_count?: number
           updated_at?: string
         }
@@ -168,10 +170,19 @@ export type Database = {
           id?: string
           is_active?: boolean
           name?: string
+          niche_id?: string | null
           trigger_count?: number
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "automation_flows_niche_id_fkey"
+            columns: ["niche_id"]
+            isOneToOne: false
+            referencedRelation: "niches"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       automation_nodes: {
         Row: {
@@ -286,6 +297,7 @@ export type Database = {
           created_at: string
           ctwa_clid: string | null
           id: string
+          niche_id: string | null
           resolved_at: string | null
           source_id: string | null
           status: string
@@ -301,6 +313,7 @@ export type Database = {
           created_at?: string
           ctwa_clid?: string | null
           id?: string
+          niche_id?: string | null
           resolved_at?: string | null
           source_id?: string | null
           status?: string
@@ -316,6 +329,7 @@ export type Database = {
           created_at?: string
           ctwa_clid?: string | null
           id?: string
+          niche_id?: string | null
           resolved_at?: string | null
           source_id?: string | null
           status?: string
@@ -328,6 +342,13 @@ export type Database = {
             columns: ["assigned_agent_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_niche_id_fkey"
+            columns: ["niche_id"]
+            isOneToOne: false
+            referencedRelation: "niches"
             referencedColumns: ["id"]
           },
         ]
@@ -450,6 +471,7 @@ export type Database = {
           created_at: string
           file_url: string | null
           id: string
+          niche_id: string | null
           title: string
           type: string
           updated_at: string
@@ -459,6 +481,7 @@ export type Database = {
           created_at?: string
           file_url?: string | null
           id?: string
+          niche_id?: string | null
           title?: string
           type?: string
           updated_at?: string
@@ -468,11 +491,20 @@ export type Database = {
           created_at?: string
           file_url?: string | null
           id?: string
+          niche_id?: string | null
           title?: string
           type?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "knowledge_base_items_niche_id_fkey"
+            columns: ["niche_id"]
+            isOneToOne: false
+            referencedRelation: "niches"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       messages: {
         Row: {
@@ -524,6 +556,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      niches: {
+        Row: {
+          auto_reply_enabled: boolean
+          created_at: string
+          flow_selector_enabled: boolean
+          flow_selector_instructions: string
+          id: string
+          name: string
+          system_prompt: string
+          updated_at: string
+          whatsapp_phone_number_id: string | null
+          zapi_instance_id: string | null
+        }
+        Insert: {
+          auto_reply_enabled?: boolean
+          created_at?: string
+          flow_selector_enabled?: boolean
+          flow_selector_instructions?: string
+          id?: string
+          name: string
+          system_prompt?: string
+          updated_at?: string
+          whatsapp_phone_number_id?: string | null
+          zapi_instance_id?: string | null
+        }
+        Update: {
+          auto_reply_enabled?: boolean
+          created_at?: string
+          flow_selector_enabled?: boolean
+          flow_selector_instructions?: string
+          id?: string
+          name?: string
+          system_prompt?: string
+          updated_at?: string
+          whatsapp_phone_number_id?: string | null
+          zapi_instance_id?: string | null
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
