@@ -7,54 +7,38 @@ const corsHeaders = {
 };
 
 Deno.serve(async (req) => {
-  // CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // GET = Meta webhook verification
   if (req.method === "GET") {
     const url = new URL(req.url);
     const mode = url.searchParams.get("hub.mode");
     const token = url.searchParams.get("hub.verify_token");
     const challenge = url.searchParams.get("hub.challenge");
-
     const verifyToken = Deno.env.get("WHATSAPP_VERIFY_TOKEN");
 
     if (mode === "subscribe" && token === verifyToken) {
       console.log("Webhook verified");
       return new Response(challenge, { status: 200, headers: corsHeaders });
     }
-
     return new Response("Forbidden", { status: 403, headers: corsHeaders });
   }
 
-  // POST = Incoming messages from Meta
   if (req.method === "POST") {
-    // Respond immediately to Meta (high-throughput strategy)
     const body = await req.json();
-
-    // Process asynchronously - don't block the response
     const processPromise = processWebhook(body);
-
-    // Return 200 immediately to Meta to avoid retries
-    // Use waitUntil pattern via EdgeRuntime
     processPromise.catch((err) =>
       console.error("Webhook processing error:", err)
     );
-
     return new Response("OK", { status: 200, headers: corsHeaders });
   }
 
-  return new Response("Method not allowed", {
-    status: 405,
-    headers: corsHeaders,
-  });
+  return new Response("Method not allowed", { status: 405, headers: corsHeaders });
 });
 
 async function downloadWhatsAppMedia(mediaId: string, accessToken: string): Promise<{ url: string; mimeType: string } | null> {
   try {
-    // Step 1: Get the media URL from Graph API
     const metaRes = await fetch(`https://graph.facebook.com/v21.0/${mediaId}`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
@@ -66,7 +50,6 @@ async function downloadWhatsAppMedia(mediaId: string, accessToken: string): Prom
     const downloadUrl = meta.url;
     const mimeType = meta.mime_type || "application/octet-stream";
 
-    // Step 2: Download the binary
     const fileRes = await fetch(downloadUrl, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
@@ -76,7 +59,6 @@ async function downloadWhatsAppMedia(mediaId: string, accessToken: string): Prom
     }
     const blob = await fileRes.blob();
 
-    // Step 3: Determine extension
     const extMap: Record<string, string> = {
       "audio/ogg": "ogg", "audio/mpeg": "mp3", "audio/aac": "aac",
       "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp",
@@ -86,7 +68,6 @@ async function downloadWhatsAppMedia(mediaId: string, accessToken: string): Prom
     const ext = extMap[mimeType] || "bin";
     const fileName = `incoming-${mediaId}.${ext}`;
 
-    // Step 4: Upload to Supabase storage
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -112,6 +93,15 @@ async function downloadWhatsAppMedia(mediaId: string, accessToken: string): Prom
   }
 }
 
+async function resolveNicheId(supabase: any, phoneNumberId: string): Promise<string | null> {
+  const { data } = await supabase
+    .from("niches")
+    .select("id")
+    .eq("whatsapp_phone_number_id", phoneNumberId)
+    .maybeSingle();
+  return data?.id || null;
+}
+
 async function processWebhook(body: any) {
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
@@ -134,19 +124,24 @@ async function processWebhook(body: any) {
 
       if (!messages?.length) continue;
 
+      // Resolve niche from the phone_number_id that received the message
+      const receivingPhoneNumberId = value?.metadata?.phone_number_id || "";
+      const nicheId = await resolveNicheId(supabase, receivingPhoneNumberId);
+      if (nicheId) {
+        console.log(`Niche resolved: ${nicheId} for phone_number_id: ${receivingPhoneNumberId}`);
+      }
+
       for (let i = 0; i < messages.length; i++) {
         const msg = messages[i];
         const contact = contacts?.[i] || contacts?.[0];
         const phone = msg.from;
         const contactName = contact?.profile?.name || phone;
 
-        // Extract referral data (CTWA ads)
         const referral = msg.referral || value?.metadata?.referral;
         const ctwaClid = referral?.ctwa_clid || null;
         const sourceId = referral?.source_id || null;
         const adTitle = referral?.headline || referral?.body || referral?.source_url || null;
 
-        // Upsert conversation (find or create by phone)
         let conversationId: string;
 
         const { data: existing } = await supabase
@@ -159,11 +154,11 @@ async function processWebhook(body: any) {
 
         if (existing) {
           conversationId = existing.id;
-          // Update last activity + referral data if present
           const updateData: any = { updated_at: new Date().toISOString(), status: "active" };
           if (ctwaClid) updateData.ctwa_clid = ctwaClid;
           if (sourceId) updateData.source_id = sourceId;
           if (adTitle) updateData.ad_title = adTitle;
+          if (nicheId) updateData.niche_id = nicheId;
           await supabase
             .from("conversations")
             .update(updateData)
@@ -179,6 +174,7 @@ async function processWebhook(body: any) {
               ctwa_clid: ctwaClid,
               source_id: sourceId,
               ad_title: adTitle,
+              niche_id: nicheId,
             })
             .select("id")
             .single();
@@ -190,12 +186,9 @@ async function processWebhook(body: any) {
           conversationId = newConv.id;
         }
 
-        // Extract message content based on type
         let content = "";
         let messageType = msg.type || "text";
         let mediaUrl: string | null = null;
-
-        // Get access token for media downloads
         const accessToken = Deno.env.get("WHATSAPP_ACCESS_TOKEN") || "";
 
         switch (msg.type) {
@@ -220,7 +213,6 @@ async function processWebhook(body: any) {
               const result = await downloadWhatsAppMedia(audioMediaId, accessToken);
               if (result) {
                 mediaUrl = result.url;
-                // Transcribe audio for AI context
                 const transcription = await transcribeAudio(result.url, "pending-conversation-id");
                 if (transcription) {
                   content = `[Áudio transcrito]: ${transcription}`;
@@ -281,7 +273,6 @@ async function processWebhook(body: any) {
             content = `[${msg.type || "Desconhecido"}]`;
         }
 
-        // Insert message
         const allowedTypes = ["text", "image", "document", "audio", "video"];
         const normalizedType = allowedTypes.includes(messageType) ? messageType : "text";
 
@@ -297,7 +288,6 @@ async function processWebhook(body: any) {
         if (msgError) {
           console.error("Error inserting message:", msgError);
         } else {
-          // Trigger AI flow selector and auto-reply asynchronously
           triggerAiFlowSelector(conversationId).catch((err) =>
             console.error("Flow selector trigger error:", err)
           );
@@ -307,13 +297,10 @@ async function processWebhook(body: any) {
         }
       }
 
-      // Process status updates (delivery receipts)
       const statuses = value?.statuses;
       if (statuses?.length) {
         for (const status of statuses) {
-          console.log(
-            `Status update: ${status.id} -> ${status.status}`
-          );
+          console.log(`Status update: ${status.id} -> ${status.status}`);
         }
       }
     }

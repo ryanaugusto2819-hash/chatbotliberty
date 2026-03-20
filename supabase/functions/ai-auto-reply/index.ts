@@ -6,6 +6,13 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -15,10 +22,7 @@ Deno.serve(async (req) => {
     const { conversationId } = await req.json();
 
     if (!conversationId) {
-      return new Response(
-        JSON.stringify({ error: "conversationId is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: "conversationId is required" }, 400);
     }
 
     const supabase = createClient(
@@ -26,30 +30,65 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Check if auto-reply is enabled
-    const { data: config } = await supabase
-      .from("connection_configs")
-      .select("config")
-      .eq("connection_id", "ai-auto-reply")
-      .maybeSingle();
+    // Fetch conversation to get niche_id
+    const { data: conversation } = await supabase
+      .from("conversations")
+      .select("contact_phone, niche_id")
+      .eq("id", conversationId)
+      .single();
 
-    const aiConfig = config?.config as Record<string, unknown> | null;
-    if (!aiConfig?.enabled) {
-      return new Response(
-        JSON.stringify({ skipped: true, reason: "Auto-reply disabled" }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    if (!conversation) {
+      return jsonResponse({ error: "Conversation not found" }, 404);
     }
 
-    const systemPrompt = (aiConfig?.system_prompt as string) ||
-      "Você é um assistente virtual amigável. Responda de forma concisa e útil em português brasileiro.";
+    const nicheId = conversation.niche_id;
 
-    // Fetch knowledge base items for context
-    const { data: kbItems } = await supabase
+    // Load niche-specific config OR global config
+    let aiEnabled = false;
+    let systemPrompt = "Você é um assistente virtual amigável. Responda de forma concisa e útil em português brasileiro.";
+
+    if (nicheId) {
+      const { data: niche } = await supabase
+        .from("niches")
+        .select("auto_reply_enabled, system_prompt")
+        .eq("id", nicheId)
+        .single();
+
+      if (niche) {
+        aiEnabled = niche.auto_reply_enabled;
+        systemPrompt = niche.system_prompt || systemPrompt;
+      }
+    } else {
+      // Fallback to global config
+      const { data: config } = await supabase
+        .from("connection_configs")
+        .select("config")
+        .eq("connection_id", "ai-auto-reply")
+        .maybeSingle();
+
+      const aiConfig = config?.config as Record<string, unknown> | null;
+      aiEnabled = !!aiConfig?.enabled;
+      if (aiConfig?.system_prompt) systemPrompt = aiConfig.system_prompt as string;
+    }
+
+    if (!aiEnabled) {
+      return jsonResponse({ skipped: true, reason: "Auto-reply disabled" });
+    }
+
+    // Fetch knowledge base items filtered by niche
+    let kbQuery = supabase
       .from("knowledge_base_items")
       .select("type, title, content")
       .order("created_at", { ascending: true })
       .limit(50);
+
+    if (nicheId) {
+      kbQuery = kbQuery.eq("niche_id", nicheId);
+    } else {
+      kbQuery = kbQuery.is("niche_id", null);
+    }
+
+    const { data: kbItems } = await kbQuery;
 
     let knowledgeContext = "";
     if (kbItems && kbItems.length > 0) {
@@ -68,7 +107,7 @@ Deno.serve(async (req) => {
 
     const fullSystemPrompt = systemPrompt + knowledgeContext;
 
-    // Fetch last 20 messages for context
+    // Fetch last 20 messages
     const { data: messages } = await supabase
       .from("messages")
       .select("content, sender_type, created_at")
@@ -77,13 +116,9 @@ Deno.serve(async (req) => {
       .limit(20);
 
     if (!messages?.length) {
-      return new Response(
-        JSON.stringify({ skipped: true, reason: "No messages" }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ skipped: true, reason: "No messages" });
     }
 
-    // Build chat history for AI
     const chatMessages = [
       { role: "system", content: fullSystemPrompt },
       ...messages.map((m) => ({
@@ -92,14 +127,10 @@ Deno.serve(async (req) => {
       })),
     ];
 
-    // Call Lovable AI Gateway
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       console.error("LOVABLE_API_KEY not configured");
-      return new Response(
-        JSON.stringify({ error: "AI not configured" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: "AI not configured" }, 500);
     }
 
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -118,30 +149,14 @@ Deno.serve(async (req) => {
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
       console.error("AI gateway error:", aiResponse.status, errorText);
-
-      if (aiResponse.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Rate limit exceeded" }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      if (aiResponse.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "AI credits exhausted" }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      return new Response(
-        JSON.stringify({ error: "AI generation failed" }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      if (aiResponse.status === 429) return jsonResponse({ error: "Rate limit exceeded" }, 429);
+      if (aiResponse.status === 402) return jsonResponse({ error: "AI credits exhausted" }, 402);
+      return jsonResponse({ error: "AI generation failed" }, 502);
     }
 
     const aiResult = await aiResponse.json();
     const replyContent = aiResult.choices?.[0]?.message?.content;
 
-    // Log token usage
     const usage = aiResult.usage;
     if (usage) {
       await supabase.from("ai_usage_logs").insert({
@@ -155,24 +170,7 @@ Deno.serve(async (req) => {
     }
 
     if (!replyContent) {
-      return new Response(
-        JSON.stringify({ error: "Empty AI response" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Send reply via WhatsApp
-    const { data: conversation } = await supabase
-      .from("conversations")
-      .select("contact_phone")
-      .eq("id", conversationId)
-      .single();
-
-    if (!conversation) {
-      return new Response(
-        JSON.stringify({ error: "Conversation not found" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: "Empty AI response" }, 500);
     }
 
     // Get WhatsApp credentials
@@ -195,13 +193,9 @@ Deno.serve(async (req) => {
 
     if (!phoneNumberId || !accessToken) {
       console.error("WhatsApp credentials missing for auto-reply");
-      return new Response(
-        JSON.stringify({ error: "WhatsApp not configured" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: "WhatsApp not configured" }, 500);
     }
 
-    // Send via WhatsApp API
     const waResponse = await fetch(
       `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`,
       {
@@ -223,13 +217,9 @@ Deno.serve(async (req) => {
 
     if (!waResponse.ok) {
       console.error("WhatsApp send error:", waResult);
-      return new Response(
-        JSON.stringify({ error: "Failed to send auto-reply", details: waResult }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: "Failed to send auto-reply", details: waResult }, 502);
     }
 
-    // Save AI reply to database
     await supabase.from("messages").insert({
       conversation_id: conversationId,
       content: replyContent,
@@ -243,15 +233,9 @@ Deno.serve(async (req) => {
       .update({ updated_at: new Date().toISOString() })
       .eq("id", conversationId);
 
-    return new Response(
-      JSON.stringify({ success: true, reply: replyContent }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return jsonResponse({ success: true, reply: replyContent });
   } catch (error) {
     console.error("Auto-reply error:", error);
-    return new Response(
-      JSON.stringify({ error: "Internal server error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return jsonResponse({ error: "Internal server error" }, 500);
   }
 });

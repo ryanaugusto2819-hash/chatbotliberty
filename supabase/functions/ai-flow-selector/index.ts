@@ -6,6 +6,13 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -15,10 +22,7 @@ Deno.serve(async (req) => {
     const { conversationId } = await req.json();
 
     if (!conversationId) {
-      return new Response(
-        JSON.stringify({ error: "conversationId is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: "conversationId is required" }, 400);
     }
 
     const supabase = createClient(
@@ -26,31 +30,65 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Check if flow selector is enabled
-    const { data: config } = await supabase
-      .from("connection_configs")
-      .select("config")
-      .eq("connection_id", "ai-flow-selector")
-      .maybeSingle();
+    // Get conversation with niche_id
+    const { data: conversation } = await supabase
+      .from("conversations")
+      .select("niche_id")
+      .eq("id", conversationId)
+      .single();
 
-    const selectorConfig = config?.config as Record<string, unknown> | null;
-    if (!selectorConfig?.enabled) {
+    const nicheId = conversation?.niche_id;
+
+    // Check if flow selector is enabled (niche-specific or global)
+    let selectorEnabled = false;
+    let customInstructions = "";
+
+    if (nicheId) {
+      const { data: niche } = await supabase
+        .from("niches")
+        .select("flow_selector_enabled, flow_selector_instructions")
+        .eq("id", nicheId)
+        .single();
+
+      if (niche) {
+        selectorEnabled = niche.flow_selector_enabled;
+        customInstructions = niche.flow_selector_instructions || "";
+      }
+    } else {
+      const { data: config } = await supabase
+        .from("connection_configs")
+        .select("config")
+        .eq("connection_id", "ai-flow-selector")
+        .maybeSingle();
+
+      const selectorConfig = config?.config as Record<string, unknown> | null;
+      selectorEnabled = !!selectorConfig?.enabled;
+      customInstructions = (selectorConfig?.instructions as string) || "";
+    }
+
+    if (!selectorEnabled) {
       return jsonResponse({ skipped: true, reason: "Flow selector disabled" });
     }
 
-    const customInstructions = (selectorConfig?.instructions as string) || "";
-
-    // Fetch active flows with their nodes (to understand flow content)
-    const { data: flows } = await supabase
+    // Fetch active flows filtered by niche
+    let flowQuery = supabase
       .from("automation_flows")
       .select("id, name, description")
       .eq("is_active", true);
+
+    if (nicheId) {
+      flowQuery = flowQuery.eq("niche_id", nicheId);
+    } else {
+      flowQuery = flowQuery.is("niche_id", null);
+    }
+
+    const { data: flows } = await flowQuery;
 
     if (!flows?.length) {
       return jsonResponse({ skipped: true, reason: "No active flows" });
     }
 
-    // Fetch ALL nodes for active flows so AI understands their content
+    // Fetch ALL nodes for active flows
     const flowIds = flows.map((f) => f.id);
     const { data: allNodes } = await supabase
       .from("automation_nodes")
@@ -58,14 +96,13 @@ Deno.serve(async (req) => {
       .in("flow_id", flowIds)
       .order("sort_order", { ascending: true });
 
-    // Group nodes by flow
     const nodesByFlow: Record<string, typeof allNodes> = {};
     for (const node of allNodes || []) {
       if (!nodesByFlow[node.flow_id]) nodesByFlow[node.flow_id] = [];
       nodesByFlow[node.flow_id].push(node);
     }
 
-    // Fetch flows already executed in this conversation
+    // Fetch past executions
     const { data: pastExecutions } = await supabase
       .from("flow_executions")
       .select("flow_id, status, created_at")
@@ -77,7 +114,7 @@ Deno.serve(async (req) => {
       .map((id) => flows.find((f) => f.id === id)?.name)
       .filter(Boolean);
 
-    // Fetch last 20 messages for richer context
+    // Fetch last 20 messages
     const { data: messages } = await supabase
       .from("messages")
       .select("content, sender_type, message_type, created_at")
@@ -89,7 +126,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ skipped: true, reason: "No messages" });
     }
 
-    // Build detailed flow descriptions including node content
+    // Build flow descriptions
     const flowDescriptions = flows.map((f, i) => {
       const nodes = nodesByFlow[f.id] || [];
       const nodeDetails = nodes.map((n) => {
@@ -157,7 +194,6 @@ ${recentMessages}
 
 Qual fluxo deve ser disparado agora?`;
 
-    // Call AI
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -185,7 +221,7 @@ Qual fluxo deve ser disparado agora?`;
                   },
                   reason: {
                     type: "string",
-                    description: "Justificativa detalhada da escolha, mencionando o contexto da conversa e por que este fluxo é o mais adequado agora",
+                    description: "Justificativa detalhada da escolha",
                   },
                 },
                 required: ["flow_index", "reason"],
@@ -202,7 +238,6 @@ Qual fluxo deve ser disparado agora?`;
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
       console.error("AI gateway error:", aiResponse.status, errorText);
-
       if (aiResponse.status === 429) return jsonResponse({ error: "Rate limit exceeded" }, 429);
       if (aiResponse.status === 402) return jsonResponse({ error: "AI credits exhausted" }, 402);
       return jsonResponse({ error: "AI generation failed" }, 502);
@@ -210,7 +245,6 @@ Qual fluxo deve ser disparado agora?`;
 
     const aiResult = await aiResponse.json();
 
-    // Log token usage
     const usage = aiResult.usage;
     if (usage) {
       await supabase.from("ai_usage_logs").insert({
@@ -223,10 +257,8 @@ Qual fluxo deve ser disparado agora?`;
       });
     }
 
-    // Extract tool call result
     const toolCall = aiResult.choices?.[0]?.message?.tool_calls?.[0];
     if (!toolCall) {
-      console.log("No tool call in AI response");
       return jsonResponse({ skipped: true, reason: "AI did not select a flow" });
     }
 
@@ -246,15 +278,13 @@ Qual fluxo deve ser disparado agora?`;
 
     const selectedFlow = flows[selection.flow_index - 1];
 
-    // Double-check: don't re-send an already executed flow
     if (executedFlowIds.includes(selectedFlow.id)) {
-      console.log(`Flow "${selectedFlow.name}" already executed, skipping despite AI selection.`);
-      return jsonResponse({ skipped: true, reason: `Flow "${selectedFlow.name}" already sent in this conversation` });
+      console.log(`Flow "${selectedFlow.name}" already executed, skipping.`);
+      return jsonResponse({ skipped: true, reason: `Flow "${selectedFlow.name}" already sent` });
     }
 
     console.log(`Executing flow "${selectedFlow.name}" (${selectedFlow.id}). Reason: ${selection.reason}`);
 
-    // Execute the selected flow
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
@@ -280,10 +310,3 @@ Qual fluxo deve ser disparado agora?`;
     return jsonResponse({ error: "Internal server error" }, 500);
   }
 });
-
-function jsonResponse(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}
