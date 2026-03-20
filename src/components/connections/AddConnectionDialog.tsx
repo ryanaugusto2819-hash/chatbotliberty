@@ -82,16 +82,20 @@ export default function AddConnectionDialog({ onCreated }: AddConnectionDialogPr
     }
     setSaving(true);
     try {
-      const { error } = await supabase.functions.invoke('save-connection', {
+      const { data, error } = await supabase.functions.invoke('save-connection', {
         body: { connectionId: selectedProvider.id, config: values, label: label.trim() },
       });
       if (error) throw error;
-      toast.success('Conexão criada!');
+      if ((data as { status?: string })?.status === 'pending_setup') {
+        toast.warning('Conexão criada, mas ainda pendente de webhook/app na Meta.');
+      } else {
+        toast.success('Conexão criada!');
+      }
       setOpen(false);
       reset();
       onCreated();
-    } catch {
-      toast.error('Erro ao criar conexão.');
+    } catch (err: any) {
+      toast.error(err?.message || 'Erro ao criar conexão.');
     } finally {
       setSaving(false);
     }

@@ -6,6 +6,43 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const GRAPH_API = "https://graph.facebook.com/v21.0";
+
+const jsonResponse = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+
+const getWebhookUrl = (connectionId: string) =>
+  connectionId === "whatsapp"
+    ? `${Deno.env.get("SUPABASE_URL")}/functions/v1/whatsapp-webhook`
+    : `${Deno.env.get("SUPABASE_URL")}/functions/v1/zapi-webhook`;
+
+async function graphRequest(path: string, accessToken: string) {
+  const separator = path.includes("?") ? "&" : "?";
+  const response = await fetch(`${GRAPH_API}${path}${separator}access_token=${encodeURIComponent(accessToken)}`);
+  const data = await response.json();
+
+  if (!response.ok || data?.error) {
+    throw new Error(data?.error?.message || `Graph API error on ${path}`);
+  }
+
+  return data;
+}
+
+async function getSubscribedApps(wabaId: string, accessToken: string, metaAppId?: string | null) {
+  const data = await graphRequest(`/${wabaId}/subscribed_apps`, accessToken);
+  const subscribedApps = Array.isArray(data?.data) ? data.data : [];
+
+  return {
+    subscribedApps,
+    appSubscribed: metaAppId
+      ? subscribedApps.some((app: Record<string, unknown>) => String(app.id || "") === metaAppId)
+      : subscribedApps.length > 0,
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -15,10 +52,7 @@ Deno.serve(async (req) => {
     const { configId } = await req.json();
 
     if (!configId) {
-      return new Response(
-        JSON.stringify({ error: "configId is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: "configId is required" }, 400);
     }
 
     const supabase = createClient(
@@ -33,10 +67,7 @@ Deno.serve(async (req) => {
       .single();
 
     if (error || !conn) {
-      return new Response(
-        JSON.stringify({ error: "Connection not found" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: "Connection not found" }, 404);
     }
 
     const config = conn.config as Record<string, string>;
@@ -44,34 +75,50 @@ Deno.serve(async (req) => {
     let details: Record<string, unknown> = {};
 
     if (conn.connection_id === "whatsapp") {
-      const token = config.access_token || Deno.env.get("WHATSAPP_ACCESS_TOKEN");
-      const phoneId = config.phone_number_id;
+      const token = config.access_token || Deno.env.get("WHATSAPP_ACCESS_TOKEN") || "";
+      const phoneId = config.phone_number_id || "";
+      const metaAppId = Deno.env.get("META_APP_ID");
+      const expectedWebhookUrl = getWebhookUrl("whatsapp");
 
-      if (token && phoneId) {
-        try {
-          const res = await fetch(
-            `https://graph.facebook.com/v21.0/${phoneId}?fields=verified_name,quality_rating,display_phone_number,name_status&access_token=${token}`
-          );
-          const data = await res.json();
-          if (res.ok && !data.error) {
-            status = "active";
-            details = {
-              verified_name: data.verified_name,
-              quality_rating: data.quality_rating,
-              phone: data.display_phone_number,
-              name_status: data.name_status,
-            };
-          } else {
-            status = "error";
-            details = { error: data.error?.message || "API returned error" };
-          }
-        } catch (e) {
-          status = "error";
-          details = { error: String(e) };
-        }
-      } else {
+      if (!token || !phoneId) {
         status = "error";
         details = { error: "Missing phone_number_id or access_token" };
+      } else {
+        try {
+          const phoneData = await graphRequest(
+            `/${phoneId}?fields=id,display_phone_number,verified_name,quality_rating,name_status,webhook_configuration,whatsapp_business_account`,
+            token
+          );
+
+          const wabaId = phoneData?.whatsapp_business_account?.id || config.waba_id || "";
+          const configuredWebhookUrl = phoneData?.webhook_configuration?.application || "";
+          const webhookUrlMatches = configuredWebhookUrl === expectedWebhookUrl;
+          let appSubscribed = false;
+          let subscribedAppsCount = 0;
+
+          if (wabaId) {
+            const subscribedApps = await getSubscribedApps(wabaId, token, metaAppId);
+            appSubscribed = subscribedApps.appSubscribed;
+            subscribedAppsCount = subscribedApps.subscribedApps.length;
+          }
+
+          status = webhookUrlMatches && appSubscribed ? "active" : "pending_setup";
+          details = {
+            verified_name: phoneData?.verified_name,
+            quality_rating: phoneData?.quality_rating,
+            phone: phoneData?.display_phone_number,
+            name_status: phoneData?.name_status,
+            waba_id: wabaId || null,
+            expected_webhook_url: expectedWebhookUrl,
+            configured_webhook_url: configuredWebhookUrl,
+            webhook_url_matches: webhookUrlMatches,
+            app_subscribed: appSubscribed,
+            subscribed_apps_count: subscribedAppsCount,
+          };
+        } catch (e) {
+          status = "error";
+          details = { error: e instanceof Error ? e.message : String(e) };
+        }
       }
     } else if (conn.connection_id === "zapi") {
       const instanceId = config.instance_id;
@@ -83,10 +130,7 @@ Deno.serve(async (req) => {
           const headers: Record<string, string> = {};
           if (clientToken) headers["Client-Token"] = clientToken;
 
-          const res = await fetch(
-            `https://api.z-api.io/instances/${instanceId}/token/${token}/status`,
-            { headers }
-          );
+          const res = await fetch(`https://api.z-api.io/instances/${instanceId}/token/${token}/status`, { headers });
           const data = await res.json();
           if (data.connected === true) {
             status = "active";
@@ -105,21 +149,14 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Update status in DB
     await supabase
       .from("connection_configs")
       .update({ status, last_checked_at: new Date().toISOString() })
       .eq("id", configId);
 
-    return new Response(
-      JSON.stringify({ status, details }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return jsonResponse({ status, details });
   } catch (err) {
     console.error("check-connection-status error:", err);
-    return new Response(
-      JSON.stringify({ error: String(err) }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, 500);
   }
 });

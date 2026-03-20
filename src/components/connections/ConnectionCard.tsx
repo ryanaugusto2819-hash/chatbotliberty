@@ -1,7 +1,18 @@
 import { useState } from 'react';
 import {
-  CheckCircle2, XCircle, AlertCircle, Loader2, Eye, EyeOff,
-  Copy, ExternalLink, Save, Trash2, ChevronDown, RefreshCw, MessageSquare, Wifi, WifiOff,
+  AlertCircle,
+  ChevronDown,
+  Copy,
+  ExternalLink,
+  Eye,
+  EyeOff,
+  Loader2,
+  MessageSquare,
+  RefreshCw,
+  Save,
+  Trash2,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -26,6 +37,11 @@ interface ConnectionCardProps {
   connection: ConnectionData;
   onDeleted: () => void;
   onUpdated: () => void;
+}
+
+interface CheckStatusResponse {
+  status?: string;
+  details?: Record<string, unknown>;
 }
 
 const WEBHOOK_URLS: Record<string, string> = {
@@ -63,6 +79,7 @@ const PROVIDER_CONFIG: Record<string, {
 
 const STATUS_MAP: Record<string, { icon: React.ReactNode; label: string; classes: string }> = {
   active: { icon: <Wifi className="h-3.5 w-3.5" />, label: 'Ativo', classes: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' },
+  pending_setup: { icon: <AlertCircle className="h-3.5 w-3.5" />, label: 'Pendente', classes: 'bg-amber-500/10 text-amber-600 border-amber-500/20' },
   error: { icon: <WifiOff className="h-3.5 w-3.5" />, label: 'Inativo', classes: 'bg-destructive/10 text-destructive border-destructive/20' },
   unknown: { icon: <AlertCircle className="h-3.5 w-3.5" />, label: 'Não verificado', classes: 'bg-muted text-muted-foreground border-border' },
 };
@@ -75,10 +92,17 @@ export default function ConnectionCard({ connection, onDeleted, onUpdated }: Con
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [checking, setChecking] = useState(false);
+  const [diagnostics, setDiagnostics] = useState<Record<string, unknown> | null>(null);
 
   const provider = PROVIDER_CONFIG[connection.connection_id];
   const statusInfo = STATUS_MAP[connection.status] || STATUS_MAP.unknown;
   const webhookUrl = WEBHOOK_URLS[connection.connection_id];
+
+  const formatDiagnosticValue = (value: unknown) => {
+    if (typeof value === 'boolean') return value ? 'Sim' : 'Não';
+    if (value === null || value === undefined || value === '') return '—';
+    return String(value);
+  };
 
   const handleSave = async () => {
     if (!provider) return;
@@ -89,14 +113,15 @@ export default function ConnectionCard({ connection, onDeleted, onUpdated }: Con
     }
     setSaving(true);
     try {
-      const { error } = await supabase.functions.invoke('save-connection', {
+      const { data, error } = await supabase.functions.invoke('save-connection', {
         body: { action: 'update', id: connection.id, config: values, label },
       });
       if (error) throw error;
+      setDiagnostics((data as { diagnostics?: Record<string, unknown> })?.diagnostics || null);
       toast.success('Conexão atualizada!');
       onUpdated();
-    } catch {
-      toast.error('Erro ao salvar.');
+    } catch (err: any) {
+      toast.error(err?.message || 'Erro ao salvar.');
     } finally {
       setSaving(false);
     }
@@ -125,10 +150,16 @@ export default function ConnectionCard({ connection, onDeleted, onUpdated }: Con
         body: { configId: connection.id },
       });
       if (error) throw error;
-      if (data?.status === 'active') {
-        toast.success('API ativa e funcionando!');
+
+      const response = data as CheckStatusResponse;
+      setDiagnostics(response.details || null);
+
+      if (response.status === 'active') {
+        toast.success('Conexão validada com sucesso!');
+      } else if (response.status === 'pending_setup') {
+        toast.warning('Conexão criada, mas ainda pendente de webhook/app.');
       } else {
-        toast.error(`API com problema: ${data?.details?.error || 'Erro desconhecido'}`);
+        toast.error(`API com problema: ${response.details?.error || 'Erro desconhecido'}`);
       }
       onUpdated();
     } catch {
@@ -145,16 +176,10 @@ export default function ConnectionCard({ connection, onDeleted, onUpdated }: Con
     }
   };
 
-  const maskValue = (val: string) => {
-    if (!val || val.length <= 8) return '••••••••';
-    return val.slice(0, 4) + '••••••••' + val.slice(-4);
-  };
-
   if (!provider) return null;
 
   return (
     <div className="rounded-2xl border border-border bg-card shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
-      {/* Header */}
       <div className="p-5">
         <div className="flex items-start gap-4">
           <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${provider.color}`}>
@@ -195,10 +220,8 @@ export default function ConnectionCard({ connection, onDeleted, onUpdated }: Con
         </div>
       </div>
 
-      {/* Expanded Details */}
       {expanded && (
         <div className="border-t border-border px-5 pb-5 pt-4 space-y-4">
-          {/* Label */}
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Nome da conexão</label>
             <input
@@ -210,10 +233,9 @@ export default function ConnectionCard({ connection, onDeleted, onUpdated }: Con
             />
           </div>
 
-          {/* Webhook URL */}
           {webhookUrl && (
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Webhook URL</label>
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Webhook URL esperada</label>
               <div className="flex items-center gap-2">
                 <div className="flex-1 rounded-lg border border-input bg-secondary/50 px-3 py-2 text-xs text-foreground font-mono truncate">
                   {webhookUrl}
@@ -229,7 +251,6 @@ export default function ConnectionCard({ connection, onDeleted, onUpdated }: Con
             </div>
           )}
 
-          {/* Credential Fields */}
           {provider.fields.map(field => (
             <div key={field.key} className="space-y-1.5">
               <label className="text-sm font-medium text-card-foreground">{field.label}</label>
@@ -254,7 +275,38 @@ export default function ConnectionCard({ connection, onDeleted, onUpdated }: Con
             </div>
           ))}
 
-          {/* Actions */}
+          {connection.connection_id === 'whatsapp' && (
+            <div className="rounded-xl border border-border bg-secondary/30 p-4 space-y-2">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Diagnóstico</p>
+              <div className="grid gap-2 text-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-muted-foreground">Webhook configurado</span>
+                  <span className="text-right font-medium">{formatDiagnosticValue(diagnostics?.configured_webhook_url)}</span>
+                </div>
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-muted-foreground">Webhook bate com o esperado</span>
+                  <span className="text-right font-medium">{formatDiagnosticValue(diagnostics?.webhook_url_matches)}</span>
+                </div>
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-muted-foreground">App inscrito</span>
+                  <span className="text-right font-medium">{formatDiagnosticValue(diagnostics?.app_subscribed)}</span>
+                </div>
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-muted-foreground">WABA ID</span>
+                  <span className="text-right font-medium break-all">{formatDiagnosticValue(diagnostics?.waba_id || values.waba_id)}</span>
+                </div>
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-muted-foreground">Número</span>
+                  <span className="text-right font-medium">{formatDiagnosticValue(diagnostics?.phone || values.phone_display)}</span>
+                </div>
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-muted-foreground">Erro</span>
+                  <span className="text-right font-medium text-destructive">{formatDiagnosticValue(diagnostics?.error)}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center justify-between pt-2">
             <a
               href={provider.docsUrl}
