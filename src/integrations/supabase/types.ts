@@ -238,6 +238,9 @@ export type Database = {
           created_at: string
           id: string
           is_connected: boolean
+          label: string
+          last_checked_at: string | null
+          status: string
           updated_at: string
         }
         Insert: {
@@ -246,6 +249,9 @@ export type Database = {
           created_at?: string
           id?: string
           is_connected?: boolean
+          label?: string
+          last_checked_at?: string | null
+          status?: string
           updated_at?: string
         }
         Update: {
@@ -254,6 +260,9 @@ export type Database = {
           created_at?: string
           id?: string
           is_connected?: boolean
+          label?: string
+          last_checked_at?: string | null
+          status?: string
           updated_at?: string
         }
         Relationships: []
