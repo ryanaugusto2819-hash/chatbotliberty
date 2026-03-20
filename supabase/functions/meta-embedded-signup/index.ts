@@ -8,6 +8,97 @@ const corsHeaders = {
 
 const GRAPH_API = "https://graph.facebook.com/v21.0";
 
+const jsonResponse = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+
+const webhookUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/whatsapp-webhook`;
+const generateVerifyToken = () => crypto.randomUUID().replace(/-/g, "").slice(0, 24);
+
+async function graphRequest(path: string, accessToken: string, init?: RequestInit) {
+  const separator = path.includes("?") ? "&" : "?";
+  const response = await fetch(`${GRAPH_API}${path}${separator}access_token=${encodeURIComponent(accessToken)}`, init);
+  const data = await response.json();
+
+  if (!response.ok || data?.error) {
+    throw new Error(data?.error?.message || `Graph API error on ${path}`);
+  }
+
+  return data;
+}
+
+async function getSubscribedApps(wabaId: string, accessToken: string, metaAppId?: string | null) {
+  const data = await graphRequest(`/${wabaId}/subscribed_apps`, accessToken);
+  const subscribedApps = Array.isArray(data?.data) ? data.data : [];
+
+  return {
+    subscribedApps,
+    appSubscribed: metaAppId
+      ? subscribedApps.some((app: Record<string, unknown>) => String(app.id || "") === metaAppId)
+      : subscribedApps.length > 0,
+  };
+}
+
+async function ensureAppSubscription(wabaId: string, accessToken: string, metaAppId?: string | null) {
+  const before = await getSubscribedApps(wabaId, accessToken, metaAppId);
+  if (before.appSubscribed) {
+    return before;
+  }
+
+  await graphRequest(`/${wabaId}/subscribed_apps`, accessToken, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
+
+  return getSubscribedApps(wabaId, accessToken, metaAppId);
+}
+
+function extractCandidateWabaIds(debugData: Record<string, any>) {
+  const ids = new Set<string>();
+  const granularScopes = debugData?.data?.granular_scopes || [];
+
+  for (const scope of granularScopes) {
+    if (
+      ["whatsapp_business_management", "whatsapp_business_messaging", "whatsapp_business_manage_events"].includes(scope.scope)
+    ) {
+      for (const targetId of scope.target_ids || []) {
+        if (targetId) ids.add(String(targetId));
+      }
+    }
+  }
+
+  return Array.from(ids);
+}
+
+async function discoverNewestPhone(accessToken: string, candidateWabaIds: string[]) {
+  const phones: Array<Record<string, any>> = [];
+
+  for (const wabaId of candidateWabaIds) {
+    try {
+      const phoneData = await graphRequest(
+        `/${wabaId}/phone_numbers?fields=id,display_phone_number,verified_name,quality_rating,name_status,webhook_configuration,last_onboarded_time`,
+        accessToken
+      );
+
+      for (const phone of phoneData?.data || []) {
+        phones.push({ ...phone, waba_id: wabaId });
+      }
+    } catch (error) {
+      console.error(`Failed to load phone numbers for WABA ${wabaId}:`, error);
+    }
+  }
+
+  phones.sort((a, b) => {
+    const aTime = a.last_onboarded_time ? new Date(a.last_onboarded_time).getTime() : 0;
+    const bTime = b.last_onboarded_time ? new Date(b.last_onboarded_time).getTime() : 0;
+    return bTime - aTime;
+  });
+
+  return phones[0] || null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -21,10 +112,7 @@ Deno.serve(async (req) => {
     const META_APP_SECRET = Deno.env.get("META_APP_SECRET");
 
     if (!META_APP_ID || !META_APP_SECRET) {
-      return new Response(
-        JSON.stringify({ error: "META_APP_ID or META_APP_SECRET not configured" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: "META_APP_ID or META_APP_SECRET not configured" }, 500);
     }
 
     const serviceClient = createClient(
@@ -32,157 +120,134 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Action: get_app_id — return the public APP_ID to the frontend
     if (action === "get_app_id") {
-      return new Response(
-        JSON.stringify({ app_id: META_APP_ID }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ app_id: META_APP_ID, webhook_url: webhookUrl });
     }
 
-    // Action: exchange_token — exchange short-lived token, get WABA info, store connection
     if (action === "exchange_token") {
       const { accessToken, label } = body;
 
       if (!accessToken) {
-        return new Response(
-          JSON.stringify({ error: "accessToken is required" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return jsonResponse({ error: "accessToken is required" }, 400);
       }
 
-      // 1. Exchange short-lived token for long-lived token
-      const tokenUrl = `${GRAPH_API}/oauth/access_token?grant_type=fb_exchange_token&client_id=${META_APP_ID}&client_secret=${META_APP_SECRET}&fb_exchange_token=${accessToken}`;
-      const tokenRes = await fetch(tokenUrl);
-      const tokenData = await tokenRes.json();
-
-      if (tokenData.error) {
-        console.error("Token exchange error:", tokenData.error);
-        return new Response(
-          JSON.stringify({ error: "Failed to exchange token", details: tokenData.error }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
+      const tokenData = await graphRequest(
+        `/oauth/access_token?grant_type=fb_exchange_token&client_id=${META_APP_ID}&client_secret=${META_APP_SECRET}&fb_exchange_token=${encodeURIComponent(accessToken)}`,
+        accessToken
+      );
       const longLivedToken = tokenData.access_token;
 
-      // 2. Get shared WABA list using debug_token or business discovery
-      // First get the user's business integrations
-      const sharedWabasRes = await fetch(
-        `${GRAPH_API}/debug_token?input_token=${longLivedToken}&access_token=${META_APP_ID}|${META_APP_SECRET}`
+      const debugData = await graphRequest(
+        `/debug_token?input_token=${encodeURIComponent(longLivedToken)}`,
+        `${META_APP_ID}|${META_APP_SECRET}`
       );
-      const debugData = await sharedWabasRes.json();
       console.log("Debug token data:", JSON.stringify(debugData));
 
-      // 3. Get WhatsApp Business Accounts shared with the app
-      // Using the user token to list shared WABAs
-      const wabaListRes = await fetch(
-        `${GRAPH_API}/me/businesses?access_token=${longLivedToken}`
-      );
-      const businessesData = await wabaListRes.json();
-      console.log("Businesses:", JSON.stringify(businessesData));
+      const candidateWabaIds = extractCandidateWabaIds(debugData);
+      const selectedPhone = await discoverNewestPhone(longLivedToken, candidateWabaIds);
 
-      let wabaId: string | null = null;
-      let phoneNumberId: string | null = null;
-      let phoneDisplay: string | null = null;
-
-      // Try to find WABA from the granted scopes / shared assets
-      if (debugData?.data?.granular_scopes) {
-        for (const scope of debugData.data.granular_scopes) {
-          if (scope.scope === "whatsapp_business_management" && scope.target_ids?.length > 0) {
-            wabaId = scope.target_ids[0];
-            break;
-          }
-        }
-      }
-
-      // If we found a WABA, get phone numbers
-      if (wabaId) {
-        const phonesRes = await fetch(
-          `${GRAPH_API}/${wabaId}/phone_numbers?access_token=${longLivedToken}`
+      if (!selectedPhone?.id || !selectedPhone?.waba_id) {
+        return jsonResponse(
+          {
+            error:
+              "Não foi possível identificar o número compartilhado com o app. Refaça a conexão e confirme o compartilhamento do ativo do WhatsApp Business.",
+          },
+          400
         );
-        const phonesData = await phonesRes.json();
-        console.log("Phone numbers:", JSON.stringify(phonesData));
-
-        if (phonesData.data && phonesData.data.length > 0) {
-          phoneNumberId = phonesData.data[0].id;
-          phoneDisplay = phonesData.data[0].display_phone_number || phonesData.data[0].verified_name;
-        }
       }
 
-      // 4. Subscribe app to the WABA (required for webhooks)
-      if (wabaId) {
-        try {
-          const subscribeRes = await fetch(
-            `${GRAPH_API}/${wabaId}/subscribed_apps`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ access_token: longLivedToken }),
-            }
-          );
-          const subscribeData = await subscribeRes.json();
-          console.log("Subscribe result:", JSON.stringify(subscribeData));
-        } catch (e) {
-          console.error("Failed to subscribe app:", e);
-        }
-      }
-
-      // 5. Generate a random verify token for webhooks
-      const verifyToken = crypto.randomUUID().replace(/-/g, "").slice(0, 24);
-
-      // 6. Store connection in database
-      const config: Record<string, string> = {
+      const subscription = await ensureAppSubscription(selectedPhone.waba_id, longLivedToken, META_APP_ID);
+      const configuredWebhookUrl = selectedPhone?.webhook_configuration?.application || "";
+      const verifyToken = generateVerifyToken();
+      const connectionConfig: Record<string, string> = {
         access_token: longLivedToken,
-        waba_id: wabaId || "",
-        phone_number_id: phoneNumberId || "",
-        phone_display: phoneDisplay || "",
+        waba_id: selectedPhone.waba_id,
+        phone_number_id: selectedPhone.id,
+        phone_display: selectedPhone.display_phone_number || "",
+        verified_name: selectedPhone.verified_name || "",
+        quality_rating: selectedPhone.quality_rating || "",
+        name_status: selectedPhone.name_status || "",
         verify_token: verifyToken,
+        webhook_url: webhookUrl,
         setup_method: "embedded_signup",
       };
 
-      const { data, error: insertError } = await serviceClient
-        .from("connection_configs")
-        .insert({
-          connection_id: "whatsapp",
-          config,
-          label: label || phoneDisplay || "WhatsApp (Embedded Signup)",
-          is_connected: true,
-          status: wabaId && phoneNumberId ? "active" : "pending_setup",
-        })
-        .select("id")
-        .single();
+      const status = configuredWebhookUrl === webhookUrl && subscription.appSubscribed ? "active" : "pending_setup";
 
-      if (insertError) {
-        console.error("Insert error:", insertError);
-        return new Response(
-          JSON.stringify({ error: "Failed to save connection" }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+      const { data: existingConnections } = await serviceClient
+        .from("connection_configs")
+        .select("id, config")
+        .eq("connection_id", "whatsapp");
+
+      const existing = existingConnections?.find((connection: Record<string, any>) => {
+        const existingConfig = connection.config as Record<string, string>;
+        return existingConfig?.phone_number_id === selectedPhone.id;
+      });
+
+      let savedId: string;
+
+      if (existing?.id) {
+        const { error: updateError } = await serviceClient
+          .from("connection_configs")
+          .update({
+            config: connectionConfig,
+            label: label?.trim() || selectedPhone.display_phone_number || "WhatsApp",
+            is_connected: true,
+            status,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existing.id);
+
+        if (updateError) {
+          console.error("Update error:", updateError);
+          return jsonResponse({ error: "Failed to update connection" }, 500);
+        }
+
+        savedId = existing.id;
+      } else {
+        const { data, error: insertError } = await serviceClient
+          .from("connection_configs")
+          .insert({
+            connection_id: "whatsapp",
+            config: connectionConfig,
+            label: label?.trim() || selectedPhone.display_phone_number || "WhatsApp",
+            is_connected: true,
+            status,
+          })
+          .select("id")
+          .single();
+
+        if (insertError) {
+          console.error("Insert error:", insertError);
+          return jsonResponse({ error: "Failed to save connection" }, 500);
+        }
+
+        savedId = data.id;
       }
 
-      return new Response(
-        JSON.stringify({
-          success: true,
-          id: data.id,
-          waba_id: wabaId,
-          phone_number_id: phoneNumberId,
-          phone_display: phoneDisplay,
-          status: wabaId && phoneNumberId ? "active" : "pending_setup",
-        }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({
+        success: true,
+        id: savedId,
+        waba_id: selectedPhone.waba_id,
+        phone_number_id: selectedPhone.id,
+        phone_display: selectedPhone.display_phone_number,
+        verify_token: verifyToken,
+        webhook_url: webhookUrl,
+        status,
+        diagnostics: {
+          candidate_waba_ids: candidateWabaIds,
+          configured_webhook_url: configuredWebhookUrl,
+          webhook_url_matches: configuredWebhookUrl === webhookUrl,
+          app_subscribed: subscription.appSubscribed,
+          subscribed_apps_count: subscription.subscribedApps.length,
+        },
+      });
     }
 
-    return new Response(
-      JSON.stringify({ error: "Invalid action" }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return jsonResponse({ error: "Invalid action" }, 400);
   } catch (error) {
     console.error("Meta embedded signup error:", error);
-    return new Response(
-      JSON.stringify({ error: "Internal server error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    const message = error instanceof Error ? error.message : "Internal server error";
+    return jsonResponse({ error: message }, 500);
   }
 });
