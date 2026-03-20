@@ -55,6 +55,7 @@ export default function AiSettings() {
   const [flows, setFlows] = useState<FlowItem[]>([]);
   const [connections, setConnections] = useState<ConnectionConfig[]>([]);
   const [nicheConnectionIds, setNicheConnectionIds] = useState<string[]>([]);
+  const [selectedNicheId, setSelectedNicheId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [creating, setCreating] = useState(false);
