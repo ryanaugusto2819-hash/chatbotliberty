@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.check-connection-status]
 verify_jwt = false
+
+[functions.meta-embedded-signup]
+verify_jwt = false
