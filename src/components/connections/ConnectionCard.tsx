@@ -61,6 +61,7 @@ const PROVIDER_CONFIG: Record<string, {
     docsUrl: 'https://developers.facebook.com/docs/whatsapp/cloud-api/get-started',
     fields: [
       { key: 'phone_number_id', label: 'Phone Number ID', placeholder: '123456789012345', sensitive: false },
+      { key: 'waba_id', label: 'WABA ID', placeholder: '123456789012345', sensitive: false },
       { key: 'access_token', label: 'Access Token', placeholder: 'EAAxxxxxxx...', sensitive: true },
       { key: 'verify_token', label: 'Verify Token (Webhook)', placeholder: 'meu_token_secreto', sensitive: false },
     ],
