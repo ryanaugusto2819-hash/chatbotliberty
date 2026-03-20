@@ -3,7 +3,7 @@ import TopBar from '@/components/layout/TopBar';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Layers, Plus, Trash2, Save, Loader2, Bot, GitBranch, BookOpen,
-  Pencil, Check, X, MessageSquare, Sparkles, Phone,
+  Pencil, Check, X, MessageSquare, Sparkles, Phone, Wifi, WifiOff,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
