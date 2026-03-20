@@ -53,7 +53,8 @@ const defaultPrompt =
 export default function AiSettings() {
   const [niches, setNiches] = useState<Niche[]>([]);
   const [flows, setFlows] = useState<FlowItem[]>([]);
-  const [selectedNicheId, setSelectedNicheId] = useState<string | null>(null);
+  const [connections, setConnections] = useState<ConnectionConfig[]>([]);
+  const [nicheConnectionIds, setNicheConnectionIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [creating, setCreating] = useState(false);
