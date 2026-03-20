@@ -54,11 +54,15 @@ Deno.serve(async (req) => {
 
   if (req.method === "POST") {
     const body = await req.json();
-    const processPromise = processWebhook(body);
-    processPromise.catch((err) =>
-      console.error("Webhook processing error:", err)
-    );
-    return new Response("OK", { status: 200, headers: corsHeaders });
+
+    try {
+      console.log("[whatsapp-webhook] Incoming webhook received");
+      await processWebhook(body);
+      return new Response("OK", { status: 200, headers: corsHeaders });
+    } catch (err) {
+      console.error("Webhook processing error:", err);
+      return new Response("Processing error", { status: 500, headers: corsHeaders });
+    }
   }
 
   return new Response("Method not allowed", { status: 405, headers: corsHeaders });
@@ -209,7 +213,7 @@ async function processWebhook(body: any) {
           .eq("contact_phone", phone)
           .order("created_at", { ascending: false })
           .limit(1)
-          .single();
+          .maybeSingle();
 
         if (existing) {
           conversationId = existing.id;
