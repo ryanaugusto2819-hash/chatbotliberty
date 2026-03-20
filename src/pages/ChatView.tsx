@@ -143,9 +143,17 @@ export default function ChatView() {
     const channel = supabase
       .channel(`chat-${id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${id}` }, (payload) => {
-        setMessages(prev => [...prev, payload.new as MessageData]);
-        // Mark incoming customer messages as read immediately since user is viewing
-        if ((payload.new as MessageData).sender_type === 'customer') {
+        const incomingMessage = payload.new as MessageData;
+
+        setMessages(prev => {
+          if (prev.some(message => message.id === incomingMessage.id)) {
+            return prev;
+          }
+
+          return [...prev, incomingMessage];
+        });
+
+        if (incomingMessage.sender_type === 'customer') {
           markMessagesAsRead();
         }
       })
@@ -168,7 +176,19 @@ export default function ChatView() {
     setSending(true);
 
     try {
-      await sendWhatsAppMessage(id, msg);
+      const result = await sendWhatsAppMessage(id, msg);
+
+      if (result?.savedMessage) {
+        setMessages(prev => {
+          if (prev.some(message => message.id === result.savedMessage.id)) {
+            return prev;
+          }
+
+          return [...prev, result.savedMessage as MessageData];
+        });
+      }
+
+      fetchConversation();
     } catch (err: any) {
       console.error('Send error:', err);
       toast.error('Erro ao enviar mensagem. Verifique a conexão do WhatsApp.');
