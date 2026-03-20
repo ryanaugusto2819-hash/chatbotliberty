@@ -129,6 +129,13 @@ export default function AiSettings() {
       toast.success('Conexão vinculada');
     }
   };
+
+  const createNiche = async () => {
+    if (!newNicheName.trim()) {
+      toast.error('Digite o nome do nicho');
+      return;
+    }
+    setCreating(true);
     const { data, error } = await supabase
       .from('niches')
       .insert({ name: newNicheName.trim(), system_prompt: defaultPrompt })
