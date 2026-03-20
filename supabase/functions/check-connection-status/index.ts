@@ -86,14 +86,14 @@ Deno.serve(async (req) => {
       } else {
         try {
           const phoneData = await graphRequest(
-            `/${phoneId}?fields=id,display_phone_number,verified_name,quality_rating,name_status,webhook_configuration,whatsapp_business_account`,
+            `/${phoneId}?fields=id,display_phone_number,verified_name,quality_rating,status`,
             token
           );
 
-          const wabaId = phoneData?.whatsapp_business_account?.id || config.waba_id || "";
-          const configuredWebhookUrl = phoneData?.webhook_configuration?.application || "";
-          const webhookUrlMatches = configuredWebhookUrl === expectedWebhookUrl;
-          let appSubscribed = false;
+          const wabaId = config.waba_id || "";
+          const configuredWebhookUrl = config.webhook_url || "";
+          const webhookUrlMatches = configuredWebhookUrl ? configuredWebhookUrl === expectedWebhookUrl : null;
+          let appSubscribed: boolean | null = null;
           let subscribedAppsCount = 0;
 
           if (wabaId) {
@@ -102,15 +102,15 @@ Deno.serve(async (req) => {
             subscribedAppsCount = subscribedApps.subscribedApps.length;
           }
 
-          status = webhookUrlMatches && appSubscribed ? "active" : "pending_setup";
+          status = appSubscribed === false ? "pending_setup" : "active";
           details = {
             verified_name: phoneData?.verified_name,
             quality_rating: phoneData?.quality_rating,
             phone: phoneData?.display_phone_number,
-            name_status: phoneData?.name_status,
+            phone_status: phoneData?.status,
             waba_id: wabaId || null,
             expected_webhook_url: expectedWebhookUrl,
-            configured_webhook_url: configuredWebhookUrl,
+            configured_webhook_url: configuredWebhookUrl || null,
             webhook_url_matches: webhookUrlMatches,
             app_subscribed: appSubscribed,
             subscribed_apps_count: subscribedAppsCount,

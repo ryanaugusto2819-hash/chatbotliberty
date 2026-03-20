@@ -74,12 +74,12 @@ async function validateWhatsAppConfig(rawConfig: Record<string, string>) {
   }
 
   const phoneData = await graphRequest(
-    `/${phoneNumberId}?fields=id,display_phone_number,verified_name,quality_rating,name_status,webhook_configuration,whatsapp_business_account`,
+    `/${phoneNumberId}?fields=id,display_phone_number,verified_name,quality_rating,status`,
     accessToken
   );
 
-  const wabaId = phoneData?.whatsapp_business_account?.id || rawConfig.waba_id || "";
-  let appSubscribed = false;
+  const wabaId = rawConfig.waba_id?.trim() || "";
+  let appSubscribed: boolean | null = null;
   let subscribedApps: unknown[] = [];
 
   if (wabaId) {
@@ -88,12 +88,13 @@ async function validateWhatsAppConfig(rawConfig: Record<string, string>) {
     subscribedApps = subscriptionResult.subscribedApps;
   }
 
-  const configuredWebhook = phoneData?.webhook_configuration?.application || "";
-  const webhookMatches = configuredWebhook === webhookUrl;
+  const configuredWebhook = rawConfig.webhook_url?.trim() || "";
+  const webhookMatches = configuredWebhook ? configuredWebhook === webhookUrl : null;
   const verifyToken = rawConfig.verify_token?.trim() || generateVerifyToken();
+  const requiresSetup = appSubscribed === false;
 
   return {
-    status: webhookMatches && appSubscribed ? "active" : "pending_setup",
+    status: requiresSetup ? "pending_setup" : "active",
     config: {
       ...rawConfig,
       access_token: accessToken,
@@ -103,19 +104,21 @@ async function validateWhatsAppConfig(rawConfig: Record<string, string>) {
       phone_display: phoneData?.display_phone_number || rawConfig.phone_display || "",
       verified_name: phoneData?.verified_name || rawConfig.verified_name || "",
       quality_rating: phoneData?.quality_rating || rawConfig.quality_rating || "",
-      name_status: phoneData?.name_status || rawConfig.name_status || "",
+      name_status: rawConfig.name_status || "",
+      phone_status: phoneData?.status || rawConfig.phone_status || "",
       webhook_url: webhookUrl,
       setup_method: rawConfig.setup_method || "manual",
     },
     diagnostics: {
       webhook_url: webhookUrl,
-      configured_webhook_url: configuredWebhook,
+      configured_webhook_url: configuredWebhook || null,
       webhook_url_matches: webhookMatches,
       app_subscribed: appSubscribed,
       subscribed_apps_count: subscribedApps.length,
       phone_display: phoneData?.display_phone_number || null,
       verified_name: phoneData?.verified_name || null,
       quality_rating: phoneData?.quality_rating || null,
+      phone_status: phoneData?.status || null,
       waba_id: wabaId || null,
     },
   };
