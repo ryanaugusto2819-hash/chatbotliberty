@@ -34,6 +34,19 @@ interface FlowItem {
   niche_id: string | null;
 }
 
+interface ConnectionConfig {
+  id: string;
+  connection_id: string;
+  label: string;
+  status: string;
+  is_connected: boolean;
+}
+
+const PROVIDER_NAMES: Record<string, string> = {
+  whatsapp: 'WhatsApp Cloud API',
+  zapi: 'Z-API (QR Code)',
+};
+
 const defaultPrompt =
   'Você é um assistente virtual amigável de atendimento ao cliente via WhatsApp. Responda de forma concisa, útil e educada em português brasileiro. Se não souber a resposta, diga que vai encaminhar para um atendente humano.';
 
