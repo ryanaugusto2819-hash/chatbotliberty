@@ -60,10 +60,10 @@ export default function AppSidebar() {
     <aside className="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col bg-sidebar border-r border-sidebar-border">
       {/* Logo */}
       <div className="flex h-16 items-center gap-3 px-5 border-b border-sidebar-border">
-        <img src={logoImg} alt="Group Liberty" className="h-9 w-9 rounded-lg object-cover ring-1 ring-sidebar-border" />
+        <img src={logoImg} alt="Group Liberty" className="h-9 w-9 rounded-lg object-cover" />
         <div>
           <h1 className="text-sm font-bold text-sidebar-accent-foreground tracking-tight">Group Liberty</h1>
-          <p className="text-[9px] text-sidebar-primary font-mono uppercase tracking-[0.15em]">Atendimento</p>
+          <p className="text-[10px] text-sidebar-foreground/60 uppercase tracking-widest">Atendimento</p>
         </div>
       </div>
 
