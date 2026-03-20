@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import TopBar from '@/components/layout/TopBar';
 import StatusBadge from '@/components/shared/StatusBadge';
 import { supabase } from '@/integrations/supabase/client';
-import { Search, Loader2, Tag, Filter, X } from 'lucide-react';
+import { Search, Loader2, Tag, Filter, X, Smartphone, Globe } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface ConversationRow {
   id: string;
@@ -18,6 +19,7 @@ interface ConversationRow {
   last_message?: string;
   unread_count?: number;
   assigned_agent_id: string | null;
+  niche_id: string | null;
 }
 
 interface TagOption {
@@ -31,8 +33,58 @@ interface AgentOption {
   full_name: string;
 }
 
+interface NicheInfo {
+  id: string;
+  name: string;
+  whatsapp_phone_number_id: string | null;
+  zapi_instance_id: string | null;
+}
+
+type ConnectionSource = 'meta' | 'zapi' | 'unknown';
+
 const statusFilters = ['all', 'new', 'pending', 'active', 'resolved'] as const;
 const statusLabels: Record<string, string> = { all: 'Todos', new: 'Novos', pending: 'Pendentes', active: 'Em atendimento', resolved: 'Resolvidos' };
+
+function getConnectionSource(nicheId: string | null, niches: NicheInfo[]): ConnectionSource {
+  if (!nicheId) return 'unknown';
+  const niche = niches.find(n => n.id === nicheId);
+  if (!niche) return 'unknown';
+  if (niche.zapi_instance_id) return 'zapi';
+  if (niche.whatsapp_phone_number_id) return 'meta';
+  return 'unknown';
+}
+
+function ConnectionIcon({ source }: { source: ConnectionSource }) {
+  if (source === 'meta') {
+    return (
+      <TooltipProvider delayDuration={300}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-blue-500/15 text-blue-500">
+              <Globe className="h-3 w-3" />
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>Meta Cloud API</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+  if (source === 'zapi') {
+    return (
+      <TooltipProvider delayDuration={300}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-green-500/15 text-green-500">
+              <Smartphone className="h-3 w-3" />
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>Z-API</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+  return null;
+}
 
 export default function Conversations() {
   const navigate = useNavigate();
@@ -40,10 +92,12 @@ export default function Conversations() {
   const [activeFilter, setActiveFilter] = useState<string>('all');
   const [selectedTag, setSelectedTag] = useState<string>('all');
   const [selectedAgent, setSelectedAgent] = useState<string>('all');
+  const [selectedConnection, setSelectedConnection] = useState<string>('all');
   const [conversations, setConversations] = useState<ConversationRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [tags, setTags] = useState<TagOption[]>([]);
   const [agents, setAgents] = useState<AgentOption[]>([]);
+  const [niches, setNiches] = useState<NicheInfo[]>([]);
   const [contactTagMap, setContactTagMap] = useState<Record<string, TagOption[]>>({});
   const [showFilters, setShowFilters] = useState(false);
 
@@ -55,6 +109,11 @@ export default function Conversations() {
   const fetchAgents = async () => {
     const { data } = await supabase.from('profiles').select('id, full_name');
     if (data) setAgents(data);
+  };
+
+  const fetchNiches = async () => {
+    const { data } = await supabase.from('niches').select('id, name, whatsapp_phone_number_id, zapi_instance_id');
+    if (data) setNiches(data);
   };
 
   const fetchContactTags = async () => {
@@ -92,6 +151,7 @@ export default function Conversations() {
     fetchTags();
     fetchAgents();
     fetchContactTags();
+    fetchNiches();
 
     const channel = supabase
       .channel('conversations-realtime')
@@ -106,19 +166,21 @@ export default function Conversations() {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  const activeFiltersCount = (selectedTag !== 'all' ? 1 : 0) + (selectedAgent !== 'all' ? 1 : 0);
+  const activeFiltersCount = (selectedTag !== 'all' ? 1 : 0) + (selectedAgent !== 'all' ? 1 : 0) + (selectedConnection !== 'all' ? 1 : 0);
 
   const filtered = conversations.filter((c) => {
     const matchesSearch = c.contact_name.toLowerCase().includes(search.toLowerCase()) || c.contact_phone.includes(search);
     const matchesStatus = activeFilter === 'all' || c.status === activeFilter;
     const matchesTag = selectedTag === 'all' || (contactTagMap[c.contact_phone] || []).some(t => t.id === selectedTag);
     const matchesAgent = selectedAgent === 'all' || c.assigned_agent_id === selectedAgent;
-    return matchesSearch && matchesStatus && matchesTag && matchesAgent;
+    const matchesConnection = selectedConnection === 'all' || getConnectionSource(c.niche_id, niches) === selectedConnection;
+    return matchesSearch && matchesStatus && matchesTag && matchesAgent && matchesConnection;
   });
 
   const clearFilters = () => {
     setSelectedTag('all');
     setSelectedAgent('all');
+    setSelectedConnection('all');
   };
 
   return (
@@ -211,6 +273,20 @@ export default function Conversations() {
                   ))}
                 </select>
               </div>
+              <div className="flex-1 space-y-1.5">
+                <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                  <Smartphone className="h-3 w-3" /> Conexão
+                </label>
+                <select
+                  value={selectedConnection}
+                  onChange={(e) => setSelectedConnection(e.target.value)}
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="all">Todas as conexões</option>
+                  <option value="meta">Meta Cloud API</option>
+                  <option value="zapi">Z-API</option>
+                </select>
+              </div>
               {activeFiltersCount > 0 && (
                 <div className="flex items-end">
                   <button
@@ -234,6 +310,7 @@ export default function Conversations() {
             <div className="divide-y divide-border">
               {filtered.map((c, i) => {
                 const cTags = contactTagMap[c.contact_phone] || [];
+                const source = getConnectionSource(c.niche_id, niches);
                 return (
                   <motion.button
                     key={c.id}
@@ -250,7 +327,10 @@ export default function Conversations() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-0.5">
-                        <p className={`text-sm font-semibold truncate ${c.unread_count && c.unread_count > 0 ? 'text-card-foreground' : 'text-card-foreground/80'}`}>{c.contact_name}</p>
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <p className={`text-sm font-semibold truncate ${c.unread_count && c.unread_count > 0 ? 'text-card-foreground' : 'text-card-foreground/80'}`}>{c.contact_name}</p>
+                          <ConnectionIcon source={source} />
+                        </div>
                         <span className="text-[11px] text-muted-foreground shrink-0 ml-2">
                           {formatDistanceToNow(new Date(c.updated_at), { addSuffix: true, locale: ptBR })}
                         </span>
