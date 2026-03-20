@@ -288,6 +288,12 @@ async function processWebhook(body: any) {
         if (msgError) {
           console.error("Error inserting message:", msgError);
         } else {
+          // Lookup ad name from Meta if source_id is present
+          if (sourceId) {
+            triggerMetaAdLookup(sourceId, conversationId).catch((err) =>
+              console.error("Meta ad lookup error:", err)
+            );
+          }
           triggerAiFlowSelector(conversationId).catch((err) =>
             console.error("Flow selector trigger error:", err)
           );
@@ -305,6 +311,23 @@ async function processWebhook(body: any) {
       }
     }
   }
+}
+
+async function triggerMetaAdLookup(sourceId: string, conversationId: string) {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+  const response = await fetch(`${supabaseUrl}/functions/v1/meta-ad-lookup`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${serviceRoleKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ sourceId, conversationId }),
+  });
+
+  const result = await response.json();
+  console.log("Meta ad lookup result:", result);
 }
 
 async function triggerAiFlowSelector(conversationId: string) {
