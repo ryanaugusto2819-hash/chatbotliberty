@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.ai-flow-selector]
 verify_jwt = false
+
+[functions.meta-ad-lookup]
+verify_jwt = false
