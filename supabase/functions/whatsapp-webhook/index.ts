@@ -16,11 +16,38 @@ Deno.serve(async (req) => {
     const mode = url.searchParams.get("hub.mode");
     const token = url.searchParams.get("hub.verify_token");
     const challenge = url.searchParams.get("hub.challenge");
-    const verifyToken = Deno.env.get("WHATSAPP_VERIFY_TOKEN");
 
-    if (mode === "subscribe" && token === verifyToken) {
-      console.log("Webhook verified");
-      return new Response(challenge, { status: 200, headers: corsHeaders });
+    if (mode === "subscribe" && token) {
+      // Check verify token against all connection_configs AND env var
+      const envVerifyToken = Deno.env.get("WHATSAPP_VERIFY_TOKEN");
+      let isValid = token === envVerifyToken;
+
+      if (!isValid) {
+        // Check if any connection_config has this verify_token
+        try {
+          const serviceClient = createClient(
+            Deno.env.get("SUPABASE_URL")!,
+            Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+          );
+          const { data: connections } = await serviceClient
+            .from("connection_configs")
+            .select("config")
+            .eq("connection_id", "whatsapp")
+            .eq("is_connected", true);
+
+          isValid = connections?.some((c: any) => {
+            const cfg = c.config as Record<string, string>;
+            return cfg?.verify_token === token;
+          }) || false;
+        } catch (err) {
+          console.error("Error checking verify tokens:", err);
+        }
+      }
+
+      if (isValid) {
+        console.log("Webhook verified");
+        return new Response(challenge, { status: 200, headers: corsHeaders });
+      }
     }
     return new Response("Forbidden", { status: 403, headers: corsHeaders });
   }
@@ -36,6 +63,35 @@ Deno.serve(async (req) => {
 
   return new Response("Method not allowed", { status: 405, headers: corsHeaders });
 });
+
+// Helper: find access_token for a given phone_number_id from connection_configs
+async function resolveAccessToken(supabase: any, phoneNumberId: string): Promise<string> {
+  try {
+    const { data: connections } = await supabase
+      .from("connection_configs")
+      .select("config")
+      .eq("connection_id", "whatsapp")
+      .eq("is_connected", true);
+
+    const match = connections?.find((c: any) => {
+      const cfg = c.config as Record<string, string>;
+      return cfg?.phone_number_id === phoneNumberId;
+    });
+
+    if (match) {
+      const cfg = match.config as Record<string, string>;
+      if (cfg?.access_token) {
+        console.log(`[resolveAccessToken] Found token for phone_number_id: ${phoneNumberId}`);
+        return cfg.access_token;
+      }
+    }
+  } catch (err) {
+    console.error("Error resolving access token:", err);
+  }
+
+  // Fallback to env var
+  return Deno.env.get("WHATSAPP_ACCESS_TOKEN") || "";
+}
 
 async function downloadWhatsAppMedia(mediaId: string, accessToken: string): Promise<{ url: string; mimeType: string } | null> {
   try {
@@ -124,12 +180,15 @@ async function processWebhook(body: any) {
 
       if (!messages?.length) continue;
 
-      // Resolve niche from the phone_number_id that received the message
+      // Resolve niche and access token from the phone_number_id that received the message
       const receivingPhoneNumberId = value?.metadata?.phone_number_id || "";
       const nicheId = await resolveNicheId(supabase, receivingPhoneNumberId);
       if (nicheId) {
         console.log(`Niche resolved: ${nicheId} for phone_number_id: ${receivingPhoneNumberId}`);
       }
+
+      // Resolve access token for this specific connection
+      const accessToken = await resolveAccessToken(supabase, receivingPhoneNumberId);
 
       for (let i = 0; i < messages.length; i++) {
         const msg = messages[i];
@@ -189,7 +248,6 @@ async function processWebhook(body: any) {
         let content = "";
         let messageType = msg.type || "text";
         let mediaUrl: string | null = null;
-        const accessToken = Deno.env.get("WHATSAPP_ACCESS_TOKEN") || "";
 
         switch (msg.type) {
           case "text":
@@ -288,7 +346,6 @@ async function processWebhook(body: any) {
         if (msgError) {
           console.error("Error inserting message:", msgError);
         } else {
-          // Lookup ad name from Meta if source_id is present
           if (sourceId) {
             triggerMetaAdLookup(sourceId, conversationId).catch((err) =>
               console.error("Meta ad lookup error:", err)
