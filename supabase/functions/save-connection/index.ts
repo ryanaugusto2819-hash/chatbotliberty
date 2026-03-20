@@ -12,110 +12,120 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { connectionId, config, action } = await req.json();
-
-    if (!connectionId) {
-      return new Response(
-        JSON.stringify({ error: "connectionId is required" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
+    const body = await req.json();
+    const { action, id, connectionId, config, label } = body;
 
     const serviceClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Handle delete action
+    // DELETE by id
     if (action === "delete") {
-      const { error: deleteError } = await serviceClient
+      if (!id) {
+        return new Response(
+          JSON.stringify({ error: "id is required for delete" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const { error } = await serviceClient
         .from("connection_configs")
         .delete()
-        .eq("connection_id", connectionId);
+        .eq("id", id);
 
-      if (deleteError) {
-        console.error("Error deleting connection:", deleteError);
+      if (error) {
+        console.error("Delete error:", error);
         return new Response(
-          JSON.stringify({ error: "Failed to delete connection" }),
+          JSON.stringify({ error: "Failed to delete" }),
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
       return new Response(
-        JSON.stringify({ success: true, message: "Connection deleted" }),
+        JSON.stringify({ success: true }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // UPDATE by id
+    if (action === "update") {
+      if (!id) {
+        return new Response(
+          JSON.stringify({ error: "id is required for update" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const updateData: Record<string, unknown> = {
+        updated_at: new Date().toISOString(),
+      };
+      if (config !== undefined) updateData.config = config;
+      if (label !== undefined) updateData.label = label;
+
+      const { error } = await serviceClient
+        .from("connection_configs")
+        .update(updateData)
+        .eq("id", id);
+
+      if (error) {
+        console.error("Update error:", error);
+        return new Response(
+          JSON.stringify({ error: "Failed to update" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      return new Response(
+        JSON.stringify({ success: true }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // CREATE new connection
+    if (!connectionId) {
+      return new Response(
+        JSON.stringify({ error: "connectionId is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     if (!config) {
       return new Response(
         JSON.stringify({ error: "config is required" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Build config based on connection type
-    let savedConfig: Record<string, unknown> = {};
-
-    if (connectionId === "whatsapp") {
-      savedConfig = {
-        phone_number_id: config.whatsapp_phone_number_id || "",
-        configured_at: new Date().toISOString(),
-      };
-    } else if (connectionId === "zapi") {
-      savedConfig = {
-        instance_id: config.zapi_instance_id || "",
-        client_token: config.zapi_client_token || "",
-        configured_at: new Date().toISOString(),
-      };
-    } else if (connectionId === "ai-auto-reply" || connectionId === "ai-flow-selector") {
-      savedConfig = config;
-    }
-
-    const { error: upsertError } = await serviceClient
+    const { data, error: insertError } = await serviceClient
       .from("connection_configs")
-      .upsert(
-        {
-          connection_id: connectionId,
-          is_connected: true,
-          config: savedConfig,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "connection_id" }
-      );
+      .insert({
+        connection_id: connectionId,
+        config,
+        label: label || "",
+        is_connected: true,
+        status: "unknown",
+      })
+      .select("id")
+      .single();
 
-    if (upsertError) {
-      console.error("Error saving connection config:", upsertError);
+    if (insertError) {
+      console.error("Insert error:", insertError);
       return new Response(
-        JSON.stringify({ error: "Failed to save connection config" }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        JSON.stringify({ error: "Failed to create connection" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     return new Response(
-      JSON.stringify({ success: true, message: "Connection saved" }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      JSON.stringify({ success: true, id: data.id }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
     console.error("Save connection error:", error);
     return new Response(
       JSON.stringify({ error: "Internal server error" }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });

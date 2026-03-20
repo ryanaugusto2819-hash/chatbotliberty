@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.meta-ad-lookup]
 verify_jwt = false
+
+[functions.check-connection-status]
+verify_jwt = false
