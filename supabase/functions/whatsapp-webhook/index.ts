@@ -154,12 +154,46 @@ async function downloadWhatsAppMedia(mediaId: string, accessToken: string): Prom
 }
 
 async function resolveNicheId(supabase: any, phoneNumberId: string): Promise<string | null> {
-  const { data } = await supabase
-    .from("niches")
-    .select("id")
-    .eq("whatsapp_phone_number_id", phoneNumberId)
-    .maybeSingle();
-  return data?.id || null;
+  try {
+    // Find the connection_config that has this phone_number_id
+    const { data: connections } = await supabase
+      .from("connection_configs")
+      .select("id")
+      .eq("connection_id", "whatsapp")
+      .eq("is_connected", true);
+
+    let matchedConfigId: string | null = null;
+    for (const conn of connections || []) {
+      const { data: fullConn } = await supabase
+        .from("connection_configs")
+        .select("id, config")
+        .eq("id", conn.id)
+        .single();
+      const cfg = fullConn?.config as Record<string, string> | null;
+      if (cfg?.phone_number_id === phoneNumberId) {
+        matchedConfigId = fullConn.id;
+        break;
+      }
+    }
+
+    if (!matchedConfigId) return null;
+
+    // Find niche linked to this connection_config via niche_connections
+    const { data: nicheConn } = await supabase
+      .from("niche_connections")
+      .select("niche_id")
+      .eq("connection_config_id", matchedConfigId)
+      .maybeSingle();
+
+    if (nicheConn?.niche_id) {
+      console.log(`[resolveNicheId] Found niche ${nicheConn.niche_id} for phone_number_id ${phoneNumberId}`);
+      return nicheConn.niche_id;
+    }
+    return null;
+  } catch (err) {
+    console.error("Error resolving niche_id:", err);
+    return null;
+  }
 }
 
 async function processWebhook(body: any) {
