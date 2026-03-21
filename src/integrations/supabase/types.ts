@@ -765,6 +765,7 @@ export type Database = {
           contact_phone: string
           id: string
           last_message: string
+          last_message_sender: string
           niche_id: string
           status: string
           tags: string[]
