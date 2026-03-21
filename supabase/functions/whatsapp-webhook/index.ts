@@ -155,38 +155,30 @@ async function downloadWhatsAppMedia(mediaId: string, accessToken: string): Prom
 
 async function resolveNicheId(supabase: any, phoneNumberId: string): Promise<string | null> {
   try {
-    // Find the connection_config that has this phone_number_id
-    const { data: connections } = await supabase
+    // Find connection_config with this phone_number_id
+    const { data: allConfigs } = await supabase
       .from("connection_configs")
-      .select("id")
+      .select("id, config")
       .eq("connection_id", "whatsapp")
       .eq("is_connected", true);
 
-    let matchedConfigId: string | null = null;
-    for (const conn of connections || []) {
-      const { data: fullConn } = await supabase
-        .from("connection_configs")
-        .select("id, config")
-        .eq("id", conn.id)
-        .single();
-      const cfg = fullConn?.config as Record<string, string> | null;
-      if (cfg?.phone_number_id === phoneNumberId) {
-        matchedConfigId = fullConn.id;
-        break;
-      }
-    }
+    const matchedConfig = (allConfigs || []).find((c: any) => {
+      const cfg = c.config as Record<string, string> | null;
+      return cfg?.phone_number_id === phoneNumberId;
+    });
 
-    if (!matchedConfigId) return null;
+    if (!matchedConfig) return null;
 
-    // Find niche linked to this connection_config via niche_connections
+    // Find niche linked via niche_connections
     const { data: nicheConn } = await supabase
       .from("niche_connections")
       .select("niche_id")
-      .eq("connection_config_id", matchedConfigId)
+      .eq("connection_config_id", matchedConfig.id)
+      .limit(1)
       .maybeSingle();
 
     if (nicheConn?.niche_id) {
-      console.log(`[resolveNicheId] Found niche ${nicheConn.niche_id} for phone_number_id ${phoneNumberId}`);
+      console.log(`[resolveNicheId] Niche ${nicheConn.niche_id} for phone ${phoneNumberId}`);
       return nicheConn.niche_id;
     }
     return null;
