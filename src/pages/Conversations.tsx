@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import TopBar from '@/components/layout/TopBar';
 import StatusBadge from '@/components/shared/StatusBadge';
 import { supabase } from '@/integrations/supabase/client';
-import { Search, Loader2, Tag, Filter, X, Smartphone, Globe, Wifi } from 'lucide-react';
+import { Search, Loader2, Tag, Filter, X, Smartphone, Globe, Wifi, MessageCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -79,6 +79,7 @@ export default function Conversations() {
   const [selectedTag, setSelectedTag] = useState<string>('all');
   const [selectedAgent, setSelectedAgent] = useState<string>('all');
   const [selectedConnection, setSelectedConnection] = useState<string>('all');
+  const [onlyUnread, setOnlyUnread] = useState(false);
   const [conversations, setConversations] = useState<ConversationRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [tags, setTags] = useState<TagOption[]>([]);
@@ -190,7 +191,8 @@ export default function Conversations() {
     const matchesAgent = selectedAgent === 'all' || c.assigned_agent_id === selectedAgent;
     const conn = getConversationConnection(c.niche_id);
     const matchesConnection = selectedConnection === 'all' || conn?.id === selectedConnection;
-    return matchesSearch && matchesStatus && matchesTag && matchesAgent && matchesConnection;
+    const matchesUnread = !onlyUnread || (c.unread_count && c.unread_count > 0);
+    return matchesSearch && matchesStatus && matchesTag && matchesAgent && matchesConnection && matchesUnread;
   });
 
   const clearFilters = () => {
@@ -249,6 +251,17 @@ export default function Conversations() {
                 {statusLabels[f]}
               </button>
             ))}
+            <button
+              onClick={() => setOnlyUnread(!onlyUnread)}
+              className={`shrink-0 flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
+                onlyUnread
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+              }`}
+            >
+              <MessageCircle className="h-3 w-3" />
+              Não lidas
+            </button>
           </div>
 
           {/* Advanced Filters */}
