@@ -144,7 +144,7 @@ Deno.serve(async (req) => {
 
     const { data: conversation } = await supabase
       .from("conversations")
-      .select("contact_phone")
+      .select("contact_phone, niche_id")
       .eq("id", conversationId)
       .single();
 
@@ -152,27 +152,71 @@ Deno.serve(async (req) => {
       return createJsonResponse({ error: "Conversation not found" }, 404);
     }
 
-    const { data: connections } = await supabase
-      .from("connection_configs")
-      .select("connection_id, config, is_connected")
-      .in("connection_id", ["zapi", "whatsapp"])
-      .eq("is_connected", true);
+    // Resolve connection for this conversation's niche
+    let resolvedConnection: Record<string, unknown> | null = null;
+    let useZapi = false;
 
-    const zapiConnection = connections?.find((c) => c.connection_id === "zapi");
-    const waConnection = connections?.find((c) => c.connection_id === "whatsapp");
-    const useZapi = !!zapiConnection;
+    if (conversation.niche_id) {
+      const { data: nicheConns } = await supabase
+        .from("niche_connections")
+        .select("connection_config_id")
+        .eq("niche_id", conversation.niche_id);
 
-    const zapiInstanceId = Deno.env.get("ZAPI_INSTANCE_ID");
-    const zapiToken = Deno.env.get("ZAPI_TOKEN");
-    const zapiConfigData = zapiConnection?.config as Record<string, unknown> | null;
-    const zapiClientToken = (zapiConfigData?.client_token as string) || Deno.env.get("ZAPI_CLIENT_TOKEN") || "";
+      if (nicheConns?.length) {
+        const configIds = nicheConns.map((nc: any) => nc.connection_config_id);
+        const { data: configs } = await supabase
+          .from("connection_configs")
+          .select("connection_id, config, is_connected")
+          .in("id", configIds)
+          .eq("is_connected", true);
 
-    const waConfigData = waConnection?.config as Record<string, unknown> | null;
-    const phoneNumberId =
-      (typeof waConfigData?.phone_number_id === "string" && waConfigData.phone_number_id.trim())
-        ? waConfigData.phone_number_id
-        : Deno.env.get("WHATSAPP_PHONE_NUMBER_ID");
-    const accessToken = Deno.env.get("WHATSAPP_ACCESS_TOKEN");
+        const zapiConn = configs?.find((c: any) => c.connection_id === "zapi");
+        const waConn = configs?.find((c: any) => c.connection_id === "whatsapp");
+
+        if (zapiConn) {
+          resolvedConnection = zapiConn.config as Record<string, unknown>;
+          useZapi = true;
+        } else if (waConn) {
+          resolvedConnection = waConn.config as Record<string, unknown>;
+        }
+      }
+    }
+
+    // Fallback to any connected connection
+    if (!resolvedConnection) {
+      const { data: connections } = await supabase
+        .from("connection_configs")
+        .select("connection_id, config, is_connected")
+        .in("connection_id", ["zapi", "whatsapp"])
+        .eq("is_connected", true);
+
+      const zapiConnection = connections?.find((c: any) => c.connection_id === "zapi");
+      const waConnection = connections?.find((c: any) => c.connection_id === "whatsapp");
+
+      if (zapiConnection) {
+        resolvedConnection = zapiConnection.config as Record<string, unknown>;
+        useZapi = true;
+      } else if (waConnection) {
+        resolvedConnection = waConnection.config as Record<string, unknown>;
+      }
+    }
+
+    const zapiInstanceId = useZapi
+      ? (resolvedConnection?.instance_id as string) || Deno.env.get("ZAPI_INSTANCE_ID")
+      : null;
+    const zapiToken = useZapi
+      ? (resolvedConnection?.token as string) || Deno.env.get("ZAPI_TOKEN")
+      : null;
+    const zapiClientToken = useZapi
+      ? (resolvedConnection?.client_token as string) || Deno.env.get("ZAPI_CLIENT_TOKEN") || ""
+      : "";
+
+    const phoneNumberId = !useZapi
+      ? (resolvedConnection?.phone_number_id as string) || Deno.env.get("WHATSAPP_PHONE_NUMBER_ID")
+      : null;
+    const accessToken = !useZapi
+      ? (resolvedConnection?.access_token as string) || Deno.env.get("WHATSAPP_ACCESS_TOKEN")
+      : null;
 
     if (useZapi && (!zapiInstanceId || !zapiToken)) {
       return createJsonResponse({ error: "Z-API not configured" }, 500);
