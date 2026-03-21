@@ -20,6 +20,7 @@ interface ConversationRow {
   unread_count?: number;
   assigned_agent_id: string | null;
   niche_id: string | null;
+  last_message_sender?: string;
 }
 
 interface TagOption {
@@ -42,8 +43,8 @@ interface ConnectionInfo {
 // Maps niche_id -> connection info
 type NicheConnectionMap = Record<string, ConnectionInfo>;
 
-const statusFilters = ['all', 'new', 'pending', 'active', 'resolved'] as const;
-const statusLabels: Record<string, string> = { all: 'Todos', new: 'Novos', pending: 'Pendentes', active: 'Em atendimento', resolved: 'Resolvidos' };
+const statusFilters = ['all', 'new', 'pending', 'active', 'last_customer'] as const;
+const statusLabels: Record<string, string> = { all: 'Todos', new: 'Novos', pending: 'Pendentes', active: 'Em atendimento', last_customer: 'Última Msg Cliente' };
 
 function ConnectionBadge({ conn }: { conn: ConnectionInfo | null }) {
   if (!conn) return null;
@@ -186,7 +187,8 @@ export default function Conversations() {
 
   const filtered = conversations.filter((c) => {
     const matchesSearch = c.contact_name.toLowerCase().includes(search.toLowerCase()) || c.contact_phone.includes(search);
-    const matchesStatus = activeFilter === 'all' || c.status === activeFilter;
+    const matchesStatus = activeFilter === 'all' 
+      || (activeFilter === 'last_customer' ? c.last_message_sender === 'customer' : c.status === activeFilter);
     const matchesTag = selectedTag === 'all' || (contactTagMap[c.contact_phone] || []).some(t => t.id === selectedTag);
     const matchesAgent = selectedAgent === 'all' || c.assigned_agent_id === selectedAgent;
     const conn = getConversationConnection(c.niche_id);
