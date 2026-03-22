@@ -300,6 +300,7 @@ export default function AiSettings() {
 
         {/* Selected niche config */}
         {selectedNiche && (
+          <>
           <Tabs defaultValue="ai" className="space-y-4">
             <TabsList className="w-full">
               <TabsTrigger value="ai" className="flex-1 gap-2">
