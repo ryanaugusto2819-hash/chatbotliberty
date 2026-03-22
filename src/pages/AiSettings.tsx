@@ -542,6 +542,7 @@ export default function AiSettings() {
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               Salvar Alterações
             </button>
+          </div>
           </>
         )}
 
