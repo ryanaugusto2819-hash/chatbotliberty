@@ -50,8 +50,42 @@ Deno.serve(async (req) => {
     let phoneNumberId: string | null = null;
     let accessToken: string | null = null;
 
-    // Strategy 1: If conversation has a niche, use the niche's phone_number_id to find the connection
+    // Strategy 1: Prefer whatsapp connections explicitly linked to the niche
     if (conversation.niche_id) {
+      const { data: nicheConnections } = await serviceClient
+        .from("niche_connections")
+        .select("connection_config_id")
+        .eq("niche_id", conversation.niche_id);
+
+      const linkedConfigIds = nicheConnections?.map((item: any) => item.connection_config_id) || [];
+
+      if (linkedConfigIds.length > 0) {
+        const { data: linkedConnections } = await serviceClient
+          .from("connection_configs")
+          .select("id, config, updated_at")
+          .in("id", linkedConfigIds)
+          .eq("connection_id", "whatsapp")
+          .eq("is_connected", true)
+          .order("updated_at", { ascending: false });
+
+        const linkedMatch = linkedConnections?.find((connection: any) => {
+          const cfg = connection.config as Record<string, string>;
+          return cfg?.phone_number_id && cfg?.access_token;
+        });
+
+        if (linkedMatch) {
+          const cfg = linkedMatch.config as Record<string, string>;
+          phoneNumberId = cfg.phone_number_id || null;
+          accessToken = cfg.access_token || null;
+          console.log(
+            `[whatsapp-send] Resolved linked niche connection: configId=${linkedMatch.id}, phoneNumberId=${phoneNumberId}`
+          );
+        }
+      }
+    }
+
+    // Strategy 2: Legacy fallback using the niche default phone number id
+    if ((!phoneNumberId || !accessToken) && conversation.niche_id) {
       const { data: niche } = await serviceClient
         .from("niches")
         .select("whatsapp_phone_number_id")
@@ -59,10 +93,9 @@ Deno.serve(async (req) => {
         .single();
 
       if (niche?.whatsapp_phone_number_id) {
-        // Find the connection_config that has this phone_number_id
         const { data: connections } = await serviceClient
           .from("connection_configs")
-          .select("config")
+          .select("id, config")
           .eq("connection_id", "whatsapp")
           .eq("is_connected", true);
 
@@ -73,18 +106,20 @@ Deno.serve(async (req) => {
 
         if (match) {
           const cfg = match.config as Record<string, string>;
-          phoneNumberId = cfg.phone_number_id;
+          phoneNumberId = cfg.phone_number_id || null;
           accessToken = cfg.access_token || null;
-          console.log(`[whatsapp-send] Resolved connection via niche: phoneNumberId=${phoneNumberId}`);
+          console.log(
+            `[whatsapp-send] Resolved legacy niche phone_number_id via configId=${match.id}: phoneNumberId=${phoneNumberId}`
+          );
         }
       }
     }
 
-    // Strategy 2: Fallback — pick the most recently updated whatsapp connection
+    // Strategy 3: Fallback — pick the most recently updated whatsapp connection
     if (!phoneNumberId || !accessToken) {
       const { data: fallbackConn } = await serviceClient
         .from("connection_configs")
-        .select("config")
+        .select("id, config")
         .eq("connection_id", "whatsapp")
         .eq("is_connected", true)
         .order("updated_at", { ascending: false })
@@ -95,11 +130,13 @@ Deno.serve(async (req) => {
         const cfg = fallbackConn.config as Record<string, string>;
         if (cfg?.phone_number_id) phoneNumberId = cfg.phone_number_id;
         if (cfg?.access_token) accessToken = cfg.access_token;
-        console.log(`[whatsapp-send] Using fallback connection: phoneNumberId=${phoneNumberId}`);
+        console.log(
+          `[whatsapp-send] Using fallback connection via configId=${fallbackConn.id}: phoneNumberId=${phoneNumberId}`
+        );
       }
     }
 
-    // Strategy 3: Final fallback to env vars
+    // Strategy 4: Final fallback to env vars
     if (!phoneNumberId) phoneNumberId = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID") || null;
     if (!accessToken) accessToken = Deno.env.get("WHATSAPP_ACCESS_TOKEN") || null;
 
