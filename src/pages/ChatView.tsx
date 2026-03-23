@@ -316,7 +316,13 @@ export default function ChatView() {
                   {msg.sender_type === 'agent' && (
                     msg.status === 'failed'
                       ? <AlertTriangle className="h-3 w-3 text-destructive" />
-                      : msg.status === 'read' ? <CheckCheck className="h-3 w-3" /> : <Check className="h-3 w-3" />
+                      : msg.status === 'read'
+                        ? <CheckCheck className="h-3 w-3" />
+                        : msg.status === 'delivered'
+                          ? <CheckCheck className="h-3 w-3 opacity-80" />
+                          : msg.status === 'pending'
+                            ? <Clock className="h-3 w-3" />
+                            : <Check className="h-3 w-3" />
                   )}
                 </div>
               </div>
