@@ -23,6 +23,7 @@ const allNavItems = [
   { to: '/automation', icon: GitBranch, label: 'Automação', adminOnly: true },
   { to: '/ai', icon: Bot, label: 'Nichos & IA', adminOnly: true },
   { to: '/reports', icon: BarChart3, label: 'Relatórios', adminOnly: true },
+  { to: '/manager-ai', icon: ShieldCheck, label: 'IA Gerente', adminOnly: true },
   { to: '/connections', icon: Plug, label: 'Conexões', adminOnly: true },
   { to: '/users', icon: ShieldCheck, label: 'Usuários', adminOnly: true },
   { to: '/settings', icon: Settings, label: 'Configurações', adminOnly: true },

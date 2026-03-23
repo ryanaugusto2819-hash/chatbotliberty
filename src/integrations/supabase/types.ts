@@ -528,6 +528,56 @@ export type Database = {
           },
         ]
       }
+      manager_analyses: {
+        Row: {
+          context_adherence_score: number
+          conversation_id: string
+          created_at: string
+          flow_accuracy_score: number
+          flows_analyzed: Json
+          id: string
+          issues: Json
+          overall_score: number
+          response_quality_score: number
+          suggestions: Json
+          summary: string
+        }
+        Insert: {
+          context_adherence_score?: number
+          conversation_id: string
+          created_at?: string
+          flow_accuracy_score?: number
+          flows_analyzed?: Json
+          id?: string
+          issues?: Json
+          overall_score?: number
+          response_quality_score?: number
+          suggestions?: Json
+          summary?: string
+        }
+        Update: {
+          context_adherence_score?: number
+          conversation_id?: string
+          created_at?: string
+          flow_accuracy_score?: number
+          flows_analyzed?: Json
+          id?: string
+          issues?: Json
+          overall_score?: number
+          response_quality_score?: number
+          suggestions?: Json
+          summary?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "manager_analyses_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: true
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           content: string
