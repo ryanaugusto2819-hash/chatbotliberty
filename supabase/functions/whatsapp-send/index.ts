@@ -143,11 +143,16 @@ Deno.serve(async (req) => {
     );
 
     const waResult = await waResponse.json();
+    const providerMessageId = waResult?.messages?.[0]?.id || null;
+    const providerError = waResult?.error
+      ? JSON.stringify(waResult.error).slice(0, 500)
+      : !providerMessageId
+        ? "WhatsApp accepted the request without returning a message id"
+        : null;
 
-    if (!waResponse.ok) {
+    if (!waResponse.ok || providerError) {
       console.error("WhatsApp API error:", waResult);
 
-      // Save failed message so user can see it in chat
       const { data: failedMsg } = await serviceClient
         .from("messages")
         .insert({
@@ -157,6 +162,8 @@ Deno.serve(async (req) => {
           sender_agent_id: null,
           message_type: type,
           status: "failed",
+          provider_status: "failed",
+          provider_error: providerError,
         })
         .select()
         .single();
@@ -170,7 +177,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Save message to database
     const { data: savedMsg, error: msgError } = await serviceClient
       .from("messages")
       .insert({
@@ -179,7 +185,9 @@ Deno.serve(async (req) => {
         sender_type: "agent",
         sender_agent_id: null,
         message_type: type,
-        status: "sent",
+        status: "pending",
+        provider_message_id: providerMessageId,
+        provider_status: "accepted",
       })
       .select()
       .single();
@@ -188,7 +196,6 @@ Deno.serve(async (req) => {
       console.error("Error saving message:", msgError);
     }
 
-    // Update conversation timestamp
     await serviceClient
       .from("conversations")
       .update({ updated_at: new Date().toISOString() })
@@ -197,7 +204,7 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        messageId: waResult.messages?.[0]?.id,
+        messageId: providerMessageId,
         savedMessage: savedMsg,
       }),
       {

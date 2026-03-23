@@ -523,6 +523,9 @@ export type Database = {
           id: string
           media_url: string | null
           message_type: string
+          provider_error: string | null
+          provider_message_id: string | null
+          provider_status: string | null
           sender_agent_id: string | null
           sender_type: string
           status: string
@@ -534,6 +537,9 @@ export type Database = {
           id?: string
           media_url?: string | null
           message_type?: string
+          provider_error?: string | null
+          provider_message_id?: string | null
+          provider_status?: string | null
           sender_agent_id?: string | null
           sender_type: string
           status?: string
@@ -545,6 +551,9 @@ export type Database = {
           id?: string
           media_url?: string | null
           message_type?: string
+          provider_error?: string | null
+          provider_message_id?: string | null
+          provider_status?: string | null
           sender_agent_id?: string | null
           sender_type?: string
           status?: string

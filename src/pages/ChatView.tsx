@@ -158,6 +158,10 @@ export default function ChatView() {
           markMessagesAsRead();
         }
       })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `conversation_id=eq.${id}` }, (payload) => {
+        const updatedMessage = payload.new as MessageData;
+        setMessages(prev => prev.map(message => message.id === updatedMessage.id ? updatedMessage : message));
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations', filter: `id=eq.${id}` }, () => {
         fetchConversation();
       })
@@ -316,7 +320,13 @@ export default function ChatView() {
                   {msg.sender_type === 'agent' && (
                     msg.status === 'failed'
                       ? <AlertTriangle className="h-3 w-3 text-destructive" />
-                      : msg.status === 'read' ? <CheckCheck className="h-3 w-3" /> : <Check className="h-3 w-3" />
+                      : msg.status === 'read'
+                        ? <CheckCheck className="h-3 w-3" />
+                        : msg.status === 'delivered'
+                          ? <CheckCheck className="h-3 w-3 opacity-80" />
+                          : msg.status === 'pending'
+                            ? <Clock className="h-3 w-3" />
+                            : <Check className="h-3 w-3" />
                   )}
                 </div>
               </div>

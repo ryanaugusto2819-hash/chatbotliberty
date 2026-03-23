@@ -393,7 +393,35 @@ async function processWebhook(body: any) {
       const statuses = value?.statuses;
       if (statuses?.length) {
         for (const status of statuses) {
-          console.log(`Status update: ${status.id} -> ${status.status}`);
+          const providerStatus = status.status || null;
+          const providerMessageId = status.id || null;
+          const providerError = Array.isArray(status.errors) && status.errors.length > 0
+            ? JSON.stringify(status.errors[0]).slice(0, 500)
+            : null;
+
+          console.log(`Status update: ${providerMessageId} -> ${providerStatus}`);
+
+          if (!providerMessageId || !providerStatus) continue;
+
+          const normalizedStatus = providerStatus === "failed"
+            ? "failed"
+            : providerStatus === "read"
+              ? "read"
+              : providerStatus === "delivered"
+                ? "delivered"
+                : "pending";
+
+          const updatePayload: Record<string, string | null> = {
+            status: normalizedStatus,
+            provider_status: providerStatus,
+            provider_error: providerError,
+          };
+
+          await supabase
+            .from("messages")
+            .update(updatePayload)
+            .eq("provider_message_id", providerMessageId)
+            .eq("sender_type", "agent");
         }
       }
     }

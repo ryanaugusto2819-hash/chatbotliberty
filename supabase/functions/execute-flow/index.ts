@@ -600,7 +600,10 @@ Deno.serve(async (req) => {
         break;
       }
 
-      // Only insert message into chat AFTER confirmed successful delivery
+      const providerMessageId = useZapi
+        ? ((waResult as Record<string, unknown>)?.messageId as string | undefined) || null
+        : (((waResult as Record<string, unknown>)?.messages as Array<Record<string, unknown>> | undefined)?.[0]?.id as string | undefined) || null;
+
       let msgContent = "";
       let msgMediaUrl: string | null = null;
       let normalizedType = "text";
@@ -632,7 +635,9 @@ Deno.serve(async (req) => {
         sender_type: "agent",
         message_type: normalizedType,
         media_url: msgMediaUrl,
-        status: "sent",
+        status: providerMessageId ? "pending" : "sent",
+        provider_message_id: providerMessageId,
+        provider_status: providerMessageId ? "accepted" : null,
       });
 
       if (messageInsertError) {
