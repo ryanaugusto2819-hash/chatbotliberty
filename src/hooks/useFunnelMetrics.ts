@@ -2,193 +2,168 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { subDays } from 'date-fns';
 
-export interface FlowSummary {
-  flowId: string;
-  flowName: string;
-  totalExecutions: number;
-  completed: number;
-  failed: number;
-  running: number;
-  completionRate: number;
-}
-
-export interface FunnelStep {
-  nodeId: string;
+export interface LeadJourneyStage {
+  key: string;
   label: string;
-  nodeType: string;
-  sortOrder: number;
-  reached: number;
-  completed: number;
-  failed: number;
-  dropOffRate: number;
-  conversionRate: number;
+  count: number;
+  rate: number; // % from total
+  dropOff: number; // % drop from previous stage
 }
 
-export interface FlowFunnel {
-  flowId: string;
-  flowName: string;
-  steps: FunnelStep[];
-  overallConversion: number;
-  totalStarted: number;
-  totalCompleted: number;
+export interface FollowUpEngagement {
+  sent: number;
+  responded: number;
+  responseRate: number;
+  pending: number;
+}
+
+export interface LeadResponseMetrics {
+  avgCustomerMessages: number;
+  avgAgentMessages: number;
+  avgBotMessages: number;
+  conversationsWithCustomerReply: number;
+  conversationsWithoutReply: number;
+  replyRate: number;
 }
 
 export function useFunnelMetrics(days: number = 30) {
   const since = subDays(new Date(), days).toISOString();
 
-  const flowSummaryQuery = useQuery({
-    queryKey: ['funnel-flow-summary', days],
-    queryFn: async (): Promise<FlowSummary[]> => {
-      const { data: executions, error } = await supabase
-        .from('flow_executions')
-        .select('flow_id, status')
+  const journeyQuery = useQuery({
+    queryKey: ['lead-journey', days],
+    queryFn: async () => {
+      // 1. All conversations in period
+      const { data: conversations } = await supabase
+        .from('conversations')
+        .select('id, status, created_at, contact_phone')
         .gte('created_at', since);
 
-      if (error) throw error;
+      const convos = conversations ?? [];
+      const convIds = convos.map(c => c.id);
+      if (convIds.length === 0) return { stages: [] as LeadJourneyStage[], responseMetrics: null };
 
-      const { data: flows } = await supabase
-        .from('automation_flows')
-        .select('id, name');
+      // 2. Fetch messages for these conversations (batch)
+      const allMessages: Array<{ conversation_id: string; sender_type: string; created_at: string }> = [];
+      const chunkSize = 100;
+      for (let i = 0; i < convIds.length; i += chunkSize) {
+        const chunk = convIds.slice(i, i + chunkSize);
+        const { data } = await supabase
+          .from('messages')
+          .select('conversation_id, sender_type, created_at')
+          .in('conversation_id', chunk)
+          .order('created_at', { ascending: true });
+        if (data) allMessages.push(...data);
+      }
 
-      const flowMap = new Map<string, string>();
-      (flows ?? []).forEach(f => flowMap.set(f.id, f.name));
-
-      const grouped = new Map<string, { total: number; completed: number; failed: number; running: number }>();
-
-      (executions ?? []).forEach(e => {
-        const existing = grouped.get(e.flow_id) ?? { total: 0, completed: 0, failed: 0, running: 0 };
-        existing.total++;
-        if (e.status === 'completed') existing.completed++;
-        else if (e.status === 'failed') existing.failed++;
-        else existing.running++;
-        grouped.set(e.flow_id, existing);
+      // Group messages by conversation
+      const msgsByConv = new Map<string, typeof allMessages>();
+      allMessages.forEach(m => {
+        const list = msgsByConv.get(m.conversation_id) ?? [];
+        list.push(m);
+        msgsByConv.set(m.conversation_id, list);
       });
 
-      return Array.from(grouped.entries()).map(([flowId, stats]) => ({
-        flowId,
-        flowName: flowMap.get(flowId) ?? 'Fluxo desconhecido',
-        totalExecutions: stats.total,
-        completed: stats.completed,
-        failed: stats.failed,
-        running: stats.running,
-        completionRate: stats.total > 0 ? Math.round((stats.completed / stats.total) * 1000) / 10 : 0,
-      })).sort((a, b) => b.totalExecutions - a.totalExecutions);
+      // Calculate journey stages
+      const totalLeads = convos.length;
+
+      // Stage: Bot/agent contacted (has at least 1 bot or agent message)
+      let contacted = 0;
+      // Stage: Lead responded (customer sent at least 1 message after a bot/agent message)
+      let responded = 0;
+      // Stage: Lead engaged (customer sent 2+ messages = ongoing conversation)
+      let engaged = 0;
+      // Stage: In active attendance
+      let inAttendance = 0;
+      // Stage: Resolved / Sale
+      let resolved = 0;
+
+      let totalCustomerMsgs = 0;
+      let totalAgentMsgs = 0;
+      let totalBotMsgs = 0;
+
+      convos.forEach(conv => {
+        const msgs = msgsByConv.get(conv.id) ?? [];
+        const botAgentMsgs = msgs.filter(m => m.sender_type === 'bot' || m.sender_type === 'agent');
+        const customerMsgs = msgs.filter(m => m.sender_type === 'customer');
+
+        totalCustomerMsgs += customerMsgs.length;
+        totalAgentMsgs += msgs.filter(m => m.sender_type === 'agent').length;
+        totalBotMsgs += msgs.filter(m => m.sender_type === 'bot').length;
+
+        if (botAgentMsgs.length > 0) {
+          contacted++;
+
+          // Check if customer replied AFTER the first bot/agent message
+          const firstOutbound = botAgentMsgs[0].created_at;
+          const repliesAfter = customerMsgs.filter(m => m.created_at > firstOutbound);
+
+          if (repliesAfter.length > 0) {
+            responded++;
+          }
+          if (repliesAfter.length >= 2) {
+            engaged++;
+          }
+        }
+
+        if (conv.status === 'active') inAttendance++;
+        if (conv.status === 'resolved') resolved++;
+      });
+
+      const stages: LeadJourneyStage[] = [
+        { key: 'leads', label: 'Leads Recebidos', count: totalLeads, rate: 100, dropOff: 0 },
+        { key: 'contacted', label: 'Contatados (Bot/Atendente)', count: contacted, rate: totalLeads > 0 ? round(contacted / totalLeads * 100) : 0, dropOff: totalLeads > 0 ? round((totalLeads - contacted) / totalLeads * 100) : 0 },
+        { key: 'responded', label: 'Responderam', count: responded, rate: totalLeads > 0 ? round(responded / totalLeads * 100) : 0, dropOff: contacted > 0 ? round((contacted - responded) / contacted * 100) : 0 },
+        { key: 'engaged', label: 'Engajaram (2+ respostas)', count: engaged, rate: totalLeads > 0 ? round(engaged / totalLeads * 100) : 0, dropOff: responded > 0 ? round((responded - engaged) / responded * 100) : 0 },
+        { key: 'attendance', label: 'Em Atendimento', count: inAttendance, rate: totalLeads > 0 ? round(inAttendance / totalLeads * 100) : 0, dropOff: engaged > 0 ? round((engaged - inAttendance) / engaged * 100) : 0 },
+        { key: 'resolved', label: 'Resolvido / Venda', count: resolved, rate: totalLeads > 0 ? round(resolved / totalLeads * 100) : 0, dropOff: inAttendance > 0 ? round((inAttendance - resolved) / inAttendance * 100) : 0 },
+      ];
+
+      const convsWithReply = responded;
+      const convsWithoutReply = totalLeads - responded;
+
+      const responseMetrics: LeadResponseMetrics = {
+        avgCustomerMessages: totalLeads > 0 ? round(totalCustomerMsgs / totalLeads) : 0,
+        avgAgentMessages: totalLeads > 0 ? round(totalAgentMsgs / totalLeads) : 0,
+        avgBotMessages: totalLeads > 0 ? round(totalBotMsgs / totalLeads) : 0,
+        conversationsWithCustomerReply: convsWithReply,
+        conversationsWithoutReply: convsWithoutReply,
+        replyRate: totalLeads > 0 ? round(convsWithReply / totalLeads * 100) : 0,
+      };
+
+      return { stages, responseMetrics };
     },
   });
 
-  const funnelQuery = useQuery({
-    queryKey: ['funnel-steps', days],
-    queryFn: async (): Promise<FlowFunnel[]> => {
-      // Get all executions in period
-      const { data: executions } = await supabase
-        .from('flow_executions')
-        .select('id, flow_id, status')
+  const followUpQuery = useQuery({
+    queryKey: ['lead-followup-engagement', days],
+    queryFn: async (): Promise<FollowUpEngagement> => {
+      const { data } = await supabase
+        .from('follow_up_executions')
+        .select('status')
         .gte('created_at', since);
 
-      if (!executions || executions.length === 0) return [];
+      const items = data ?? [];
+      const sent = items.filter(i => i.status === 'sent' || i.status === 'responded').length;
+      const responded = items.filter(i => i.status === 'responded').length;
+      const pending = items.filter(i => i.status === 'pending').length;
 
-      const executionIds = executions.map(e => e.id);
-      const flowIds = [...new Set(executions.map(e => e.flow_id))];
-
-      // Get flows
-      const { data: flows } = await supabase
-        .from('automation_flows')
-        .select('id, name')
-        .in('id', flowIds);
-
-      const flowMap = new Map<string, string>();
-      (flows ?? []).forEach(f => flowMap.set(f.id, f.name));
-
-      // Get nodes for these flows
-      const { data: nodes } = await supabase
-        .from('automation_nodes')
-        .select('id, flow_id, label, node_type, sort_order')
-        .in('flow_id', flowIds)
-        .order('sort_order', { ascending: true });
-
-      // Get step logs - batch in chunks to avoid query limit
-      const allLogs: Array<{ execution_id: string; node_id: string; status: string; sort_order: number; node_label: string; node_type: string }> = [];
-      const chunkSize = 50;
-      for (let i = 0; i < executionIds.length; i += chunkSize) {
-        const chunk = executionIds.slice(i, i + chunkSize);
-        const { data: logs } = await supabase
-          .from('flow_step_logs')
-          .select('execution_id, node_id, status, sort_order, node_label, node_type')
-          .in('execution_id', chunk);
-        if (logs) allLogs.push(...logs);
-      }
-
-      // Group executions by flow
-      const execByFlow = new Map<string, string[]>();
-      executions.forEach(e => {
-        const list = execByFlow.get(e.flow_id) ?? [];
-        list.push(e.id);
-        execByFlow.set(e.flow_id, list);
-      });
-
-      const completedByFlow = new Map<string, number>();
-      executions.forEach(e => {
-        if (e.status === 'completed') {
-          completedByFlow.set(e.flow_id, (completedByFlow.get(e.flow_id) ?? 0) + 1);
-        }
-      });
-
-      // Build funnels per flow
-      const funnels: FlowFunnel[] = [];
-
-      for (const [flowId, execIds] of execByFlow.entries()) {
-        const flowNodes = (nodes ?? []).filter(n => n.flow_id === flowId).sort((a, b) => a.sort_order - b.sort_order);
-        if (flowNodes.length === 0) continue;
-
-        const totalStarted = execIds.length;
-        const logsForFlow = allLogs.filter(l => execIds.includes(l.execution_id));
-
-        const steps: FunnelStep[] = flowNodes.map((node, idx) => {
-          const nodeLogs = logsForFlow.filter(l => l.node_id === node.id);
-          const reached = nodeLogs.length;
-          const completed = nodeLogs.filter(l => l.status === 'completed').length;
-          const failed = nodeLogs.filter(l => l.status === 'failed').length;
-
-          const previousReached = idx === 0 ? totalStarted : (() => {
-            const prevNode = flowNodes[idx - 1];
-            return logsForFlow.filter(l => l.node_id === prevNode.id).length;
-          })();
-
-          const dropOffRate = previousReached > 0 ? Math.round(((previousReached - reached) / previousReached) * 1000) / 10 : 0;
-          const conversionRate = totalStarted > 0 ? Math.round((reached / totalStarted) * 1000) / 10 : 0;
-
-          return {
-            nodeId: node.id,
-            label: node.label || `Etapa ${idx + 1}`,
-            nodeType: node.node_type,
-            sortOrder: node.sort_order,
-            reached,
-            completed,
-            failed,
-            dropOffRate: Math.max(0, dropOffRate),
-            conversionRate,
-          };
-        });
-
-        funnels.push({
-          flowId,
-          flowName: flowMap.get(flowId) ?? 'Fluxo desconhecido',
-          steps,
-          totalStarted,
-          totalCompleted: completedByFlow.get(flowId) ?? 0,
-          overallConversion: totalStarted > 0
-            ? Math.round(((completedByFlow.get(flowId) ?? 0) / totalStarted) * 1000) / 10
-            : 0,
-        });
-      }
-
-      return funnels.sort((a, b) => b.totalStarted - a.totalStarted);
+      return {
+        sent,
+        responded,
+        responseRate: sent > 0 ? round(responded / sent * 100) : 0,
+        pending,
+      };
     },
   });
 
   return {
-    flowSummaries: flowSummaryQuery.data ?? [],
-    funnels: funnelQuery.data ?? [],
-    isLoading: flowSummaryQuery.isLoading || funnelQuery.isLoading,
+    stages: journeyQuery.data?.stages ?? [],
+    responseMetrics: journeyQuery.data?.responseMetrics ?? null,
+    followUp: followUpQuery.data ?? null,
+    isLoading: journeyQuery.isLoading || followUpQuery.isLoading,
   };
+}
+
+function round(n: number): number {
+  return Math.round(n * 10) / 10;
 }
