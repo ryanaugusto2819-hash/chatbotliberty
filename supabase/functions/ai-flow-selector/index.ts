@@ -177,12 +177,14 @@ ${nodeDetails || "   (sem etapas)"}`;
 Sua função é analisar a conversa completa e decidir qual fluxo disparar com base no contexto.
 
 REGRAS OBRIGATÓRIAS:
-1. NUNCA selecione um fluxo que já foi enviado nesta conversa (marcado como [JÁ ENVIADO]).
-2. RESPEITE A ORDEM DE PRIORIDADE: Se existem fluxos numerados por etapas (Etapa 1, Etapa 2, Etapa 3...), NUNCA envie uma etapa posterior sem que as anteriores já tenham sido enviadas.
-3. Analise o CONTEÚDO COMPLETO de cada fluxo (todas as mensagens, perguntas e mídias das etapas) para entender o que cada fluxo faz antes de decidir.
-4. Analise TODA a conversa, não apenas a última mensagem, para entender o contexto completo do atendimento.
-5. Se nenhum fluxo se encaixar ou se todos os fluxos aplicáveis já foram enviados, retorne null.
-6. Seja criterioso: só selecione um fluxo se ele realmente fizer sentido para o momento atual da conversa.
+1. A DESCRIÇÃO DE CADA FLUXO É O CRITÉRIO PRINCIPAL DE SELEÇÃO. Cada fluxo tem uma descrição que explica EXATAMENTE quando ele deve ser disparado. Leia a descrição com atenção e SÓ selecione o fluxo se a situação descrita corresponder ao momento atual da conversa. Se a descrição diz "Quando o cliente perguntar sobre X", o cliente PRECISA ter perguntado sobre X.
+2. NUNCA selecione um fluxo que já foi enviado nesta conversa (marcado como [JÁ ENVIADO]).
+3. RESPEITE A ORDEM DE PRIORIDADE: Se existem fluxos numerados por etapas (Etapa 1, Etapa 2, Etapa 3...), NUNCA envie uma etapa posterior sem que as anteriores já tenham sido enviadas.
+4. Analise o CONTEÚDO COMPLETO de cada fluxo (todas as mensagens, perguntas e mídias das etapas) para entender o que cada fluxo faz antes de decidir.
+5. Analise TODA a conversa, não apenas a última mensagem, para entender o contexto completo do atendimento.
+6. Se nenhum fluxo se encaixar ou se todos os fluxos aplicáveis já foram enviados, retorne null. NA DÚVIDA, retorne null. É melhor não enviar nada do que enviar o fluxo errado.
+7. Seja MUITO criterioso: só selecione um fluxo se a descrição dele corresponder CLARAMENTE ao que o cliente está pedindo ou ao momento da conversa.
+8. NÃO envie fluxos apenas porque o cliente respondeu com uma saudação simples (ex: "bom dia", "oi", "olá"). Uma saudação NÃO é motivo para disparar um fluxo, a menos que seja a primeira mensagem do lead vinda de um anúncio.
 ${customInstructions ? `\nInstruções adicionais do administrador:\n${customInstructions}` : ""}`;
 
     const userPrompt = `${executionHistory}
