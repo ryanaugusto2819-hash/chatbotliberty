@@ -102,12 +102,35 @@ serve(async (req) => {
       return `[${item.title}]: ${item.content.substring(0, 500)}`;
     }).join("\n\n");
 
-    // Build the conversation transcript
+    // Build the conversation transcript (handle media messages)
     const transcript = messages.map((m: any) => {
       const sender = m.sender_type === "customer" ? "CLIENTE" :
                      m.sender_type === "bot" ? "BOT/IA" : "ATENDENTE";
       const time = new Date(m.created_at).toLocaleString("pt-BR");
-      return `[${time}] ${sender}: ${m.content}`;
+
+      let displayContent = m.content || "";
+
+      // If content is empty, describe the media type so the AI knows what was sent
+      if (!displayContent.trim()) {
+        const typeLabels: Record<string, string> = {
+          image: "[Imagem enviada]",
+          video: "[Vídeo enviado]",
+          audio: "[Áudio enviado]",
+          document: "[Documento enviado]",
+          sticker: "[Sticker enviado]",
+        };
+        displayContent = typeLabels[m.message_type] || "[Mídia enviada]";
+      }
+
+      // Append media indicator if there's a media_url but content doesn't mention it
+      if (m.media_url && !displayContent.includes("[") && m.message_type !== "text") {
+        const mediaLabel = m.message_type === "image" ? "📷 Imagem" :
+                          m.message_type === "video" ? "🎥 Vídeo" :
+                          m.message_type === "audio" ? "🎤 Áudio" : "📎 Arquivo";
+        displayContent = `${displayContent} [${mediaLabel} anexado]`.trim();
+      }
+
+      return `[${time}] ${sender}: ${displayContent}`;
     }).join("\n");
 
     // Build flow execution summary
