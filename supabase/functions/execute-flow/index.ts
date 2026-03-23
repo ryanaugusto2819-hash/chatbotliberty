@@ -125,6 +125,45 @@ async function sendWhatsAppCloudMessage(params: {
   return response;
 }
 
+/** Validates the API response body to detect silent failures */
+function validateSendResponse(
+  waResponse: Response,
+  waResult: Record<string, unknown>,
+  useZapi: boolean,
+  nodeId: string
+): { success: boolean; errorDetail?: string } {
+  if (!waResponse.ok) {
+    return {
+      success: false,
+      errorDetail: JSON.stringify(waResult?.error || waResult).slice(0, 500),
+    };
+  }
+
+  if (useZapi) {
+    // Z-API can return 200 with error in body
+    const zapiError = (waResult as any)?.error;
+    if (zapiError) {
+      console.error(`[execute-flow] Z-API 200 but body has error for node ${nodeId}:`, JSON.stringify(zapiError));
+      return { success: false, errorDetail: JSON.stringify(zapiError).slice(0, 500) };
+    }
+    return { success: true };
+  }
+
+  // WhatsApp Cloud API validation
+  const waError = (waResult as any)?.error;
+  if (waError) {
+    console.error(`[execute-flow] WA Cloud 200 but body has error for node ${nodeId}:`, JSON.stringify(waError));
+    return { success: false, errorDetail: JSON.stringify(waError).slice(0, 500) };
+  }
+
+  const waMessages = (waResult as any)?.messages;
+  if (!waMessages || !Array.isArray(waMessages) || waMessages.length === 0) {
+    console.warn(`[execute-flow] WA Cloud 200 but no messages array for node ${nodeId}:`, JSON.stringify(waResult).slice(0, 300));
+  }
+
+  return { success: true };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -233,9 +272,11 @@ Deno.serve(async (req) => {
       const localNumber = phone.substring(4);
       if (!localNumber.startsWith("9")) {
         phone = `55${ddd}9${localNumber}`;
-        console.log(`Normalized phone: ${conversation.contact_phone} -> ${phone}`);
+        console.log(`[execute-flow] Normalized phone: ${conversation.contact_phone} -> ${phone}`);
       }
     }
+
+    console.log(`[execute-flow] Starting flow ${flowId} for conversation ${conversationId}, phone: ${phone}, provider: ${useZapi ? "Z-API" : "WA Cloud"}`);
 
     const { data: nodes } = await supabase
       .from("automation_nodes")
@@ -415,6 +456,7 @@ Deno.serve(async (req) => {
 
       let waResponse: Response;
       let waResult: Record<string, unknown>;
+      let sendValidation: { success: boolean; errorDetail?: string };
 
       try {
         if (useZapi) {
@@ -452,6 +494,8 @@ Deno.serve(async (req) => {
             zapiBody = { phone, message: textContent };
           }
 
+          console.log(`[execute-flow] Sending via Z-API node ${node.id} (${node.node_type}) to ${phone}`);
+
           waResponse = await fetch(zapiEndpoint, {
             method: "POST",
             headers: {
@@ -461,6 +505,8 @@ Deno.serve(async (req) => {
             body: JSON.stringify(zapiBody),
           });
         } else {
+          console.log(`[execute-flow] Sending via WA Cloud node ${node.id} (${node.node_type}) to ${phone}`);
+
           waResponse = await sendWhatsAppCloudMessage({
             accessToken,
             phoneNumberId,
@@ -472,16 +518,26 @@ Deno.serve(async (req) => {
         }
 
         waResult = await waResponse.json();
+        console.log(`[execute-flow] API response node ${node.id}: HTTP ${waResponse.status}, body: ${JSON.stringify(waResult).slice(0, 400)}`);
+
+        // Validate response body beyond just HTTP status
+        sendValidation = validateSendResponse(waResponse, waResult, useZapi, node.id);
       } catch (error) {
-        console.error("WhatsApp send exception:", error);
+        console.error("[execute-flow] Send exception for node", node.id, ":", error);
         waResponse = new Response(null, { status: 500 });
         waResult = {
           error: error instanceof Error ? error.message : "Unknown send error",
         };
+        sendValidation = {
+          success: false,
+          errorDetail: error instanceof Error ? error.message : "Unknown send error",
+        };
       }
 
-      if (!waResponse.ok) {
-        console.error("WhatsApp send error:", waResult);
+      if (!sendValidation.success) {
+        const errorDetail = sendValidation.errorDetail || JSON.stringify(waResult).slice(0, 500);
+        console.error(`[execute-flow] FAILED node ${node.id} (${node.node_type}) to ${phone}: ${errorDetail}`);
+
         if (executionId) {
           await supabase.from("flow_step_logs").insert({
             execution_id: executionId,
@@ -490,7 +546,7 @@ Deno.serve(async (req) => {
             node_label: node.label || node.node_type,
             sort_order: node.sort_order,
             status: "failed",
-            error_message: JSON.stringify(waResult.error || waResult).slice(0, 500),
+            error_message: errorDetail,
           });
 
           await supabase
@@ -508,6 +564,7 @@ Deno.serve(async (req) => {
         break;
       }
 
+      // Only insert message into chat AFTER confirmed successful delivery
       let msgContent = "";
       let msgMediaUrl: string | null = null;
       let normalizedType = "text";
@@ -543,7 +600,7 @@ Deno.serve(async (req) => {
       });
 
       if (messageInsertError) {
-        console.error("Message insert error:", messageInsertError);
+        console.error("[execute-flow] Message insert error:", messageInsertError);
       }
 
       if (executionId) {
@@ -588,9 +645,11 @@ Deno.serve(async (req) => {
       .update({ updated_at: new Date().toISOString() })
       .eq("id", conversationId);
 
-    return createJsonResponse({ success: true, executionId, results }, 200);
+    console.log(`[execute-flow] Flow ${flowId} finished: ${failed ? "FAILED" : "SUCCESS"}, ${completedCount}/${nodes.length} nodes completed`);
+
+    return createJsonResponse({ success: !failed, executionId, results }, 200);
   } catch (error) {
-    console.error("Execute flow error:", error);
+    console.error("[execute-flow] Fatal error:", error);
     return createJsonResponse({ error: "Internal server error" }, 500);
   }
 });
