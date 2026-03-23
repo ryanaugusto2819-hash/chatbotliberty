@@ -88,7 +88,7 @@ interface ChatViewProps {
 export default function ChatView({ embedded, conversationId, onBack }: ChatViewProps = {}) {
   const { id: paramId } = useParams();
   const id = conversationId || paramId;
-  const navigate = embedded ? undefined : useNavigate();
+  const navigate = useNavigate();
   const [input, setInput] = useState('');
   const [conversation, setConversation] = useState<ConversationData | null>(null);
   const [messages, setMessages] = useState<MessageData[]>([]);
