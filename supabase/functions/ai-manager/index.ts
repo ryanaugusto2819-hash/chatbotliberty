@@ -80,6 +80,28 @@ serve(async (req) => {
       nicheInfo = niche;
     }
 
+    // Load manager config
+    const { data: managerConfig } = await supabase
+      .from("manager_config")
+      .select("*")
+      .limit(1)
+      .maybeSingle();
+
+    const customPrompt = managerConfig?.custom_prompt || '';
+    const evalCriteria = (managerConfig?.evaluation_criteria || []) as Array<{ name: string; weight: number; description: string }>;
+
+    // Load knowledge base items for context
+    const { data: kbItems } = await supabase
+      .from("knowledge_base_items")
+      .select("title, content, type")
+      .order("created_at", { ascending: false })
+      .limit(30);
+
+    const kbContext = (kbItems || []).map((item: any) => {
+      if (item.type === 'qa') return `P: ${item.title}\nR: ${item.content}`;
+      return `[${item.title}]: ${item.content.substring(0, 500)}`;
+    }).join("\n\n");
+
     // Build the conversation transcript
     const transcript = messages.map((m: any) => {
       const sender = m.sender_type === "customer" ? "CLIENTE" :
@@ -95,17 +117,19 @@ serve(async (req) => {
       return `- Fluxo "${flowName}" (${flowDesc}) — Status: ${fe.status}, Nós completados: ${fe.completed_nodes}/${fe.total_nodes}`;
     }).join("\n");
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+    // Build criteria text
+    const criteriaText = evalCriteria.length > 0
+      ? evalCriteria.map((c, i) => `${i + 1}. ${c.name} (Peso: ${c.weight}%): ${c.description}`).join("\n")
+      : `1. QUALIDADE DAS RESPOSTAS: As respostas do bot/atendente foram claras, úteis e profissionais?
+2. PRECISÃO DOS FLUXOS: Os fluxos de automação disparados foram adequados ao contexto?
+3. ADERÊNCIA AO CONTEXTO: As respostas mantiveram coerência com o histórico?
+4. IDENTIFICAÇÃO DE ERROS: Houve respostas incorretas ou informações contraditórias?`;
 
-    const systemPrompt = `Você é um GERENTE DE QUALIDADE especializado em atendimento ao cliente via WhatsApp.
+    const systemPrompt = `${customPrompt || 'Você é um GERENTE DE QUALIDADE especializado em atendimento ao cliente via WhatsApp.'}
 
 Sua função é analisar conversas de atendimento e gerar um relatório detalhado avaliando:
 
-1. QUALIDADE DAS RESPOSTAS: As respostas do bot/atendente foram claras, úteis e profissionais?
-2. PRECISÃO DOS FLUXOS: Os fluxos de automação disparados foram adequados ao contexto da dúvida do cliente? A descrição do fluxo corresponde ao que o cliente perguntou?
-3. ADERÊNCIA AO CONTEXTO: As respostas mantiveram coerência com o histórico da conversa?
-4. IDENTIFICAÇÃO DE ERROS: Houve respostas incorretas, fluxos disparados fora de contexto, ou informações contraditórias?
+${criteriaText}
 
 REGRAS:
 - Avalie cada aspecto com uma nota de 0 a 100.
@@ -115,6 +139,8 @@ REGRAS:
 - Seja crítico mas justo.
 
 ${nicheInfo ? `CONTEXTO DO NICHO: "${nicheInfo.name}"\nPrompt do sistema: ${nicheInfo.system_prompt}` : ""}
+
+${kbContext ? `BASE DE CONHECIMENTO (use como referência para validar respostas):\n${kbContext}` : ""}
 
 FLUXOS EXECUTADOS NESTA CONVERSA:
 ${flowSummary || "Nenhum fluxo foi executado."}

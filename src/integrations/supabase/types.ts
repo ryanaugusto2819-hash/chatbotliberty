@@ -578,6 +578,30 @@ export type Database = {
           },
         ]
       }
+      manager_config: {
+        Row: {
+          created_at: string
+          custom_prompt: string
+          evaluation_criteria: Json
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          custom_prompt?: string
+          evaluation_criteria?: Json
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          custom_prompt?: string
+          evaluation_criteria?: Json
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
           content: string
