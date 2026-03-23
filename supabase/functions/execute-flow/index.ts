@@ -538,6 +538,42 @@ Deno.serve(async (req) => {
         const errorDetail = sendValidation.errorDetail || JSON.stringify(waResult).slice(0, 500);
         console.error(`[execute-flow] FAILED node ${node.id} (${node.node_type}) to ${phone}: ${errorDetail}`);
 
+        // Save the failed message to chat so the user can see it failed
+        let failedContent = "";
+        let failedMediaUrl: string | null = null;
+        let failedType = "text";
+
+        if (node.node_type === "message") {
+          failedContent = (config.content as string) || "";
+        } else if (node.node_type === "image") {
+          failedContent = (config.caption as string) || "";
+          failedMediaUrl = (config.media_url as string) || null;
+          failedType = "image";
+        } else if (node.node_type === "audio") {
+          failedMediaUrl = (config.media_url as string) || null;
+          failedType = "audio";
+        } else if (node.node_type === "video") {
+          failedContent = (config.caption as string) || "";
+          failedMediaUrl = (config.media_url as string) || null;
+          failedType = "video";
+        } else if (node.node_type === "quick_reply") {
+          const qrContent = (config.content as string) || "";
+          const qrButtons = (config.buttons as string[]) || [];
+          failedContent = qrButtons.length > 0
+            ? qrContent + "\n\n" + qrButtons.map((b, i) => `${i + 1}. ${b}`).join("\n")
+            : qrContent;
+        }
+
+        // Insert message with status 'failed' so it appears in chat with error indicator
+        await supabase.from("messages").insert({
+          conversation_id: conversationId,
+          content: failedContent || `[${failedType}]`,
+          sender_type: "agent",
+          message_type: failedType,
+          media_url: failedMediaUrl,
+          status: "failed",
+        });
+
         if (executionId) {
           await supabase.from("flow_step_logs").insert({
             execution_id: executionId,

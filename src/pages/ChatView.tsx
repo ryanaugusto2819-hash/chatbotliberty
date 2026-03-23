@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { sendWhatsAppMessage } from '@/lib/whatsapp';
 import StatusBadge from '@/components/shared/StatusBadge';
-import { ArrowLeft, Send, Paperclip, MoreVertical, User, Clock, CheckCheck, Check, Loader2, Phone, MessageSquare, Tag, Calendar, Hash, History } from 'lucide-react';
+import { ArrowLeft, Send, Paperclip, MoreVertical, User, Clock, CheckCheck, Check, Loader2, Phone, MessageSquare, Tag, Calendar, Hash, History, AlertTriangle, RefreshCw } from 'lucide-react';
 import FlowTrigger from '@/components/automation/FlowTrigger';
 import QuickMessages from '@/components/chat/QuickMessages';
 import TagManager from '@/components/tags/TagManager';
@@ -251,18 +251,28 @@ export default function ChatView() {
             >
               <div
                 className={`max-w-[70%] rounded-2xl px-4 py-2.5 ${
-                  msg.sender_type === 'agent'
-                    ? 'bg-primary text-primary-foreground rounded-br-md'
-                    : 'bg-card border border-border text-card-foreground rounded-bl-md'
+                  msg.status === 'failed'
+                    ? 'bg-destructive/10 border border-destructive/30 text-destructive rounded-br-md'
+                    : msg.sender_type === 'agent'
+                      ? 'bg-primary text-primary-foreground rounded-br-md'
+                      : 'bg-card border border-border text-card-foreground rounded-bl-md'
                 }`}
               >
+                {/* Failed banner */}
+                {msg.status === 'failed' && (
+                  <div className="flex items-center gap-1.5 mb-2 pb-1.5 border-b border-destructive/20">
+                    <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
+                    <span className="text-[11px] font-medium text-destructive">Falha no envio</span>
+                  </div>
+                )}
+
                 {/* Image */}
                 {msg.message_type === 'image' && msg.media_url && (
                   <div className="mb-1.5">
                     <img
                       src={msg.media_url}
                       alt="Imagem"
-                      className="rounded-lg max-w-full max-h-64 object-cover cursor-pointer"
+                      className={`rounded-lg max-w-full max-h-64 object-cover cursor-pointer ${msg.status === 'failed' ? 'opacity-50' : ''}`}
                       onClick={() => window.open(msg.media_url!, '_blank')}
                       loading="lazy"
                     />
@@ -271,8 +281,8 @@ export default function ChatView() {
 
                 {/* Audio */}
                 {msg.message_type === 'audio' && msg.media_url && (
-                  <div className="mb-1.5 min-w-[220px]">
-                    <audio controls preload="none" className="w-full h-10 rounded-lg" style={{ filter: msg.sender_type === 'agent' ? 'invert(1) hue-rotate(180deg)' : 'none' }}>
+                  <div className={`mb-1.5 min-w-[220px] ${msg.status === 'failed' ? 'opacity-50' : ''}`}>
+                    <audio controls preload="none" className="w-full h-10 rounded-lg" style={{ filter: msg.sender_type === 'agent' && msg.status !== 'failed' ? 'invert(1) hue-rotate(180deg)' : 'none' }}>
                       <source src={msg.media_url} />
                     </audio>
                   </div>
@@ -280,16 +290,16 @@ export default function ChatView() {
 
                 {/* Video */}
                 {msg.message_type === 'video' && msg.media_url && (
-                  <div className="mb-1.5">
+                  <div className={`mb-1.5 ${msg.status === 'failed' ? 'opacity-50' : ''}`}>
                     <video controls preload="none" className="rounded-lg max-w-full max-h-64">
                       <source src={msg.media_url} />
                     </video>
                   </div>
                 )}
 
-                {/* Text content - show if not a media-only message */}
+                {/* Text content */}
                 {msg.content && !(msg.message_type === 'audio' && msg.media_url && !msg.content.trim()) && (
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                  <p className={`text-sm leading-relaxed whitespace-pre-wrap ${msg.status === 'failed' ? 'text-destructive/80' : ''}`}>{msg.content}</p>
                 )}
 
                 {/* Fallback for media without URL */}
@@ -299,10 +309,14 @@ export default function ChatView() {
                   </p>
                 )}
 
-                <div className={`flex items-center justify-end gap-1 mt-1 ${msg.sender_type === 'agent' ? 'text-primary-foreground/60' : 'text-muted-foreground'}`}>
+                <div className={`flex items-center justify-end gap-1 mt-1 ${
+                  msg.status === 'failed' ? 'text-destructive/60' : msg.sender_type === 'agent' ? 'text-primary-foreground/60' : 'text-muted-foreground'
+                }`}>
                   <span className="text-[10px]">{format(new Date(msg.created_at), 'HH:mm')}</span>
                   {msg.sender_type === 'agent' && (
-                    msg.status === 'read' ? <CheckCheck className="h-3 w-3" /> : <Check className="h-3 w-3" />
+                    msg.status === 'failed'
+                      ? <AlertTriangle className="h-3 w-3 text-destructive" />
+                      : msg.status === 'read' ? <CheckCheck className="h-3 w-3" /> : <Check className="h-3 w-3" />
                   )}
                 </div>
               </div>
