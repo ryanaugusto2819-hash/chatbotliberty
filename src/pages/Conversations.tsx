@@ -201,9 +201,17 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
     setSelectedConnection('all');
   };
 
+  const handleConversationClick = (conversationId: string) => {
+    if (onSelectConversation) {
+      onSelectConversation(conversationId);
+    } else {
+      navigate(`/conversations/${conversationId}`);
+    }
+  };
+
   return (
-    <div>
-      <TopBar title="Conversas" subtitle={`${conversations.length} conversas totais`} />
+    <div className={embedded ? 'flex flex-col h-full' : ''}>
+      {!embedded && <TopBar title="Conversas" subtitle={`${conversations.length} conversas totais`} />}
       <div className="p-6 space-y-4">
         <div className="flex flex-col gap-3">
           <div className="flex flex-col sm:flex-row gap-3">
@@ -321,8 +329,10 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
                     initial={{ opacity: 0, x: -8 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.2, delay: i * 0.03 }}
-                    onClick={() => navigate(`/conversations/${c.id}`)}
-                    className="flex items-center gap-4 w-full px-5 py-4 text-left hover:bg-secondary/40 transition-colors"
+                    onClick={() => handleConversationClick(c.id)}
+                    className={`flex items-center gap-4 w-full px-5 py-4 text-left hover:bg-secondary/40 transition-colors ${
+                      selectedId === c.id ? 'bg-primary/5 border-l-2 border-primary' : ''
+                    }`}
                   >
                     <div className="relative shrink-0">
                       <div className="flex h-11 w-11 items-center justify-center rounded-full bg-accent text-sm font-semibold text-accent-foreground">
