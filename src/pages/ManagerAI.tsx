@@ -8,16 +8,17 @@ import {
   ShieldCheck, AlertTriangle, CheckCircle2, Info, Lightbulb,
   TrendingUp, ArrowRight, Clock, RefreshCw, Filter, X,
   BookOpen, Save, Brain, FileText, MessageSquare, Upload, Loader2,
-  ChevronDown, ChevronUp, Repeat,
+  ChevronDown, ChevronUp, Repeat, MessageCircle, Send,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import KnowledgeBase from '@/components/ai/KnowledgeBase';
 
 interface Issue {
-  type: 'error' | 'warning' | 'info';
+  type: 'error' | 'warning' | 'info' | 'justified';
   title: string;
   description: string;
   excerpt?: string;
+  justification?: string;
 }
 
 interface Suggestion {
@@ -89,6 +90,82 @@ function PriorityBadge({ priority }: { priority: string }) {
 }
 
 type TabView = 'analyses' | 'training';
+
+function IssueCard({ issue, index, analysisId, allIssues, onUpdated }: {
+  issue: Issue; index: number; analysisId: string; allIssues: Issue[]; onUpdated: () => void;
+}) {
+  const [showForm, setShowForm] = useState(false);
+  const [justText, setJustText] = useState(issue.justification || '');
+  const [saving, setSaving] = useState(false);
+  const isJustified = issue.type === 'justified';
+
+  const handleSave = async () => {
+    if (!justText.trim()) return;
+    setSaving(true);
+    const updatedIssues = [...allIssues];
+    updatedIssues[index] = { ...updatedIssues[index], type: 'justified', justification: justText.trim() };
+    const { error } = await supabase.from('manager_analyses').update({ issues: updatedIssues as any }).eq('id', analysisId);
+    setSaving(false);
+    if (error) toast.error('Erro ao salvar justificativa');
+    else { toast.success('Justificativa salva'); setShowForm(false); onUpdated(); }
+  };
+
+  const handleRemove = async () => {
+    setSaving(true);
+    const updatedIssues = [...allIssues];
+    updatedIssues[index] = { ...updatedIssues[index], type: 'warning', justification: undefined };
+    const { error } = await supabase.from('manager_analyses').update({ issues: updatedIssues as any }).eq('id', analysisId);
+    setSaving(false);
+    if (error) toast.error('Erro ao remover');
+    else { toast.success('Justificativa removida'); setJustText(''); onUpdated(); }
+  };
+
+  return (
+    <div className={`p-3 rounded-lg ${isJustified ? 'bg-success/5 border border-success/20' : 'bg-secondary/50'}`}>
+      <div className="flex gap-3">
+        {isJustified ? <CheckCircle2 className="h-4 w-4 text-success shrink-0 mt-0.5" /> : <IssueIcon type={issue.type} />}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <p className={`text-sm font-medium ${isJustified ? 'text-success line-through' : 'text-card-foreground'}`}>{issue.title}</p>
+            {isJustified && <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-success/10 text-success">Justificado</span>}
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5">{issue.description}</p>
+          {issue.excerpt && <p className="text-xs text-muted-foreground mt-1 italic border-l-2 border-border pl-2">"{issue.excerpt}"</p>}
+          {isJustified && issue.justification && (
+            <div className="mt-2 p-2 rounded-md bg-success/5 border border-success/10">
+              <p className="text-xs text-success font-medium mb-0.5">Sua justificativa:</p>
+              <p className="text-xs text-muted-foreground">{issue.justification}</p>
+            </div>
+          )}
+          <div className="flex items-center gap-2 mt-2">
+            {!isJustified && !showForm && (
+              <button onClick={() => setShowForm(true)} className="flex items-center gap-1 text-xs text-primary hover:underline">
+                <MessageCircle className="h-3 w-3" /> Justificar
+              </button>
+            )}
+            {isJustified && (
+              <button onClick={handleRemove} disabled={saving} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive">
+                <X className="h-3 w-3" /> Remover justificativa
+              </button>
+            )}
+          </div>
+          {showForm && !isJustified && (
+            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="mt-2 space-y-2">
+              <textarea value={justText} onChange={e => setJustText(e.target.value)} rows={2} placeholder="Explique por que isso não é um erro..."
+                className="w-full resize-none rounded-lg border border-input bg-background px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" autoFocus />
+              <div className="flex items-center gap-2">
+                <button onClick={handleSave} disabled={saving || !justText.trim()} className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+                  {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />} Salvar
+                </button>
+                <button onClick={() => { setShowForm(false); setJustText(''); }} className="text-xs text-muted-foreground hover:text-foreground">Cancelar</button>
+              </div>
+            </motion.div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function ManagerAI() {
   const navigate = useNavigate();
@@ -468,18 +545,14 @@ export default function ManagerAI() {
                           </h3>
                           <div className="space-y-3">
                             {selected.issues.map((issue, i) => (
-                              <div key={i} className="flex gap-3 p-3 rounded-lg bg-secondary/50">
-                                <IssueIcon type={issue.type} />
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium text-card-foreground">{issue.title}</p>
-                                  <p className="text-xs text-muted-foreground mt-0.5">{issue.description}</p>
-                                  {issue.excerpt && (
-                                    <p className="text-xs text-muted-foreground mt-1 italic border-l-2 border-border pl-2">
-                                      "{issue.excerpt}"
-                                    </p>
-                                  )}
-                                </div>
-                              </div>
+                              <IssueCard
+                                key={i}
+                                issue={issue}
+                                index={i}
+                                analysisId={selected.id}
+                                allIssues={selected.issues}
+                                onUpdated={() => refetch()}
+                              />
                             ))}
                           </div>
                         </div>
