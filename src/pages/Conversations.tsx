@@ -74,7 +74,13 @@ function ConnectionBadge({ conn }: { conn: ConnectionInfo | null }) {
   );
 }
 
-export default function Conversations() {
+interface ConversationsProps {
+  embedded?: boolean;
+  selectedId?: string;
+  onSelectConversation?: (id: string) => void;
+}
+
+export default function Conversations({ embedded, selectedId, onSelectConversation }: ConversationsProps = {}) {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<string>('all');

@@ -79,8 +79,15 @@ const parseProviderError = (providerError?: string | null): ParsedProviderError 
   }
 };
 
-export default function ChatView() {
-  const { id } = useParams();
+interface ChatViewProps {
+  embedded?: boolean;
+  conversationId?: string;
+  onBack?: () => void;
+}
+
+export default function ChatView({ embedded, conversationId, onBack }: ChatViewProps = {}) {
+  const { id: paramId } = useParams();
+  const id = conversationId || paramId;
   const navigate = useNavigate();
   const [input, setInput] = useState('');
   const [conversation, setConversation] = useState<ConversationData | null>(null);
