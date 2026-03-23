@@ -19,6 +19,7 @@ import Reports from "./pages/Reports";
 import ManagerAI from "./pages/ManagerAI";
 import Connections from "./pages/Connections";
 import UserManagement from "./pages/UserManagement";
+import FollowUps from "./pages/FollowUps";
 import Login from "./pages/Login";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
@@ -72,6 +73,7 @@ const App = () => (
                 <Route path="/ai" element={<AdminRoute><AiSettings /></AdminRoute>} />
                 <Route path="/reports" element={<AdminRoute><Reports /></AdminRoute>} />
                 <Route path="/manager-ai" element={<AdminRoute><ManagerAI /></AdminRoute>} />
+                <Route path="/follow-ups" element={<AdminRoute><FollowUps /></AdminRoute>} />
                 <Route path="/connections" element={<AdminRoute><Connections /></AdminRoute>} />
                 <Route path="/users" element={<AdminRoute><UserManagement /></AdminRoute>} />
                 <Route path="/settings" element={<AdminRoute><PlaceholderPage title="Configurações" subtitle="Configurar conta e integrações" /></AdminRoute>} />
