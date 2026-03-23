@@ -7,12 +7,11 @@ import { motion } from 'framer-motion';
 import {
   MessageSquare, CheckCircle2, Clock, Send, Inbox, Bot,
   TrendingUp, BarChart3, Filter, ArrowDown, Zap, Target,
-  AlertTriangle,
+  AlertTriangle, Users, Reply, UserCheck, ShieldCheck,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend, PieChart, Pie, Cell, LineChart, Line,
-  FunnelChart, Funnel, LabelList,
 } from 'recharts';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
@@ -29,30 +28,21 @@ const STATUS_COLORS: Record<string, string> = {
   resolved: 'hsl(var(--success))',
 };
 
-const STEP_COLORS = [
+const STAGE_COLORS = [
   'hsl(var(--primary))',
   'hsl(var(--info))',
+  'hsl(210 70% 55%)',
   'hsl(var(--warning))',
+  'hsl(30 80% 55%)',
   'hsl(var(--success))',
-  'hsl(var(--accent-foreground))',
-  'hsl(var(--muted-foreground))',
 ];
 
-const NODE_TYPE_LABELS: Record<string, string> = {
-  message: '💬 Mensagem',
-  delay: '⏱️ Delay',
-  condition: '🔀 Condição',
-  ai_response: '🤖 IA',
-  webhook: '🔗 Webhook',
-  assign_agent: '👤 Atribuir',
-  tag: '🏷️ Tag',
-  media: '📎 Mídia',
-};
+const STAGE_ICONS = [Users, Send, Reply, MessageSquare, UserCheck, ShieldCheck];
 
 export default function Reports() {
   const [period, setPeriod] = useState(14);
   const { metrics, daily, statusDistribution, isLoading } = useReportMetrics(period);
-  const { flowSummaries, funnels, isLoading: funnelLoading } = useFunnelMetrics(period);
+  const { stages, responseMetrics, followUp, isLoading: funnelLoading } = useFunnelMetrics(period);
 
   const metricCards = metrics
     ? [
@@ -71,7 +61,6 @@ export default function Reports() {
     <div>
       <TopBar title="Relatórios" subtitle="Análises e métricas detalhadas" />
       <div className="p-6 space-y-6">
-        {/* Period selector */}
         <div className="flex items-center gap-2">
           {PERIOD_OPTIONS.map(opt => (
             <button
@@ -88,11 +77,243 @@ export default function Reports() {
           ))}
         </div>
 
-        <Tabs defaultValue="general" className="w-full">
+        <Tabs defaultValue="funnel" className="w-full">
           <TabsList className="mb-4">
+            <TabsTrigger value="funnel">🔄 Funil do Lead</TabsTrigger>
             <TabsTrigger value="general">📊 Geral</TabsTrigger>
-            <TabsTrigger value="funnel">🔄 Funil de Conversão</TabsTrigger>
           </TabsList>
+
+          {/* ===== FUNNEL TAB ===== */}
+          <TabsContent value="funnel">
+            {funnelLoading ? (
+              <div className="flex items-center justify-center py-20">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {stages.length > 0 && stages[0].count > 0 ? (
+                  <>
+                    {/* Summary cards */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <MetricCard title="Leads Recebidos" value={stages[0]?.count ?? 0} icon={Users} index={0} />
+                      <MetricCard
+                        title="Taxa de Resposta"
+                        value={`${responseMetrics?.replyRate ?? 0}%`}
+                        icon={Reply}
+                        index={1}
+                        changeType={responseMetrics && responseMetrics.replyRate >= 50 ? 'positive' : 'negative'}
+                        change={`${responseMetrics?.conversationsWithCustomerReply ?? 0} de ${stages[0]?.count ?? 0} responderam`}
+                      />
+                      <MetricCard
+                        title="Taxa de Conversão"
+                        value={`${stages[stages.length - 1]?.rate ?? 0}%`}
+                        icon={Target}
+                        index={2}
+                        changeType={stages[stages.length - 1]?.rate >= 10 ? 'positive' : 'negative'}
+                        change={`${stages[stages.length - 1]?.count ?? 0} vendas/resoluções`}
+                      />
+                      <MetricCard
+                        title="Follow-ups Respondidos"
+                        value={followUp ? `${followUp.responseRate}%` : '—'}
+                        icon={Zap}
+                        index={3}
+                        change={followUp ? `${followUp.responded} de ${followUp.sent} enviados` : undefined}
+                      />
+                    </div>
+
+                    {/* Main funnel visualization */}
+                    <motion.div
+                      initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3, delay: 0.15 }}
+                      className="rounded-xl border border-border bg-card p-6"
+                    >
+                      <h3 className="text-sm font-semibold text-card-foreground mb-6 flex items-center gap-2">
+                        <Filter className="h-4 w-4" /> Jornada do Lead no Funil
+                      </h3>
+
+                      <div className="space-y-1">
+                        {stages.map((stage, idx) => {
+                          const Icon = STAGE_ICONS[idx] ?? Users;
+                          const barWidth = Math.max(8, stage.rate);
+
+                          return (
+                            <div key={stage.key}>
+                              <div className="flex items-center gap-4">
+                                {/* Icon */}
+                                <div
+                                  className="flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center"
+                                  style={{ backgroundColor: `${STAGE_COLORS[idx]}20` }}
+                                >
+                                  <Icon className="h-4 w-4" style={{ color: STAGE_COLORS[idx] }} />
+                                </div>
+
+                                {/* Content */}
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between mb-1.5">
+                                    <span className="text-xs font-semibold text-card-foreground">{stage.label}</span>
+                                    <div className="flex items-center gap-3 text-xs flex-shrink-0 ml-3">
+                                      <span className="font-bold text-card-foreground">{stage.count}</span>
+                                      <span className="text-muted-foreground">({stage.rate}%)</span>
+                                      {stage.dropOff > 0 && (
+                                        <span className="text-destructive flex items-center gap-0.5 font-medium">
+                                          <ArrowDown className="h-3 w-3" />
+                                          {stage.dropOff}%
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Funnel bar */}
+                                  <div className="h-8 rounded-lg bg-muted/40 overflow-hidden relative flex items-center justify-center mx-auto"
+                                    style={{ width: '100%' }}
+                                  >
+                                    <motion.div
+                                      initial={{ width: 0 }}
+                                      animate={{ width: `${barWidth}%` }}
+                                      transition={{ duration: 0.7, delay: idx * 0.1, ease: 'easeOut' }}
+                                      className="absolute left-0 top-0 h-full rounded-lg"
+                                      style={{ backgroundColor: STAGE_COLORS[idx], opacity: 0.85 }}
+                                    />
+                                    <span className="relative z-10 text-[11px] font-bold text-card-foreground">
+                                      {stage.rate}%
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Connector */}
+                              {idx < stages.length - 1 && (
+                                <div className="flex items-center ml-[18px] h-4">
+                                  <div className="w-px h-full bg-border" />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </motion.div>
+
+                    {/* Bottom row: response details + follow-up */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* Response breakdown */}
+                      {responseMetrics && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.3, delay: 0.3 }}
+                          className="rounded-xl border border-border bg-card p-5"
+                        >
+                          <h3 className="text-sm font-semibold text-card-foreground mb-4">Engajamento dos Leads</h3>
+                          <div className="space-y-4">
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs text-muted-foreground">Responderam</span>
+                              <div className="flex items-center gap-2">
+                                <div className="h-2 w-24 rounded-full bg-muted overflow-hidden">
+                                  <div className="h-full rounded-full bg-success" style={{ width: `${responseMetrics.replyRate}%` }} />
+                                </div>
+                                <span className="text-xs font-bold text-card-foreground">{responseMetrics.conversationsWithCustomerReply}</span>
+                              </div>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs text-muted-foreground">Sem resposta</span>
+                              <div className="flex items-center gap-2">
+                                <div className="h-2 w-24 rounded-full bg-muted overflow-hidden">
+                                  <div className="h-full rounded-full bg-destructive" style={{ width: `${100 - responseMetrics.replyRate}%` }} />
+                                </div>
+                                <span className="text-xs font-bold text-card-foreground">{responseMetrics.conversationsWithoutReply}</span>
+                              </div>
+                            </div>
+                            <div className="border-t border-border pt-3 grid grid-cols-3 gap-3 text-center">
+                              <div>
+                                <p className="text-lg font-bold text-card-foreground">{responseMetrics.avgCustomerMessages}</p>
+                                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Média msgs cliente</p>
+                              </div>
+                              <div>
+                                <p className="text-lg font-bold text-card-foreground">{responseMetrics.avgAgentMessages}</p>
+                                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Média msgs atendente</p>
+                              </div>
+                              <div>
+                                <p className="text-lg font-bold text-card-foreground">{responseMetrics.avgBotMessages}</p>
+                                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Média msgs bot</p>
+                              </div>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+
+                      {/* Follow-up engagement */}
+                      {followUp && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.3, delay: 0.35 }}
+                          className="rounded-xl border border-border bg-card p-5"
+                        >
+                          <h3 className="text-sm font-semibold text-card-foreground mb-4">Follow-ups</h3>
+                          <div className="space-y-4">
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs text-muted-foreground">Enviados</span>
+                              <span className="text-sm font-bold text-card-foreground">{followUp.sent}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs text-muted-foreground">Respondidos</span>
+                              <span className="text-sm font-bold text-success">{followUp.responded}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs text-muted-foreground">Aguardando</span>
+                              <span className="text-sm font-bold text-warning">{followUp.pending}</span>
+                            </div>
+                            <div className="border-t border-border pt-3">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs text-muted-foreground">Taxa de resposta</span>
+                                <div className="flex items-center gap-2">
+                                  <div className="h-3 w-20 rounded-full bg-muted overflow-hidden">
+                                    <div className="h-full rounded-full bg-primary" style={{ width: `${followUp.responseRate}%` }} />
+                                  </div>
+                                  <span className="text-sm font-bold text-card-foreground">{followUp.responseRate}%</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </div>
+
+                    {/* Funnel chart */}
+                    <motion.div
+                      initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3, delay: 0.4 }}
+                      className="rounded-xl border border-border bg-card p-5"
+                    >
+                      <h3 className="text-sm font-semibold text-card-foreground mb-4">Conversão por Etapa</h3>
+                      <div className="h-64">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={stages} layout="vertical" barSize={20}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+                            <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} unit="%" />
+                            <YAxis type="category" dataKey="label" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={150} />
+                            <Tooltip
+                              contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }}
+                              formatter={(value: number) => [`${value}%`, 'Taxa']}
+                            />
+                            <Bar dataKey="rate" radius={[0, 6, 6, 0]}>
+                              {stages.map((_, idx) => (
+                                <Cell key={idx} fill={STAGE_COLORS[idx]} />
+                              ))}
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </motion.div>
+                  </>
+                ) : (
+                  <div className="rounded-xl border border-border bg-card p-16 text-center">
+                    <Filter className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+                    <p className="text-sm font-medium text-card-foreground">Nenhum lead no período</p>
+                    <p className="text-xs text-muted-foreground mt-1">Receba conversas para acompanhar a jornada dos leads no funil.</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </TabsContent>
 
           {/* ===== GENERAL TAB ===== */}
           <TabsContent value="general">
@@ -103,17 +324,10 @@ export default function Reports() {
             ) : (
               <div className="space-y-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {metricCards.map((m, i) => (
-                    <MetricCard key={m.title} {...m} index={i} />
-                  ))}
+                  {metricCards.map((m, i) => (<MetricCard key={m.title} {...m} index={i} />))}
                 </div>
-
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  <motion.div
-                    initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: 0.2 }}
-                    className="lg:col-span-2 rounded-xl border border-border bg-card p-5"
-                  >
+                  <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.2 }} className="lg:col-span-2 rounded-xl border border-border bg-card p-5">
                     <h3 className="text-sm font-semibold text-card-foreground mb-4">Atividade Diária</h3>
                     <div className="h-72">
                       {daily && daily.length > 0 ? (
@@ -133,12 +347,7 @@ export default function Reports() {
                       )}
                     </div>
                   </motion.div>
-
-                  <motion.div
-                    initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: 0.3 }}
-                    className="rounded-xl border border-border bg-card p-5"
-                  >
+                  <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.3 }} className="rounded-xl border border-border bg-card p-5">
                     <h3 className="text-sm font-semibold text-card-foreground mb-4">Distribuição por Status</h3>
                     <div className="h-72">
                       {statusDistribution && statusDistribution.some(s => s.count > 0) ? (
@@ -156,7 +365,6 @@ export default function Reports() {
                     </div>
                   </motion.div>
                 </div>
-
                 <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.4 }} className="rounded-xl border border-border bg-card p-5">
                   <h3 className="text-sm font-semibold text-card-foreground mb-4">Resoluções por Dia</h3>
                   <div className="h-64">
@@ -175,208 +383,6 @@ export default function Reports() {
                     )}
                   </div>
                 </motion.div>
-              </div>
-            )}
-          </TabsContent>
-
-          {/* ===== FUNNEL TAB ===== */}
-          <TabsContent value="funnel">
-            {funnelLoading ? (
-              <div className="flex items-center justify-center py-20">
-                <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {/* Flow summary cards */}
-                {flowSummaries.length > 0 ? (
-                  <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                      <MetricCard
-                        title="Fluxos Executados"
-                        value={flowSummaries.reduce((sum, f) => sum + f.totalExecutions, 0)}
-                        icon={Zap}
-                        index={0}
-                      />
-                      <MetricCard
-                        title="Concluídos"
-                        value={flowSummaries.reduce((sum, f) => sum + f.completed, 0)}
-                        icon={CheckCircle2}
-                        index={1}
-                        changeType="positive"
-                        change={`${flowSummaries.length > 0 ? Math.round(flowSummaries.reduce((s, f) => s + f.completed, 0) / Math.max(1, flowSummaries.reduce((s, f) => s + f.totalExecutions, 0)) * 1000) / 10 : 0}% taxa geral`}
-                      />
-                      <MetricCard
-                        title="Falharam"
-                        value={flowSummaries.reduce((sum, f) => sum + f.failed, 0)}
-                        icon={AlertTriangle}
-                        index={2}
-                        changeType="negative"
-                      />
-                      <MetricCard
-                        title="Em Andamento"
-                        value={flowSummaries.reduce((sum, f) => sum + f.running, 0)}
-                        icon={Clock}
-                        index={3}
-                      />
-                    </div>
-
-                    {/* Per-flow performance table */}
-                    <motion.div
-                      initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.3, delay: 0.1 }}
-                      className="rounded-xl border border-border bg-card p-5"
-                    >
-                      <h3 className="text-sm font-semibold text-card-foreground mb-4 flex items-center gap-2">
-                        <Target className="h-4 w-4" /> Performance por Fluxo
-                      </h3>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="border-b border-border">
-                              <th className="text-left py-3 px-2 text-muted-foreground font-medium">Fluxo</th>
-                              <th className="text-center py-3 px-2 text-muted-foreground font-medium">Execuções</th>
-                              <th className="text-center py-3 px-2 text-muted-foreground font-medium">Concluídos</th>
-                              <th className="text-center py-3 px-2 text-muted-foreground font-medium">Falhas</th>
-                              <th className="text-center py-3 px-2 text-muted-foreground font-medium">Taxa de Conversão</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {flowSummaries.map(flow => (
-                              <tr key={flow.flowId} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
-                                <td className="py-3 px-2 font-medium text-card-foreground">{flow.flowName}</td>
-                                <td className="py-3 px-2 text-center text-card-foreground">{flow.totalExecutions}</td>
-                                <td className="py-3 px-2 text-center text-success font-medium">{flow.completed}</td>
-                                <td className="py-3 px-2 text-center text-destructive font-medium">{flow.failed}</td>
-                                <td className="py-3 px-2 text-center">
-                                  <div className="flex items-center justify-center gap-2">
-                                    <div className="h-2 w-16 rounded-full bg-muted overflow-hidden">
-                                      <div
-                                        className="h-full rounded-full bg-primary transition-all"
-                                        style={{ width: `${Math.min(100, flow.completionRate)}%` }}
-                                      />
-                                    </div>
-                                    <span className="font-semibold text-card-foreground">{flow.completionRate}%</span>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </motion.div>
-
-                    {/* Funnel visualization per flow */}
-                    {funnels.map((funnel, fi) => (
-                      <motion.div
-                        key={funnel.flowId}
-                        initial={{ opacity: 0, y: 12 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.3, delay: 0.2 + fi * 0.1 }}
-                        className="rounded-xl border border-border bg-card p-5"
-                      >
-                        <div className="flex items-center justify-between mb-5">
-                          <div>
-                            <h3 className="text-sm font-semibold text-card-foreground flex items-center gap-2">
-                              <Filter className="h-4 w-4" /> Funil: {funnel.flowName}
-                            </h3>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {funnel.totalStarted} iniciaram → {funnel.totalCompleted} concluíram ({funnel.overallConversion}% conversão geral)
-                            </p>
-                          </div>
-                          <div className={`rounded-lg px-3 py-1.5 text-xs font-bold ${
-                            funnel.overallConversion >= 50 ? 'bg-success/10 text-success' :
-                            funnel.overallConversion >= 20 ? 'bg-warning/10 text-warning' :
-                            'bg-destructive/10 text-destructive'
-                          }`}>
-                            {funnel.overallConversion}%
-                          </div>
-                        </div>
-
-                        {/* Step-by-step funnel bars */}
-                        <div className="space-y-2">
-                          {funnel.steps.map((step, idx) => {
-                            const maxReached = funnel.steps[0]?.reached || funnel.totalStarted;
-                            const barWidth = maxReached > 0 ? Math.max(5, (step.reached / maxReached) * 100) : 0;
-
-                            return (
-                              <div key={step.nodeId} className="relative">
-                                <div className="flex items-center gap-3">
-                                  {/* Step number */}
-                                  <div className="flex-shrink-0 w-7 h-7 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground">
-                                    {idx + 1}
-                                  </div>
-
-                                  {/* Bar + info */}
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center justify-between mb-1">
-                                      <span className="text-xs font-medium text-card-foreground truncate">
-                                        {NODE_TYPE_LABELS[step.nodeType] ?? step.nodeType} — {step.label}
-                                      </span>
-                                      <div className="flex items-center gap-3 text-xs text-muted-foreground flex-shrink-0 ml-2">
-                                        <span>{step.reached} alcançaram</span>
-                                        {step.dropOffRate > 0 && (
-                                          <span className="text-destructive flex items-center gap-0.5">
-                                            <ArrowDown className="h-3 w-3" />
-                                            {step.dropOffRate}% abandono
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-                                    <div className="h-6 rounded-md bg-muted/50 overflow-hidden relative">
-                                      <motion.div
-                                        initial={{ width: 0 }}
-                                        animate={{ width: `${barWidth}%` }}
-                                        transition={{ duration: 0.6, delay: idx * 0.08 }}
-                                        className="h-full rounded-md"
-                                        style={{ backgroundColor: STEP_COLORS[idx % STEP_COLORS.length] }}
-                                      />
-                                      <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-card-foreground mix-blend-difference">
-                                        {step.conversionRate}%
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {/* Connector line */}
-                                {idx < funnel.steps.length - 1 && (
-                                  <div className="ml-3.5 w-px h-2 bg-border" />
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-
-                        {/* Summary footer */}
-                        <div className="mt-4 pt-4 border-t border-border grid grid-cols-3 gap-4 text-center">
-                          <div>
-                            <p className="text-lg font-bold text-card-foreground">{funnel.totalStarted}</p>
-                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Iniciaram</p>
-                          </div>
-                          <div>
-                            <p className="text-lg font-bold text-success">{funnel.totalCompleted}</p>
-                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Concluíram</p>
-                          </div>
-                          <div>
-                            <p className="text-lg font-bold text-destructive">{funnel.totalStarted - funnel.totalCompleted}</p>
-                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Abandonaram</p>
-                          </div>
-                        </div>
-                      </motion.div>
-                    ))}
-
-                    {funnels.length === 0 && flowSummaries.length > 0 && (
-                      <div className="rounded-xl border border-border bg-card p-10 text-center text-sm text-muted-foreground">
-                        Execuções registradas, mas nenhum log detalhado por etapa foi encontrado.
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="rounded-xl border border-border bg-card p-16 text-center">
-                    <Filter className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-                    <p className="text-sm font-medium text-card-foreground">Nenhum fluxo executado no período</p>
-                    <p className="text-xs text-muted-foreground mt-1">Execute fluxos de automação para ver as métricas de funil aqui.</p>
-                  </div>
-                )}
               </div>
             )}
           </TabsContent>
