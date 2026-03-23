@@ -52,7 +52,32 @@ interface MessageData {
   status: string;
   created_at: string;
   media_url?: string | null;
+  provider_error?: string | null;
+  provider_status?: string | null;
 }
+
+interface ParsedProviderError {
+  code?: number | string;
+  title?: string;
+  message?: string;
+  details?: string;
+}
+
+const parseProviderError = (providerError?: string | null): ParsedProviderError | null => {
+  if (!providerError) return null;
+
+  try {
+    const parsed = JSON.parse(providerError);
+    return {
+      code: parsed?.code,
+      title: parsed?.title,
+      message: parsed?.message,
+      details: parsed?.error_data?.details,
+    };
+  } catch {
+    return { message: providerError };
+  }
+};
 
 export default function ChatView() {
   const { id } = useParams();
@@ -246,6 +271,9 @@ export default function ChatView() {
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-6 space-y-3 scrollbar-thin bg-background">
           {messages.map((msg, i) => (
+            (() => {
+              const providerError = parseProviderError(msg.provider_error);
+              return (
             <motion.div
               key={msg.id}
               initial={{ opacity: 0, y: 8 }}
@@ -313,6 +341,26 @@ export default function ChatView() {
                   </p>
                 )}
 
+                {msg.status === 'failed' && providerError && (
+                  <div className="mt-2 rounded-xl border border-destructive/20 bg-destructive/5 p-2 text-[11px] text-destructive/90 space-y-1">
+                    {providerError.code && (
+                      <p>
+                        <span className="font-semibold">Código:</span> {providerError.code}
+                      </p>
+                    )}
+                    {(providerError.title || providerError.message) && (
+                      <p>
+                        <span className="font-semibold">Erro:</span> {providerError.title || providerError.message}
+                      </p>
+                    )}
+                    {providerError.details && (
+                      <p>
+                        <span className="font-semibold">Detalhe:</span> {providerError.details}
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 <div className={`flex items-center justify-end gap-1 mt-1 ${
                   msg.status === 'failed' ? 'text-destructive/60' : msg.sender_type === 'agent' ? 'text-primary-foreground/60' : 'text-muted-foreground'
                 }`}>
@@ -331,6 +379,8 @@ export default function ChatView() {
                 </div>
               </div>
             </motion.div>
+              );
+            })()
           ))}
           <div ref={messagesEndRef} />
         </div>
