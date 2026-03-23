@@ -29,15 +29,24 @@ async function uploadWhatsAppMedia(params: {
     params.mediaType === "video"
       ? "video/mp4"
       : params.mediaType === "audio"
-        ? "audio/ogg"
+        ? "audio/ogg; codecs=opus"
         : "image/jpeg";
+
+  // For audio, always force OGG Opus MIME type so WhatsApp renders as voice note (PTT)
+  const effectiveContentType = params.mediaType === "audio"
+    ? "audio/ogg; codecs=opus"
+    : sourceContentType || fallbackContentType;
+
+  const fileName = params.mediaType === "audio"
+    ? `automation-audio.ogg`
+    : `automation-${params.mediaType}`;
 
   const formData = new FormData();
   formData.append("messaging_product", "whatsapp");
   formData.append(
     "file",
-    new File([blob], `automation-${params.mediaType}`, {
-      type: sourceContentType || fallbackContentType,
+    new File([blob], fileName, {
+      type: effectiveContentType,
     })
   );
 
