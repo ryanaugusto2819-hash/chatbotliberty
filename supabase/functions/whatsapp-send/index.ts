@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
     // Get conversation with niche info
     const { data: conversation, error: convError } = await serviceClient
       .from("conversations")
-      .select("contact_phone, niche_id")
+      .select("contact_phone, niche_id, connection_config_id")
       .eq("id", conversationId)
       .single();
 
@@ -50,8 +50,30 @@ Deno.serve(async (req) => {
     let phoneNumberId: string | null = null;
     let accessToken: string | null = null;
 
-    // Strategy 1: Prefer whatsapp connections explicitly linked to the niche
-    if (conversation.niche_id) {
+    // Strategy 1: Prefer the exact connection stored on the conversation
+    if (conversation.connection_config_id) {
+      const { data: directConnection } = await serviceClient
+        .from("connection_configs")
+        .select("id, connection_id, config")
+        .eq("id", conversation.connection_config_id)
+        .eq("connection_id", "whatsapp")
+        .eq("is_connected", true)
+        .maybeSingle();
+
+      if (directConnection) {
+        const cfg = directConnection.config as Record<string, string>;
+        if (cfg?.phone_number_id && cfg?.access_token) {
+          phoneNumberId = cfg.phone_number_id;
+          accessToken = cfg.access_token;
+          console.log(
+            `[whatsapp-send] Using conversation connection: configId=${directConnection.id}, phoneNumberId=${phoneNumberId}`
+          );
+        }
+      }
+    }
+
+    // Strategy 2: Prefer whatsapp connections explicitly linked to the niche
+    if ((!phoneNumberId || !accessToken) && conversation.niche_id) {
       const { data: nicheConnections } = await serviceClient
         .from("niche_connections")
         .select("connection_config_id")
@@ -84,7 +106,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Strategy 2: Legacy fallback using the niche default phone number id
+    // Strategy 3: Legacy fallback using the niche default phone number id
     if ((!phoneNumberId || !accessToken) && conversation.niche_id) {
       const { data: niche } = await serviceClient
         .from("niches")
@@ -115,7 +137,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Strategy 3: Fallback — pick the most recently updated whatsapp connection
+    // Strategy 4: Fallback — pick the most recently updated whatsapp connection
     if (!phoneNumberId || !accessToken) {
       const { data: fallbackConn } = await serviceClient
         .from("connection_configs")
@@ -136,7 +158,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Strategy 4: Final fallback to env vars
+    // Strategy 5: Final fallback to env vars
     if (!phoneNumberId) phoneNumberId = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID") || null;
     if (!accessToken) accessToken = Deno.env.get("WHATSAPP_ACCESS_TOKEN") || null;
 
