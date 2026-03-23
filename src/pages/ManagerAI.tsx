@@ -8,7 +8,7 @@ import {
   ShieldCheck, AlertTriangle, CheckCircle2, Info, Lightbulb,
   TrendingUp, ArrowRight, Clock, RefreshCw, Filter, X,
   BookOpen, Save, Brain, FileText, MessageSquare, Upload, Loader2,
-  ChevronDown, ChevronUp, Repeat,
+  ChevronDown, ChevronUp, Repeat, MessageCircle, Send,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import KnowledgeBase from '@/components/ai/KnowledgeBase';
