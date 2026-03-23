@@ -74,7 +74,13 @@ function ConnectionBadge({ conn }: { conn: ConnectionInfo | null }) {
   );
 }
 
-export default function Conversations() {
+interface ConversationsProps {
+  embedded?: boolean;
+  selectedId?: string;
+  onSelectConversation?: (id: string) => void;
+}
+
+export default function Conversations({ embedded, selectedId, onSelectConversation }: ConversationsProps = {}) {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<string>('all');
@@ -195,10 +201,24 @@ export default function Conversations() {
     setSelectedConnection('all');
   };
 
+  const handleConversationClick = (conversationId: string) => {
+    if (onSelectConversation) {
+      onSelectConversation(conversationId);
+    } else {
+      navigate(`/conversations/${conversationId}`);
+    }
+  };
+
   return (
-    <div>
-      <TopBar title="Conversas" subtitle={`${conversations.length} conversas totais`} />
-      <div className="p-6 space-y-4">
+    <div className={embedded ? 'flex flex-col h-full overflow-hidden' : ''}>
+      {!embedded && <TopBar title="Conversas" subtitle={`${conversations.length} conversas totais`} />}
+      {embedded && (
+        <div className="px-4 pt-4 pb-2 border-b border-border">
+          <h2 className="text-sm font-semibold text-foreground">Conversas</h2>
+          <p className="text-[11px] text-muted-foreground">{conversations.length} conversas</p>
+        </div>
+      )}
+      <div className={`${embedded ? 'p-3 flex-1 overflow-hidden flex flex-col' : 'p-6'} space-y-4`}>
         <div className="flex flex-col gap-3">
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
@@ -299,7 +319,7 @@ export default function Conversations() {
           </div>
         </div>
 
-        <div className="rounded-xl border border-border bg-card shadow-elevated overflow-hidden">
+        <div className={`rounded-xl border border-border bg-card shadow-elevated overflow-hidden ${embedded ? 'flex-1 overflow-y-auto' : ''}`}>
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -315,8 +335,10 @@ export default function Conversations() {
                     initial={{ opacity: 0, x: -8 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.2, delay: i * 0.03 }}
-                    onClick={() => navigate(`/conversations/${c.id}`)}
-                    className="flex items-center gap-4 w-full px-5 py-4 text-left hover:bg-secondary/40 transition-colors"
+                    onClick={() => handleConversationClick(c.id)}
+                    className={`flex items-center gap-4 w-full px-5 py-4 text-left hover:bg-secondary/40 transition-colors ${
+                      selectedId === c.id ? 'bg-primary/5 border-l-2 border-primary' : ''
+                    }`}
                   >
                     <div className="relative shrink-0">
                       <div className="flex h-11 w-11 items-center justify-center rounded-full bg-accent text-sm font-semibold text-accent-foreground">

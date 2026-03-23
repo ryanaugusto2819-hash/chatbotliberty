@@ -7,8 +7,7 @@ import { AuthProvider, useAuth } from "./hooks/useAuth";
 import { ThemeProvider } from "./hooks/useTheme";
 import AppLayout from "./components/layout/AppLayout";
 import Index from "./pages/Index";
-import Conversations from "./pages/Conversations";
-import ChatView from "./pages/ChatView";
+import ConversationsLayout from "./pages/ConversationsLayout";
 import Agents from "./pages/Agents";
 import Automation from "./pages/Automation";
 import FlowEditor from "./pages/FlowEditor";
@@ -64,8 +63,8 @@ const App = () => (
               {/* Protected routes */}
               <Route element={<AppLayout />}>
                 <Route path="/" element={<Index />} />
-                <Route path="/conversations" element={<Conversations />} />
-                <Route path="/conversations/:id" element={<ChatView />} />
+                <Route path="/conversations" element={<ConversationsLayout />} />
+                <Route path="/conversations/:id" element={<ConversationsLayout />} />
                 <Route path="/agents" element={<AdminRoute><Agents /></AdminRoute>} />
                 <Route path="/automation" element={<AdminRoute><Automation /></AdminRoute>} />
                 <Route path="/automation/:id" element={<AdminRoute><FlowEditor /></AdminRoute>} />
