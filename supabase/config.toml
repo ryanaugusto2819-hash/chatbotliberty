@@ -32,3 +32,9 @@ verify_jwt = false
 
 [functions.meta-embedded-signup]
 verify_jwt = false
+
+[functions.ai-manager]
+verify_jwt = false
+
+[functions.ai-manager-cron]
+verify_jwt = false
