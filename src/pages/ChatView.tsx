@@ -369,7 +369,7 @@ export default function ChatView() {
                     msg.status === 'failed'
                       ? <AlertTriangle className="h-3 w-3 text-destructive" />
                       : msg.status === 'read'
-                        ? <CheckCheck className="h-3 w-3" />
+                        ? <CheckCheck className="h-3 w-3 text-blue-400" />
                         : msg.status === 'delivered'
                           ? <CheckCheck className="h-3 w-3 opacity-80" />
                           : msg.status === 'pending'
