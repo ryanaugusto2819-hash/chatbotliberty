@@ -210,9 +210,15 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
   };
 
   return (
-    <div className={embedded ? 'flex flex-col h-full' : ''}>
+    <div className={embedded ? 'flex flex-col h-full overflow-hidden' : ''}>
       {!embedded && <TopBar title="Conversas" subtitle={`${conversations.length} conversas totais`} />}
-      <div className="p-6 space-y-4">
+      {embedded && (
+        <div className="px-4 pt-4 pb-2 border-b border-border">
+          <h2 className="text-sm font-semibold text-foreground">Conversas</h2>
+          <p className="text-[11px] text-muted-foreground">{conversations.length} conversas</p>
+        </div>
+      )}
+      <div className={`${embedded ? 'p-3 flex-1 overflow-hidden flex flex-col' : 'p-6'} space-y-4`}>
         <div className="flex flex-col gap-3">
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
