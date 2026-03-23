@@ -6,6 +6,7 @@ import StatusBadge from '@/components/shared/StatusBadge';
 import { ArrowLeft, Send, Paperclip, MoreVertical, User, Clock, CheckCheck, Check, Loader2, Phone, MessageSquare, Tag, Calendar, Hash, History } from 'lucide-react';
 import FlowTrigger from '@/components/automation/FlowTrigger';
 import QuickMessages from '@/components/chat/QuickMessages';
+import TagManager from '@/components/tags/TagManager';
 import { motion } from 'framer-motion';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -493,9 +494,16 @@ export default function ChatView() {
 
           {/* Tags */}
           <div>
-            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
-              <Tag className="h-3 w-3" /> Etiquetas
-            </p>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                <Tag className="h-3 w-3" /> Etiquetas
+              </p>
+              <TagManager
+                contactPhone={conversation.contact_phone}
+                contactTags={contactTags}
+                onTagsChanged={fetchConversation}
+              />
+            </div>
             <div className="rounded-lg border border-border bg-background/50 p-3">
               {contactTags.length > 0 ? (
                 <div className="flex flex-wrap gap-1.5">
