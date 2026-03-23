@@ -487,6 +487,119 @@ export type Database = {
           },
         ]
       }
+      follow_up_executions: {
+        Row: {
+          attempt_number: number
+          conversation_id: string
+          created_at: string
+          id: string
+          message_sent: string | null
+          responded_at: string | null
+          scheduled_at: string
+          sent_at: string | null
+          status: string
+          template_id: string
+        }
+        Insert: {
+          attempt_number?: number
+          conversation_id: string
+          created_at?: string
+          id?: string
+          message_sent?: string | null
+          responded_at?: string | null
+          scheduled_at?: string
+          sent_at?: string | null
+          status?: string
+          template_id: string
+        }
+        Update: {
+          attempt_number?: number
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          message_sent?: string | null
+          responded_at?: string | null
+          scheduled_at?: string
+          sent_at?: string | null
+          status?: string
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "follow_up_executions_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "follow_up_executions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "follow_up_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      follow_up_templates: {
+        Row: {
+          active_hours_end: number
+          active_hours_start: number
+          created_at: string
+          delay_hours: number
+          escalation_level: number
+          id: string
+          is_active: boolean
+          max_attempts: number
+          message_template: string
+          name: string
+          niche_id: string | null
+          objective: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          active_hours_end?: number
+          active_hours_start?: number
+          created_at?: string
+          delay_hours?: number
+          escalation_level?: number
+          id?: string
+          is_active?: boolean
+          max_attempts?: number
+          message_template?: string
+          name?: string
+          niche_id?: string | null
+          objective?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          active_hours_end?: number
+          active_hours_start?: number
+          created_at?: string
+          delay_hours?: number
+          escalation_level?: number
+          id?: string
+          is_active?: boolean
+          max_attempts?: number
+          message_template?: string
+          name?: string
+          niche_id?: string | null
+          objective?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "follow_up_templates_niche_id_fkey"
+            columns: ["niche_id"]
+            isOneToOne: false
+            referencedRelation: "niches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       knowledge_base_items: {
         Row: {
           content: string
