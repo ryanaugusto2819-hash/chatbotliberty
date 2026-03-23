@@ -780,6 +780,7 @@ export type Database = {
         Args: never
         Returns: {
           assigned_agent_id: string
+          connection_config_id: string
           contact_name: string
           contact_phone: string
           id: string
