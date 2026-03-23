@@ -218,24 +218,6 @@ export default function Conversations() {
                 className="w-full rounded-lg border border-input bg-card pl-10 pr-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className={`shrink-0 flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
-                  showFilters || activeFiltersCount > 0
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-                }`}
-              >
-                <Filter className="h-3.5 w-3.5" />
-                Filtros
-                {activeFiltersCount > 0 && (
-                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary-foreground/20 text-[10px]">
-                    {activeFiltersCount}
-                  </span>
-                )}
-              </button>
-            </div>
           </div>
 
           {/* Status Filters + Inline Advanced Filters */}
