@@ -163,17 +163,23 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
     fetchContactTags();
     fetchConnections();
 
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const debouncedFetch = () => {
+      if (document.hidden) return;
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => fetchConversations(), 500);
+    };
+
     const channel = supabase
       .channel('conversations-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, () => {
-        fetchConversations();
-      })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
-        fetchConversations();
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, debouncedFetch)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, debouncedFetch)
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const getConversationConnection = (connConfigId: string | null): ConnectionInfo | null => {
