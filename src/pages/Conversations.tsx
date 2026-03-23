@@ -238,8 +238,8 @@ export default function Conversations() {
             </div>
           </div>
 
-          {/* Status Filters */}
-          <div className="flex items-center gap-1.5 overflow-x-auto">
+          {/* Status Filters + Inline Advanced Filters */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
             {statusFilters.map((f) => (
               <button
                 key={f}
@@ -264,75 +264,65 @@ export default function Conversations() {
               <MessageCircle className="h-3 w-3" />
               Não lidas
             </button>
-          </div>
 
-          {/* Advanced Filters */}
-          {showFilters && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="flex flex-col sm:flex-row gap-3 p-3 rounded-lg border border-border bg-card"
+            <div className="h-5 w-px bg-border mx-1 shrink-0" />
+
+            <select
+              value={selectedTag}
+              onChange={(e) => setSelectedTag(e.target.value)}
+              className={`shrink-0 rounded-lg border px-2.5 py-2 text-xs font-medium transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring ${
+                selectedTag !== 'all'
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-input bg-secondary text-secondary-foreground'
+              }`}
             >
-              <div className="flex-1 space-y-1.5">
-                <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                  <Tag className="h-3 w-3" /> Etiqueta
-                </label>
-                <select
-                  value={selectedTag}
-                  onChange={(e) => setSelectedTag(e.target.value)}
-                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                >
-                  <option value="all">Todas as etiquetas</option>
-                  {tags.map((t) => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex-1 space-y-1.5">
-                <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                  <Filter className="h-3 w-3" /> Agente / Departamento
-                </label>
-                <select
-                  value={selectedAgent}
-                  onChange={(e) => setSelectedAgent(e.target.value)}
-                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                >
-                  <option value="all">Todos os atendentes</option>
-                  {agents.map((a) => (
-                    <option key={a.id} value={a.id}>{a.full_name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex-1 space-y-1.5">
-                <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                  <Wifi className="h-3 w-3" /> Conexão
-                </label>
-                <select
-                  value={selectedConnection}
-                  onChange={(e) => setSelectedConnection(e.target.value)}
-                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                >
-                  <option value="all">Todas as conexões</option>
-                  {allConnections.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.label} ({c.connection_id === 'whatsapp' ? 'Meta' : 'Z-API'})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {activeFiltersCount > 0 && (
-                <div className="flex items-end">
-                  <button
-                    onClick={clearFilters}
-                    className="flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors"
-                  >
-                    <X className="h-3 w-3" /> Limpar
-                  </button>
-                </div>
-              )}
-            </motion.div>
-          )}
+              <option value="all">🏷️ Etiqueta</option>
+              {tags.map((t) => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+
+            <select
+              value={selectedAgent}
+              onChange={(e) => setSelectedAgent(e.target.value)}
+              className={`shrink-0 rounded-lg border px-2.5 py-2 text-xs font-medium transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring ${
+                selectedAgent !== 'all'
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-input bg-secondary text-secondary-foreground'
+              }`}
+            >
+              <option value="all">👤 Agente</option>
+              {agents.map((a) => (
+                <option key={a.id} value={a.id}>{a.full_name}</option>
+              ))}
+            </select>
+
+            <select
+              value={selectedConnection}
+              onChange={(e) => setSelectedConnection(e.target.value)}
+              className={`shrink-0 rounded-lg border px-2.5 py-2 text-xs font-medium transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring ${
+                selectedConnection !== 'all'
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-input bg-secondary text-secondary-foreground'
+              }`}
+            >
+              <option value="all">📡 Conexão</option>
+              {allConnections.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.label} ({c.connection_id === 'whatsapp' ? 'Meta' : 'Z-API'})
+                </option>
+              ))}
+            </select>
+
+            {activeFiltersCount > 0 && (
+              <button
+                onClick={clearFilters}
+                className="shrink-0 flex items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors"
+              >
+                <X className="h-3 w-3" /> Limpar
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="rounded-xl border border-border bg-card shadow-elevated overflow-hidden">
