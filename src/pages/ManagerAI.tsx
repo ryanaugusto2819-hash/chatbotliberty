@@ -469,18 +469,14 @@ export default function ManagerAI() {
                           </h3>
                           <div className="space-y-3">
                             {selected.issues.map((issue, i) => (
-                              <div key={i} className="flex gap-3 p-3 rounded-lg bg-secondary/50">
-                                <IssueIcon type={issue.type} />
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium text-card-foreground">{issue.title}</p>
-                                  <p className="text-xs text-muted-foreground mt-0.5">{issue.description}</p>
-                                  {issue.excerpt && (
-                                    <p className="text-xs text-muted-foreground mt-1 italic border-l-2 border-border pl-2">
-                                      "{issue.excerpt}"
-                                    </p>
-                                  )}
-                                </div>
-                              </div>
+                              <IssueCard
+                                key={i}
+                                issue={issue}
+                                index={i}
+                                analysisId={selected.id}
+                                allIssues={selected.issues}
+                                onUpdated={() => refetch()}
+                              />
                             ))}
                           </div>
                         </div>
