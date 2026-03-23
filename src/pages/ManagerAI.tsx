@@ -14,10 +14,11 @@ import { toast } from 'sonner';
 import KnowledgeBase from '@/components/ai/KnowledgeBase';
 
 interface Issue {
-  type: 'error' | 'warning' | 'info';
+  type: 'error' | 'warning' | 'info' | 'justified';
   title: string;
   description: string;
   excerpt?: string;
+  justification?: string;
 }
 
 interface Suggestion {
