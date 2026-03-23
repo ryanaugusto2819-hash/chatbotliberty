@@ -21,6 +21,7 @@ interface ConversationRow {
   assigned_agent_id: string | null;
   niche_id: string | null;
   last_message_sender?: string;
+  connection_config_id: string | null;
 }
 
 interface TagOption {
@@ -40,8 +41,8 @@ interface ConnectionInfo {
   connection_id: string; // 'whatsapp' or 'zapi'
 }
 
-// Maps niche_id -> connection info
-type NicheConnectionMap = Record<string, ConnectionInfo>;
+// Maps connection_config_id -> connection info
+type ConnectionMap = Record<string, ConnectionInfo>;
 
 const statusFilters = ['all', 'new', 'pending', 'active', 'last_customer'] as const;
 const statusLabels: Record<string, string> = { all: 'Todos', new: 'Novos', pending: 'Pendentes', active: 'Em atendimento', last_customer: 'Última Msg Cliente' };
@@ -86,7 +87,7 @@ export default function Conversations() {
   const [tags, setTags] = useState<TagOption[]>([]);
   const [agents, setAgents] = useState<AgentOption[]>([]);
   const [allConnections, setAllConnections] = useState<ConnectionInfo[]>([]);
-  const [nicheConnectionMap, setNicheConnectionMap] = useState<NicheConnectionMap>({});
+  const [connectionMap, setConnectionMap] = useState<ConnectionMap>({});
   const [contactTagMap, setContactTagMap] = useState<Record<string, TagOption[]>>({});
   const [showFilters, setShowFilters] = useState(false);
 
@@ -109,22 +110,13 @@ export default function Conversations() {
 
     if (configs) {
       setAllConnections(configs.map(c => ({ id: c.id, label: c.label, connection_id: c.connection_id })));
-    }
 
-    // Fetch niche_connections to map niche_id -> connection
-    const { data: nicheConns } = await supabase
-      .from('niche_connections')
-      .select('niche_id, connection_config_id');
-
-    if (nicheConns && configs) {
-      const map: NicheConnectionMap = {};
-      nicheConns.forEach((nc: any) => {
-        const conn = configs.find((c: any) => c.id === nc.connection_config_id);
-        if (conn) {
-          map[nc.niche_id] = { id: conn.id, label: conn.label, connection_id: conn.connection_id };
-        }
+      // Build a direct map by config id
+      const map: ConnectionMap = {};
+      configs.forEach((c: any) => {
+        map[c.id] = { id: c.id, label: c.label, connection_id: c.connection_id };
       });
-      setNicheConnectionMap(map);
+      setConnectionMap(map);
     }
   };
 
@@ -178,9 +170,9 @@ export default function Conversations() {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  const getConversationConnection = (nicheId: string | null): ConnectionInfo | null => {
-    if (!nicheId) return null;
-    return nicheConnectionMap[nicheId] || null;
+  const getConversationConnection = (connConfigId: string | null): ConnectionInfo | null => {
+    if (!connConfigId) return null;
+    return connectionMap[connConfigId] || null;
   };
 
   const activeFiltersCount = (selectedTag !== 'all' ? 1 : 0) + (selectedAgent !== 'all' ? 1 : 0) + (selectedConnection !== 'all' ? 1 : 0);
@@ -191,7 +183,7 @@ export default function Conversations() {
       || (activeFilter === 'last_customer' ? c.last_message_sender === 'customer' : c.status === activeFilter);
     const matchesTag = selectedTag === 'all' || (contactTagMap[c.contact_phone] || []).some(t => t.id === selectedTag);
     const matchesAgent = selectedAgent === 'all' || c.assigned_agent_id === selectedAgent;
-    const conn = getConversationConnection(c.niche_id);
+    const conn = getConversationConnection(c.connection_config_id);
     const matchesConnection = selectedConnection === 'all' || conn?.id === selectedConnection;
     const matchesUnread = !onlyUnread || (c.unread_count && c.unread_count > 0);
     return matchesSearch && matchesStatus && matchesTag && matchesAgent && matchesConnection && matchesUnread;
@@ -316,7 +308,7 @@ export default function Conversations() {
             <div className="divide-y divide-border">
               {filtered.map((c, i) => {
                 const cTags = contactTagMap[c.contact_phone] || [];
-                const conn = getConversationConnection(c.niche_id);
+                const conn = getConversationConnection(c.connection_config_id);
                 return (
                   <motion.button
                     key={c.id}

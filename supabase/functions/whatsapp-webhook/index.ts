@@ -188,6 +188,26 @@ async function resolveNicheId(supabase: any, phoneNumberId: string): Promise<str
   }
 }
 
+async function resolveConnectionConfigId(supabase: any, phoneNumberId: string): Promise<string | null> {
+  try {
+    const { data: allConfigs } = await supabase
+      .from("connection_configs")
+      .select("id, config")
+      .eq("connection_id", "whatsapp")
+      .eq("is_connected", true);
+
+    const matchedConfig = (allConfigs || []).find((c: any) => {
+      const cfg = c.config as Record<string, string> | null;
+      return cfg?.phone_number_id === phoneNumberId;
+    });
+
+    return matchedConfig?.id || null;
+  } catch (err) {
+    console.error("Error resolving connection_config_id:", err);
+    return null;
+  }
+}
+
 async function processWebhook(body: any) {
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
@@ -213,6 +233,7 @@ async function processWebhook(body: any) {
       // Resolve niche and access token from the phone_number_id that received the message
       const receivingPhoneNumberId = value?.metadata?.phone_number_id || "";
       const nicheId = await resolveNicheId(supabase, receivingPhoneNumberId);
+      const connectionConfigId = await resolveConnectionConfigId(supabase, receivingPhoneNumberId);
       if (nicheId) {
         console.log(`Niche resolved: ${nicheId} for phone_number_id: ${receivingPhoneNumberId}`);
       }
@@ -248,6 +269,7 @@ async function processWebhook(body: any) {
           if (sourceId) updateData.source_id = sourceId;
           if (adTitle) updateData.ad_title = adTitle;
           if (nicheId) updateData.niche_id = nicheId;
+          if (connectionConfigId) updateData.connection_config_id = connectionConfigId;
           await supabase
             .from("conversations")
             .update(updateData)
@@ -264,6 +286,7 @@ async function processWebhook(body: any) {
               source_id: sourceId,
               ad_title: adTitle,
               niche_id: nicheId,
+              connection_config_id: connectionConfigId,
             })
             .select("id")
             .single();
