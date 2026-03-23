@@ -251,12 +251,12 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
   }
 
   return (
-    <div className="flex h-screen">
-      <div className="flex flex-1 flex-col">
+    <div className={embedded ? "flex h-full" : "flex h-screen"}>
+      <div className="flex flex-1 flex-col min-w-0">
         {/* Header */}
         <div className="flex h-16 items-center justify-between border-b border-border bg-card px-4">
           <div className="flex items-center gap-3">
-            <button onClick={() => navigate('/conversations')} className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary transition-colors">
+            <button onClick={() => onBack ? onBack() : navigate('/conversations')} className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary transition-colors lg:hidden">
               <ArrowLeft className="h-4 w-4" />
             </button>
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-sm font-semibold text-accent-foreground">
