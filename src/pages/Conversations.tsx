@@ -319,7 +319,7 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
           </div>
         </div>
 
-        <div className="rounded-xl border border-border bg-card shadow-elevated overflow-hidden">
+        <div className={`rounded-xl border border-border bg-card shadow-elevated overflow-hidden ${embedded ? 'flex-1 overflow-y-auto' : ''}`}>
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
