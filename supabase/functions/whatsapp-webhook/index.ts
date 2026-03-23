@@ -227,6 +227,43 @@ async function processWebhook(body: any) {
       const value = change.value;
       const messages = value?.messages;
       const contacts = value?.contacts;
+      const statuses = value?.statuses;
+
+      if (statuses?.length) {
+        for (const status of statuses) {
+          const providerStatus = status.status || null;
+          const providerMessageId = status.id || null;
+          const providerError = Array.isArray(status.errors) && status.errors.length > 0
+            ? JSON.stringify(status.errors[0]).slice(0, 500)
+            : null;
+
+          console.log(`[whatsapp-webhook] Status update: ${providerMessageId} -> ${providerStatus}`);
+
+          if (!providerMessageId || !providerStatus) continue;
+
+          const normalizedStatus = providerStatus === "failed"
+            ? "failed"
+            : providerStatus === "read"
+              ? "read"
+              : providerStatus === "delivered"
+                ? "delivered"
+                : providerStatus === "sent"
+                  ? "sent"
+                  : "pending";
+
+          const updatePayload: Record<string, string | null> = {
+            status: normalizedStatus,
+            provider_status: providerStatus,
+            provider_error: providerError,
+          };
+
+          await supabase
+            .from("messages")
+            .update(updatePayload)
+            .eq("provider_message_id", providerMessageId)
+            .eq("sender_type", "agent");
+        }
+      }
 
       if (!messages?.length) continue;
 
@@ -431,40 +468,6 @@ async function processWebhook(body: any) {
         }
       }
 
-      const statuses = value?.statuses;
-      if (statuses?.length) {
-        for (const status of statuses) {
-          const providerStatus = status.status || null;
-          const providerMessageId = status.id || null;
-          const providerError = Array.isArray(status.errors) && status.errors.length > 0
-            ? JSON.stringify(status.errors[0]).slice(0, 500)
-            : null;
-
-          console.log(`Status update: ${providerMessageId} -> ${providerStatus}`);
-
-          if (!providerMessageId || !providerStatus) continue;
-
-          const normalizedStatus = providerStatus === "failed"
-            ? "failed"
-            : providerStatus === "read"
-              ? "read"
-              : providerStatus === "delivered"
-                ? "delivered"
-                : "pending";
-
-          const updatePayload: Record<string, string | null> = {
-            status: normalizedStatus,
-            provider_status: providerStatus,
-            provider_error: providerError,
-          };
-
-          await supabase
-            .from("messages")
-            .update(updatePayload)
-            .eq("provider_message_id", providerMessageId)
-            .eq("sender_type", "agent");
-        }
-      }
     }
   }
 }
