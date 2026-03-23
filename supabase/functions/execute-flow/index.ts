@@ -183,7 +183,7 @@ Deno.serve(async (req) => {
 
     const { data: conversation } = await supabase
       .from("conversations")
-      .select("contact_phone, niche_id")
+      .select("contact_phone, niche_id, connection_config_id")
       .eq("id", conversationId)
       .single();
 
@@ -195,7 +195,21 @@ Deno.serve(async (req) => {
     let resolvedConnection: Record<string, unknown> | null = null;
     let useZapi = false;
 
-    if (conversation.niche_id) {
+    if (conversation.connection_config_id) {
+      const { data: directConfig } = await supabase
+        .from("connection_configs")
+        .select("connection_id, config, is_connected")
+        .eq("id", conversation.connection_config_id)
+        .eq("is_connected", true)
+        .maybeSingle();
+
+      if (directConfig) {
+        resolvedConnection = directConfig.config as Record<string, unknown>;
+        useZapi = directConfig.connection_id === "zapi";
+      }
+    }
+
+    if (!resolvedConnection && conversation.niche_id) {
       const { data: nicheConns } = await supabase
         .from("niche_connections")
         .select("connection_config_id")
