@@ -92,6 +92,7 @@ export default function FlowEditor() {
   const [flowName, setFlowName] = useState('');
   const [flowDescription, setFlowDescription] = useState('');
   const [flowActive, setFlowActive] = useState(false);
+  const [manualOnly, setManualOnly] = useState(false);
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [loading, setLoading] = useState(true);
@@ -121,6 +122,7 @@ export default function FlowEditor() {
       setFlowName(flowRes.data.name);
       setFlowDescription(flowRes.data.description || '');
       setFlowActive(flowRes.data.is_active);
+      setManualOnly((flowRes.data as any).manual_only ?? false);
     }
 
     if (nodesRes.data && nodesRes.data.length > 0) {
@@ -324,7 +326,7 @@ export default function FlowEditor() {
 
     await supabase
       .from('automation_flows')
-      .update({ name: flowName, description: flowDescription })
+      .update({ name: flowName, description: flowDescription, manual_only: manualOnly } as any)
       .eq('id', id);
 
     // Nodes are saved as-is (connection_ids are already in each trigger node's config)
@@ -410,6 +412,17 @@ export default function FlowEditor() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setManualOnly(!manualOnly)}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+              manualOnly
+                ? 'bg-amber-500/10 text-amber-600 border border-amber-500/30'
+                : 'bg-secondary text-muted-foreground border border-border'
+            }`}
+            title="Quando ativado, a IA não selecionará este fluxo automaticamente"
+          >
+            {manualOnly ? 'Somente Manual' : 'Automático'}
+          </button>
           <button
             onClick={toggleActive}
             className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${

@@ -74,7 +74,8 @@ Deno.serve(async (req) => {
     let flowQuery = supabase
       .from("automation_flows")
       .select("id, name, description")
-      .eq("is_active", true);
+      .eq("is_active", true)
+      .eq("manual_only", false);
 
     if (nicheId) {
       flowQuery = flowQuery.eq("niche_id", nicheId);
