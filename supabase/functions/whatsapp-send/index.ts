@@ -146,8 +146,23 @@ Deno.serve(async (req) => {
 
     if (!waResponse.ok) {
       console.error("WhatsApp API error:", waResult);
+
+      // Save failed message so user can see it in chat
+      const { data: failedMsg } = await serviceClient
+        .from("messages")
+        .insert({
+          conversation_id: conversationId,
+          content: message,
+          sender_type: "agent",
+          sender_agent_id: null,
+          message_type: type,
+          status: "failed",
+        })
+        .select()
+        .single();
+
       return new Response(
-        JSON.stringify({ error: "Failed to send message", details: waResult }),
+        JSON.stringify({ error: "Failed to send message", details: waResult, savedMessage: failedMsg }),
         {
           status: 502,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
