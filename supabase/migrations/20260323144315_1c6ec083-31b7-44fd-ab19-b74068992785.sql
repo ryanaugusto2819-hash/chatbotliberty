@@ -1,0 +1,1 @@
+ALTER TABLE public.automation_flows ADD COLUMN manual_only boolean NOT NULL DEFAULT false;

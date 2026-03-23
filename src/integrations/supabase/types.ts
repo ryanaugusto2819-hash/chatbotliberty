@@ -147,6 +147,7 @@ export type Database = {
           description: string | null
           id: string
           is_active: boolean
+          manual_only: boolean
           name: string
           niche_id: string | null
           trigger_count: number
@@ -158,6 +159,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean
+          manual_only?: boolean
           name?: string
           niche_id?: string | null
           trigger_count?: number
@@ -169,6 +171,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean
+          manual_only?: boolean
           name?: string
           niche_id?: string | null
           trigger_count?: number
