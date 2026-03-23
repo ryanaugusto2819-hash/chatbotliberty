@@ -300,6 +300,7 @@ export type Database = {
         Row: {
           ad_title: string | null
           assigned_agent_id: string | null
+          connection_config_id: string | null
           contact_avatar: string | null
           contact_name: string
           contact_phone: string
@@ -316,6 +317,7 @@ export type Database = {
         Insert: {
           ad_title?: string | null
           assigned_agent_id?: string | null
+          connection_config_id?: string | null
           contact_avatar?: string | null
           contact_name: string
           contact_phone: string
@@ -332,6 +334,7 @@ export type Database = {
         Update: {
           ad_title?: string | null
           assigned_agent_id?: string | null
+          connection_config_id?: string | null
           contact_avatar?: string | null
           contact_name?: string
           contact_phone?: string
@@ -351,6 +354,13 @@ export type Database = {
             columns: ["assigned_agent_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_connection_config_id_fkey"
+            columns: ["connection_config_id"]
+            isOneToOne: false
+            referencedRelation: "connection_configs"
             referencedColumns: ["id"]
           },
           {
