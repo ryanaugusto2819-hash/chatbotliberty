@@ -89,11 +89,33 @@ Deno.serve(async (req) => {
     );
 
     const zapiResult = await zapiResponse.json();
+    const providerMessageId = zapiResult?.messageId || zapiResult?.zaapId || null;
+    const providerError = zapiResult?.error
+      ? JSON.stringify(zapiResult.error).slice(0, 500)
+      : !providerMessageId
+        ? null
+        : null;
 
-    if (!zapiResponse.ok) {
+    if (!zapiResponse.ok || providerError) {
       console.error("Z-API send error:", zapiResult);
+
+      const { data: failedMsg } = await serviceClient
+        .from("messages")
+        .insert({
+          conversation_id: conversationId,
+          content: message,
+          sender_type: "agent",
+          sender_agent_id: null,
+          message_type: type,
+          status: "failed",
+          provider_status: "failed",
+          provider_error: providerError,
+        })
+        .select()
+        .single();
+
       return new Response(
-        JSON.stringify({ error: "Failed to send message via Z-API", details: zapiResult }),
+        JSON.stringify({ error: "Failed to send message via Z-API", details: zapiResult, savedMessage: failedMsg }),
         {
           status: 502,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -101,7 +123,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Save message to database
     const { data: savedMsg, error: msgError } = await serviceClient
       .from("messages")
       .insert({
@@ -110,7 +131,9 @@ Deno.serve(async (req) => {
         sender_type: "agent",
         sender_agent_id: null,
         message_type: type,
-        status: "sent",
+        status: providerMessageId ? "pending" : "sent",
+        provider_message_id: providerMessageId,
+        provider_status: providerMessageId ? "accepted" : null,
       })
       .select()
       .single();
@@ -119,7 +142,6 @@ Deno.serve(async (req) => {
       console.error("Error saving message:", msgError);
     }
 
-    // Update conversation timestamp
     await serviceClient
       .from("conversations")
       .update({ updated_at: new Date().toISOString() })
@@ -128,7 +150,7 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        zapiMessageId: zapiResult.messageId,
+        zapiMessageId: providerMessageId,
         savedMessage: savedMsg,
       }),
       {

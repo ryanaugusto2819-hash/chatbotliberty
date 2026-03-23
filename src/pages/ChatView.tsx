@@ -158,6 +158,10 @@ export default function ChatView() {
           markMessagesAsRead();
         }
       })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `conversation_id=eq.${id}` }, (payload) => {
+        const updatedMessage = payload.new as MessageData;
+        setMessages(prev => prev.map(message => message.id === updatedMessage.id ? updatedMessage : message));
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations', filter: `id=eq.${id}` }, () => {
         fetchConversation();
       })
