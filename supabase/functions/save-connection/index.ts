@@ -73,10 +73,32 @@ async function validateWhatsAppConfig(rawConfig: Record<string, string>) {
     throw new Error("Phone Number ID é obrigatório.");
   }
 
-  const phoneData = await graphRequest(
-    `/${phoneNumberId}?fields=id,display_phone_number,verified_name,quality_rating,status`,
-    accessToken
-  );
+  let phoneData: Record<string, unknown> | null = null;
+  try {
+    phoneData = await graphRequest(
+      `/${phoneNumberId}?fields=id,display_phone_number,verified_name,quality_rating,status`,
+      accessToken
+    );
+  } catch (e) {
+    console.error("Graph API validation failed for phone_number_id:", phoneNumberId, e);
+    // Return error status instead of crashing
+    return {
+      status: "error",
+      config: {
+        ...rawConfig,
+        access_token: accessToken,
+        phone_number_id: phoneNumberId,
+        verify_token: rawConfig.verify_token?.trim() || generateVerifyToken(),
+        webhook_url: webhookUrl,
+        setup_method: rawConfig.setup_method || "manual",
+      },
+      diagnostics: {
+        error: e instanceof Error ? e.message : String(e),
+        phone_number_id: phoneNumberId,
+        webhook_url: webhookUrl,
+      },
+    };
+  }
 
   const wabaId = rawConfig.waba_id?.trim() || "";
   let appSubscribed: boolean | null = null;
