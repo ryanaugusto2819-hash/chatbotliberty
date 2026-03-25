@@ -13,29 +13,31 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
-/** Determine the lead's funnel stage based on message history */
-function determineFunnelStage(messages: any[]): { stage: string; label: string; description: string } {
-  if (!messages?.length) return { stage: "new", label: "Recebido", description: "Lead novo, sem interação" };
-
-  const customerMessages = messages.filter((m: any) => m.sender_type === "customer");
-  const outboundMessages = messages.filter((m: any) => m.sender_type !== "customer");
-  const customerRepliesAfterOutbound = customerMessages.filter((cm: any) => {
-    return outboundMessages.some((om: any) => new Date(cm.created_at) > new Date(om.created_at));
-  });
-
-  if (customerRepliesAfterOutbound.length >= 2) {
-    return { stage: "engaged", label: "Engajado", description: "Cliente respondeu 2+ vezes, demonstrando interesse ativo" };
-  }
-  if (customerRepliesAfterOutbound.length >= 1) {
-    return { stage: "responded", label: "Respondeu", description: "Cliente respondeu ao contato, mas ainda não engajou profundamente" };
-  }
-  if (outboundMessages.length > 0) {
-    return { stage: "contacted", label: "Contatado", description: "Sistema/agente já enviou mensagem, aguardando resposta do cliente" };
-  }
-  if (customerMessages.length > 0) {
-    return { stage: "received", label: "Recebido", description: "Lead iniciou contato mas ainda não recebeu resposta completa" };
-  }
-  return { stage: "new", label: "Recebido", description: "Lead novo, sem interação" };
+/** Get human-readable label for funnel stage */
+function getFunnelStageInfo(stage: string): { label: string; description: string; strategy: string } {
+  const stages: Record<string, { label: string; description: string; strategy: string }> = {
+    etapa_1: {
+      label: "Etapa 1",
+      description: "Início do funil — primeiro contato",
+      strategy: "O lead acabou de chegar. Seja acolhedor, demonstre que viu o interesse dele e faça uma pergunta aberta para iniciar o diálogo.",
+    },
+    etapa_2: {
+      label: "Etapa 2",
+      description: "Recebeu informações/preços",
+      strategy: "O lead já recebeu preços/informações. Reforce o valor, tire dúvidas específicas sobre os preços, crie senso de oportunidade. Pergunte se ficou alguma dúvida sobre os valores.",
+    },
+    etapa_3: {
+      label: "Etapa 3",
+      description: "Negociação / demonstrou intenção de compra",
+      strategy: "O lead demonstrou intenção de compra. Seja mais direto, ofereça condições especiais se possível, conduza para o fechamento. Pergunte o que falta para fechar.",
+    },
+    etapa_4: {
+      label: "Etapa 4",
+      description: "Aguardando pagamento / fechamento",
+      strategy: "O lead disse que vai pagar ou já está no processo final. Seja gentil mas direto: pergunte se conseguiu efetuar o pagamento, se precisa de ajuda com o link/dados, ou se surgiu algum impedimento. Crie urgência suave.",
+    },
+  };
+  return stages[stage] || stages.etapa_1;
 }
 
 Deno.serve(async (req) => {
@@ -83,7 +85,7 @@ Deno.serve(async (req) => {
     // Find conversations that are NOT resolved
     const { data: conversations } = await supabase
       .from("conversations")
-      .select("id, contact_name, contact_phone, niche_id, status, updated_at, tags, ad_title")
+      .select("id, contact_name, contact_phone, niche_id, status, updated_at, tags, ad_title, funnel_stage")
       .neq("status", "resolved");
 
     if (!conversations?.length) {
@@ -111,9 +113,8 @@ Deno.serve(async (req) => {
       const lastMsgTime = new Date(lastMsg.created_at);
       const hoursSinceLastMsg = (now.getTime() - lastMsgTime.getTime()) / (1000 * 60 * 60);
 
-      // Determine funnel stage
-      const allMsgsChronological = [...lastMessages].reverse();
-      const funnelStage = determineFunnelStage(allMsgsChronological);
+      // Use the stored funnel stage from the conversation (set by flow actions)
+      const funnelStage = getFunnelStageInfo(conv.funnel_stage || "etapa_1");
 
       // Get existing follow-up executions for this conversation
       const { data: existingExecs } = await supabase
