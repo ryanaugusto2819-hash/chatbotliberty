@@ -1,13 +1,21 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TopBar from '@/components/layout/TopBar';
 import StatusBadge from '@/components/shared/StatusBadge';
 import { supabase } from '@/integrations/supabase/client';
-import { Search, Loader2, Tag, Filter, X, Smartphone, Globe, Wifi, MessageCircle } from 'lucide-react';
+import { Search, Loader2, X, Smartphone, Globe, Wifi, MessageCircle, ChevronDown } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface ConversationRow {
   id: string;
@@ -38,10 +46,9 @@ interface AgentOption {
 interface ConnectionInfo {
   id: string;
   label: string;
-  connection_id: string; // 'whatsapp' or 'zapi'
+  connection_id: string;
 }
 
-// Maps connection_config_id -> connection info
 type ConnectionMap = Record<string, ConnectionInfo>;
 
 const statusFilters = ['all', 'new', 'pending', 'active', 'last_customer'] as const;
@@ -95,8 +102,6 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
   const [allConnections, setAllConnections] = useState<ConnectionInfo[]>([]);
   const [connectionMap, setConnectionMap] = useState<ConnectionMap>({});
   const [contactTagMap, setContactTagMap] = useState<Record<string, TagOption[]>>({});
-  const [showConnectionDropdown, setShowConnectionDropdown] = useState(false);
-  const connectionDropdownRef = useRef<HTMLDivElement>(null);
 
   const fetchTags = async () => {
     const { data } = await supabase.from('tags').select('id, name, color');
@@ -109,7 +114,6 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
   };
 
   const fetchConnections = async () => {
-    // Fetch all active connections
     const { data: configs } = await supabase
       .from('connection_configs')
       .select('id, label, connection_id')
@@ -118,7 +122,6 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
     if (configs) {
       setAllConnections(configs.map(c => ({ id: c.id, label: c.label, connection_id: c.connection_id })));
 
-      // Build a direct map by config id
       const map: ConnectionMap = {};
       configs.forEach((c: any) => {
         map[c.id] = { id: c.id, label: c.label, connection_id: c.connection_id };
@@ -183,16 +186,6 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
     };
   }, []);
 
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (connectionDropdownRef.current && !connectionDropdownRef.current.contains(e.target as Node)) {
-        setShowConnectionDropdown(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
   const getConversationConnection = (connConfigId: string | null): ConnectionInfo | null => {
     if (!connConfigId) return null;
     return connectionMap[connConfigId] || null;
@@ -202,7 +195,7 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
 
   const filtered = conversations.filter((c) => {
     const matchesSearch = c.contact_name.toLowerCase().includes(search.toLowerCase()) || c.contact_phone.includes(search);
-    const matchesStatus = activeFilter === 'all' 
+    const matchesStatus = activeFilter === 'all'
       || (activeFilter === 'last_customer' ? c.last_message_sender === 'customer' : c.status === activeFilter);
     const matchesTag = selectedTag === 'all' || (contactTagMap[c.contact_phone] || []).some(t => t.id === selectedTag);
     const matchesAgent = selectedAgent === 'all' || c.assigned_agent_id === selectedAgent;
@@ -249,7 +242,6 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
             </div>
           </div>
 
-          {/* Status Filters + Inline Advanced Filters */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
             {statusFilters.map((f) => (
               <button
@@ -308,44 +300,46 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
               ))}
             </select>
 
-            <div className="relative shrink-0" ref={connectionDropdownRef}>
-              <button
-                onClick={() => setShowConnectionDropdown(!showConnectionDropdown)}
-                className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-medium transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring ${
-                  selectedConnections.length > 0
-                    ? 'border-primary bg-primary/10 text-primary'
-                    : 'border-input bg-secondary text-secondary-foreground'
-                }`}
-              >
-                <Wifi className="h-3 w-3" />
-                {selectedConnections.length > 0 ? `${selectedConnections.length} conexão(ões)` : 'Conexão'}
-              </button>
-              {showConnectionDropdown && (
-                <div className="absolute top-full mt-1 left-0 z-50 min-w-[220px] rounded-lg border border-border bg-card shadow-lg p-2 space-y-1">
-                  {allConnections.map((c) => {
-                    const isChecked = selectedConnections.includes(c.id);
-                    return (
-                      <label key={c.id} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-secondary/60 cursor-pointer text-xs text-foreground">
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => {
-                            setSelectedConnections(prev =>
-                              isChecked ? prev.filter(id => id !== c.id) : [...prev, c.id]
-                            );
-                          }}
-                          className="rounded border-input accent-primary h-3.5 w-3.5"
-                        />
-                        <span className="truncate">{c.label} ({c.connection_id === 'whatsapp' ? 'Meta' : 'Z-API'})</span>
-                      </label>
-                    );
-                  })}
-                  {allConnections.length === 0 && (
-                    <p className="text-xs text-muted-foreground px-2 py-1">Nenhuma conexão ativa</p>
-                  )}
-                </div>
-              )}
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className={`shrink-0 flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-ring ${
+                    selectedConnections.length > 0
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : 'border-input bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                  }`}
+                >
+                  <Wifi className="h-3 w-3" />
+                  <span>{selectedConnections.length > 0 ? `${selectedConnections.length} conexão(ões)` : 'Conexão'}</span>
+                  <ChevronDown className="h-3 w-3" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" side="bottom" className="w-64">
+                <DropdownMenuLabel>Filtrar por conexão</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {allConnections.length > 0 ? allConnections.map((c) => {
+                  const isChecked = selectedConnections.includes(c.id);
+                  return (
+                    <DropdownMenuCheckboxItem
+                      key={c.id}
+                      checked={isChecked}
+                      onSelect={(e) => e.preventDefault()}
+                      onCheckedChange={(checked) => {
+                        setSelectedConnections((prev) => {
+                          if (checked) return prev.includes(c.id) ? prev : [...prev, c.id];
+                          return prev.filter((id) => id !== c.id);
+                        });
+                      }}
+                      className="text-xs"
+                    >
+                      {c.label} ({c.connection_id === 'whatsapp' ? 'Meta' : 'Z-API'})
+                    </DropdownMenuCheckboxItem>
+                  );
+                }) : (
+                  <div className="px-2 py-1.5 text-xs text-muted-foreground">Nenhuma conexão ativa</div>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             {activeFiltersCount > 0 && (
               <button
