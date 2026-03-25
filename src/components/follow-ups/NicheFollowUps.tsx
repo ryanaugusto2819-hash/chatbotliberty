@@ -18,6 +18,15 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 
+const FUNNEL_STAGES = [
+  { value: 'new', label: 'Recebido', description: 'Lead novo, sem interação', color: 'bg-muted text-muted-foreground' },
+  { value: 'received', label: 'Recebido (iniciou)', description: 'Lead iniciou contato', color: 'bg-blue-500/10 text-blue-500' },
+  { value: 'contacted', label: 'Contatado', description: 'Aguardando resposta do cliente', color: 'bg-yellow-500/10 text-yellow-500' },
+  { value: 'responded', label: 'Respondeu', description: 'Cliente respondeu ao contato', color: 'bg-orange-500/10 text-orange-500' },
+  { value: 'engaged', label: 'Engajado', description: 'Cliente respondeu 2+ vezes', color: 'bg-green-500/10 text-green-500' },
+  { value: 'all', label: 'Todas as etapas', description: 'Aplica em qualquer etapa do funil', color: 'bg-primary/10 text-primary' },
+] as const;
+
 interface FollowUpTemplate {
   id: string;
   name: string;
@@ -31,6 +40,7 @@ interface FollowUpTemplate {
   is_active: boolean;
   niche_id: string | null;
   sort_order: number;
+  funnel_stage: string;
 }
 
 interface FollowUpExecution {
@@ -75,11 +85,12 @@ export default function NicheFollowUps({ nicheId }: NicheFollowUpsProps) {
     setLoading(false);
   };
 
-  const addTemplate = () => {
+  const addTemplate = (stage: string = 'all') => {
     const newLevel = templates.length + 1;
+    const stageInfo = FUNNEL_STAGES.find(s => s.value === stage);
     setTemplates(prev => [...prev, {
       id: crypto.randomUUID(),
-      name: `Follow-up Nível ${newLevel}`,
+      name: `Follow-up ${stageInfo?.label || 'Nível ' + newLevel}`,
       objective: '',
       message_template: '',
       escalation_level: newLevel,
@@ -90,6 +101,7 @@ export default function NicheFollowUps({ nicheId }: NicheFollowUpsProps) {
       is_active: true,
       niche_id: nicheId,
       sort_order: newLevel,
+      funnel_stage: stage,
     }]);
   };
 
