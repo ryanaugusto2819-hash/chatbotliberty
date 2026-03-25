@@ -13,31 +13,18 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
-/** Get human-readable label for funnel stage */
-function getFunnelStageInfo(stage: string): { label: string; description: string; strategy: string } {
-  const stages: Record<string, { label: string; description: string; strategy: string }> = {
-    etapa_1: {
-      label: "Etapa 1",
-      description: "Início do funil — primeiro contato",
-      strategy: "O lead acabou de chegar. Seja acolhedor, demonstre que viu o interesse dele e faça uma pergunta aberta para iniciar o diálogo.",
-    },
-    etapa_2: {
-      label: "Etapa 2",
-      description: "Recebeu informações/preços",
-      strategy: "O lead já recebeu preços/informações. Reforce o valor, tire dúvidas específicas sobre os preços, crie senso de oportunidade. Pergunte se ficou alguma dúvida sobre os valores.",
-    },
-    etapa_3: {
-      label: "Etapa 3",
-      description: "Negociação / demonstrou intenção de compra",
-      strategy: "O lead demonstrou intenção de compra. Seja mais direto, ofereça condições especiais se possível, conduza para o fechamento. Pergunte o que falta para fechar.",
-    },
-    etapa_4: {
-      label: "Etapa 4",
-      description: "Aguardando pagamento / fechamento",
-      strategy: "O lead disse que vai pagar ou já está no processo final. Seja gentil mas direto: pergunte se conseguiu efetuar o pagamento, se precisa de ajuda com o link/dados, ou se surgiu algum impedimento. Crie urgência suave.",
-    },
+/** Get funnel stage info from database stages map */
+function getFunnelStageInfo(
+  stage: string,
+  stagesMap: Map<string, { label: string; description: string; strategy: string }>
+): { label: string; description: string; strategy: string } {
+  const info = stagesMap.get(stage);
+  if (info) return info;
+  return {
+    label: stage,
+    description: "Etapa do funil",
+    strategy: "Aborde o lead de forma natural, referenciando o contexto da conversa.",
   };
-  return stages[stage] || stages.etapa_1;
 }
 
 Deno.serve(async (req) => {
