@@ -297,7 +297,7 @@ Qual fluxo deve ser disparado agora?`;
         Authorization: `Bearer ${serviceRoleKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ flowId: selectedFlow.id, conversationId }),
+      body: JSON.stringify({ flowId: selectedFlow.id, conversationId, senderLabel: "ia-seletora" }),
     });
 
     const execResult = await execResponse.json();
