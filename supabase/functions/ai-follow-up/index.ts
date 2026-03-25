@@ -208,14 +208,13 @@ Deno.serve(async (req) => {
 ${nicheInfo ? `NICHO: ${nicheInfo.name}\nCONTEXTO DO NEGÓCIO: ${nicheInfo.system_prompt}` : ""}
 ${kbContext}
 
-ETAPA DO FUNIL DO LEAD: ${funnelStage.label} (${funnelStage.stage})
+ETAPA DO FUNIL DO LEAD: ${funnelStage.label}
 ${funnelStage.description}
 
-ESTRATÉGIA POR ETAPA DO FUNIL:
-- Recebido: O lead acabou de chegar. Seja acolhedor, demonstre que viu o interesse dele e faça uma pergunta aberta para iniciar o diálogo.
-- Contatado: Já houve contato mas sem resposta. Reforce o valor, crie curiosidade ou senso de oportunidade. Não repita a mesma abordagem.
-- Respondeu: O lead respondeu uma vez. Aprofunde o interesse, faça perguntas direcionadas, ofereça mais informações relevantes.
-- Engajado: Lead ativo na conversa. Conduza para o próximo passo concreto (agendamento, proposta, link de pagamento). Seja mais direto.
+ESTRATÉGIA PARA ESTA ETAPA:
+${funnelStage.strategy}
+
+IMPORTANTE: A etapa do funil foi definida pelo fluxo de automação. Adapte 100% da sua abordagem a esta etapa específica.
 
 REGRAS:
 1. A mensagem DEVE ser natural, como se fosse de um humano real, não um robô.
