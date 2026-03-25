@@ -517,6 +517,76 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
         </div>
 
         <div className="p-4 space-y-5 flex-1">
+          {/* Register Sale */}
+          <div>
+            <button
+              onClick={() => {
+                const adParts = conversation.ad_title?.split(' › ') || [];
+                setSaleData({
+                  revenue: '',
+                  creative: adParts[2] || adParts[0] || '',
+                  campaign: adParts[0] || '',
+                });
+                setShowSaleDialog(true);
+              }}
+              className="w-full flex items-center justify-center gap-2 rounded-lg bg-green-600 hover:bg-green-700 text-white py-2.5 px-4 text-sm font-medium transition-colors"
+            >
+              <DollarSign className="h-4 w-4" />
+              Registrar Venda
+            </button>
+          </div>
+
+          {showSaleDialog && (
+            <div className="rounded-lg border border-border bg-background p-4 space-y-3">
+              <p className="text-sm font-semibold text-card-foreground">Dados da Venda</p>
+              <div>
+                <label className="text-xs text-muted-foreground">Valor (R$) *</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={saleData.revenue}
+                  onChange={(e) => setSaleData(prev => ({ ...prev, revenue: e.target.value }))}
+                  placeholder="197.00"
+                  className="w-full mt-1 rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">Criativo</label>
+                <input
+                  type="text"
+                  value={saleData.creative}
+                  onChange={(e) => setSaleData(prev => ({ ...prev, creative: e.target.value }))}
+                  placeholder="nome-do-criativo"
+                  className="w-full mt-1 rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">Campanha</label>
+                <input
+                  type="text"
+                  value={saleData.campaign}
+                  onChange={(e) => setSaleData(prev => ({ ...prev, campaign: e.target.value }))}
+                  placeholder="nome-da-campanha"
+                  className="w-full mt-1 rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowSaleDialog(false)}
+                  className="flex-1 rounded-lg border border-border py-2 text-sm text-muted-foreground hover:bg-secondary transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSendSale}
+                  disabled={!saleData.revenue || sendingSale}
+                  className="flex-1 rounded-lg bg-green-600 hover:bg-green-700 text-white py-2 text-sm font-medium transition-colors disabled:opacity-50"
+                >
+                  {sendingSale ? <Loader2 className="h-4 w-4 animate-spin mx-auto" /> : 'Enviar'}
+                </button>
+              </div>
+            </div>
+          )}
           {/* Contact Details */}
           <div>
             <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
