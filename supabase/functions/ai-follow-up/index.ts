@@ -112,7 +112,8 @@ Deno.serve(async (req) => {
       const hoursSinceLastMsg = (now.getTime() - lastMsgTime.getTime()) / (1000 * 60 * 60);
 
       // Use the stored funnel stage from the conversation (set by flow actions)
-      const funnelStage = getFunnelStageInfo(conv.funnel_stage || "etapa_1");
+      const nicheStages = conv.niche_id ? nicheStagesMap.get(conv.niche_id) || new Map() : new Map();
+      const funnelStage = getFunnelStageInfo(conv.funnel_stage || "etapa_1", nicheStages);
 
       // Get existing follow-up executions for this conversation
       const { data: existingExecs } = await supabase
