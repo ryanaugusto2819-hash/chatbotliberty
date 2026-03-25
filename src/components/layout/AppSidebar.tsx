@@ -14,7 +14,7 @@ import {
   Settings,
   LogOut,
   ShieldCheck,
-  Clock,
+  
 } from 'lucide-react';
 
 const allNavItems = [

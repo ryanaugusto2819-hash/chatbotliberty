@@ -18,7 +18,7 @@ import Reports from "./pages/Reports";
 import ManagerAI from "./pages/ManagerAI";
 import Connections from "./pages/Connections";
 import UserManagement from "./pages/UserManagement";
-import FollowUps from "./pages/FollowUps";
+
 import Login from "./pages/Login";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
