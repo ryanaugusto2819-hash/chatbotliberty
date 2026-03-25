@@ -54,6 +54,7 @@ interface MessageData {
   media_url?: string | null;
   provider_error?: string | null;
   provider_status?: string | null;
+  sender_agent_id?: string | null;
 }
 
 interface ParsedProviderError {
