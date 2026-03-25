@@ -86,7 +86,7 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
   const [activeFilter, setActiveFilter] = useState<string>('all');
   const [selectedTag, setSelectedTag] = useState<string>('all');
   const [selectedAgent, setSelectedAgent] = useState<string>('all');
-  const [selectedConnection, setSelectedConnection] = useState<string>('all');
+  const [selectedConnections, setSelectedConnections] = useState<string[]>([]);
   const [onlyUnread, setOnlyUnread] = useState(false);
   const [conversations, setConversations] = useState<ConversationRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -187,7 +187,7 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
     return connectionMap[connConfigId] || null;
   };
 
-  const activeFiltersCount = (selectedTag !== 'all' ? 1 : 0) + (selectedAgent !== 'all' ? 1 : 0) + (selectedConnection !== 'all' ? 1 : 0);
+  const activeFiltersCount = (selectedTag !== 'all' ? 1 : 0) + (selectedAgent !== 'all' ? 1 : 0) + (selectedConnections.length > 0 ? 1 : 0);
 
   const filtered = conversations.filter((c) => {
     const matchesSearch = c.contact_name.toLowerCase().includes(search.toLowerCase()) || c.contact_phone.includes(search);
@@ -196,7 +196,7 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
     const matchesTag = selectedTag === 'all' || (contactTagMap[c.contact_phone] || []).some(t => t.id === selectedTag);
     const matchesAgent = selectedAgent === 'all' || c.assigned_agent_id === selectedAgent;
     const conn = getConversationConnection(c.connection_config_id);
-    const matchesConnection = selectedConnection === 'all' || conn?.id === selectedConnection;
+    const matchesConnection = selectedConnections.length === 0 || (conn && selectedConnections.includes(conn.id));
     const matchesUnread = !onlyUnread || (c.unread_count && c.unread_count > 0);
     return matchesSearch && matchesStatus && matchesTag && matchesAgent && matchesConnection && matchesUnread;
   });
@@ -204,7 +204,7 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
   const clearFilters = () => {
     setSelectedTag('all');
     setSelectedAgent('all');
-    setSelectedConnection('all');
+    setSelectedConnections([]);
   };
 
   const handleConversationClick = (conversationId: string) => {
@@ -297,22 +297,44 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
               ))}
             </select>
 
-            <select
-              value={selectedConnection}
-              onChange={(e) => setSelectedConnection(e.target.value)}
-              className={`shrink-0 rounded-lg border px-2.5 py-2 text-xs font-medium transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring ${
-                selectedConnection !== 'all'
-                  ? 'border-primary bg-primary/10 text-primary'
-                  : 'border-input bg-secondary text-secondary-foreground'
-              }`}
-            >
-              <option value="all">📡 Conexão</option>
-              {allConnections.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.label} ({c.connection_id === 'whatsapp' ? 'Meta' : 'Z-API'})
-                </option>
-              ))}
-            </select>
+            <div className="relative shrink-0">
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-medium transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring ${
+                  selectedConnections.length > 0
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-input bg-secondary text-secondary-foreground'
+                }`}
+              >
+                <Wifi className="h-3 w-3" />
+                {selectedConnections.length > 0 ? `${selectedConnections.length} conexão(ões)` : 'Conexão'}
+              </button>
+              {showFilters && (
+                <div className="absolute top-full mt-1 left-0 z-50 min-w-[200px] rounded-lg border border-border bg-card shadow-lg p-2 space-y-1">
+                  {allConnections.map((c) => {
+                    const isChecked = selectedConnections.includes(c.id);
+                    return (
+                      <label key={c.id} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-secondary/60 cursor-pointer text-xs text-foreground">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {
+                            setSelectedConnections(prev =>
+                              isChecked ? prev.filter(id => id !== c.id) : [...prev, c.id]
+                            );
+                          }}
+                          className="rounded border-input accent-primary h-3.5 w-3.5"
+                        />
+                        <span className="truncate">{c.label} ({c.connection_id === 'whatsapp' ? 'Meta' : 'Z-API'})</span>
+                      </label>
+                    );
+                  })}
+                  {allConnections.length === 0 && (
+                    <p className="text-xs text-muted-foreground px-2 py-1">Nenhuma conexão ativa</p>
+                  )}
+                </div>
+              )}
+            </div>
 
             {activeFiltersCount > 0 && (
               <button
