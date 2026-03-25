@@ -299,6 +299,7 @@ Gere a mensagem de follow-up:`,
           to: conv.contact_phone,
           message: followUpMessage,
           conversationId: conv.id,
+          senderLabel: "ia-follow-up",
         };
 
         if (conv.niche_id) {
