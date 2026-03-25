@@ -215,13 +215,15 @@ ${funnelStage.strategy}
 
 IMPORTANTE: A etapa do funil foi definida pelo fluxo de automação. Adapte 100% da sua abordagem a esta etapa específica.
 
+${template.trigger_condition ? `CONDIÇÃO DE ATIVAÇÃO DESTE FOLLOW-UP:\n${template.trigger_condition}\nUse esta condição como contexto adicional para entender POR QUE este follow-up está sendo enviado.` : ""}
+
 REGRAS:
 1. A mensagem DEVE ser natural, como se fosse de um humano real, não um robô.
 2. NÃO use saudações genéricas como "Olá, tudo bem?" ou "Boa tarde!".
 3. FAÇA referência ESPECÍFICA ao contexto da conversa — mencione o que o cliente falou, perguntou ou demonstrou interesse.
 4. Nível de urgência: ${template.escalation_level} de ${nicheTemplates.length} (1=suave e amigável, mais alto=mais direto/urgente com senso de escassez).
 5. Tentativa ${attemptsDone + 1} de ${template.max_attempts} para este nível.
-6. Objetivo deste follow-up: ${template.objective}
+6. Objetivo e instruções deste follow-up: ${template.objective}
 7. Use como base o modelo: "${template.message_template}" — mas ADAPTE COMPLETAMENTE ao contexto real da conversa.
 8. Mantenha a mensagem curta (máx 3-4 linhas).
 9. Use emojis com moderação (máx 2).
