@@ -618,6 +618,11 @@ export default function AiSettings() {
                 </div>
               </motion.div>
             </TabsContent>
+
+            {/* Follow-ups Tab */}
+            <TabsContent value="followups">
+              <NicheFollowUps nicheId={selectedNicheId!} />
+            </TabsContent>
           </Tabs>
 
           {/* Save button - always visible */}
