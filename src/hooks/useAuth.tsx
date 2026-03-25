@@ -65,20 +65,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      async (event, session) => {
         if (!mounted) return;
         setSession(session);
         if (session?.user) {
-          setLoading(true);
-          setTimeout(async () => {
-            if (mounted) {
-              await fetchUserMeta(session.user.id);
-              if (mounted) setLoading(false);
-            }
-          }, 0);
+          if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+            if (mounted) setLoading(true);
+            await fetchUserMeta(session.user.id);
+            if (mounted) setLoading(false);
+            return;
+          }
+
+          void fetchUserMeta(session.user.id);
+          if (mounted) setLoading(false);
         } else {
           setRole(null);
           setIsApproved(false);
+          setLoading(false);
         }
       }
     );
