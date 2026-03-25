@@ -144,6 +144,7 @@ export default function NicheFollowUps({ nicheId }: NicheFollowUpsProps) {
       niche_id: nicheId,
       sort_order: newLevel,
       funnel_stage: stage,
+      trigger_condition: '',
     }]);
   };
 
