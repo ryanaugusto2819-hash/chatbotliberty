@@ -69,6 +69,22 @@ serve(async (req) => {
       .select("*, automation_flows(name, description)")
       .eq("conversation_id", conversation_id);
 
+    // Load full node details for each executed flow
+    const flowIds = [...new Set((flowExecs || []).map((fe: any) => fe.flow_id))];
+    let allFlowNodes: Record<string, any[]> = {};
+    if (flowIds.length > 0) {
+      const { data: nodes } = await supabase
+        .from("automation_nodes")
+        .select("flow_id, node_type, label, config, sort_order")
+        .in("flow_id", flowIds)
+        .order("sort_order", { ascending: true });
+
+      for (const node of (nodes || [])) {
+        if (!allFlowNodes[node.flow_id]) allFlowNodes[node.flow_id] = [];
+        allFlowNodes[node.flow_id].push(node);
+      }
+    }
+
     // Get niche info if available
     let nicheInfo = null;
     if (conversation.niche_id) {
