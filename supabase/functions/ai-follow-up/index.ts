@@ -13,6 +13,31 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
+/** Determine the lead's funnel stage based on message history */
+function determineFunnelStage(messages: any[]): { stage: string; label: string; description: string } {
+  if (!messages?.length) return { stage: "new", label: "Recebido", description: "Lead novo, sem interação" };
+
+  const customerMessages = messages.filter((m: any) => m.sender_type === "customer");
+  const outboundMessages = messages.filter((m: any) => m.sender_type !== "customer");
+  const customerRepliesAfterOutbound = customerMessages.filter((cm: any) => {
+    return outboundMessages.some((om: any) => new Date(cm.created_at) > new Date(om.created_at));
+  });
+
+  if (customerRepliesAfterOutbound.length >= 2) {
+    return { stage: "engaged", label: "Engajado", description: "Cliente respondeu 2+ vezes, demonstrando interesse ativo" };
+  }
+  if (customerRepliesAfterOutbound.length >= 1) {
+    return { stage: "responded", label: "Respondeu", description: "Cliente respondeu ao contato, mas ainda não engajou profundamente" };
+  }
+  if (outboundMessages.length > 0) {
+    return { stage: "contacted", label: "Contatado", description: "Sistema/agente já enviou mensagem, aguardando resposta do cliente" };
+  }
+  if (customerMessages.length > 0) {
+    return { stage: "received", label: "Recebido", description: "Lead iniciou contato mas ainda não recebeu resposta completa" };
+  }
+  return { stage: "new", label: "Recebido", description: "Lead novo, sem interação" };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -43,11 +68,22 @@ Deno.serve(async (req) => {
       return jsonResponse({ processed: 0, reason: "No active templates" });
     }
 
-    // Find conversations with no customer response in the last N hours
-    // Get conversations that are NOT resolved
+    // Get niche data for system prompts & knowledge base
+    const nicheIds = [...new Set(templates.map((t: any) => t.niche_id).filter(Boolean))];
+    const { data: nichesData } = nicheIds.length
+      ? await supabase.from("niches").select("id, name, system_prompt").in("id", nicheIds)
+      : { data: [] };
+    const nichesMap = new Map((nichesData || []).map((n: any) => [n.id, n]));
+
+    // Get knowledge base items for context
+    const { data: kbItems } = nicheIds.length
+      ? await supabase.from("knowledge_base_items").select("title, content, niche_id").in("niche_id", nicheIds).limit(50)
+      : { data: [] };
+
+    // Find conversations that are NOT resolved
     const { data: conversations } = await supabase
       .from("conversations")
-      .select("id, contact_name, contact_phone, niche_id, status, updated_at")
+      .select("id, contact_name, contact_phone, niche_id, status, updated_at, tags, ad_title")
       .neq("status", "resolved");
 
     if (!conversations?.length) {
@@ -58,13 +94,13 @@ Deno.serve(async (req) => {
     let totalSkipped = 0;
 
     for (const conv of conversations) {
-      // Get last message
+      // Get more messages for richer context (up to 30)
       const { data: lastMessages } = await supabase
         .from("messages")
-        .select("sender_type, created_at, content, message_type")
+        .select("sender_type, created_at, content, message_type, media_url")
         .eq("conversation_id", conv.id)
         .order("created_at", { ascending: false })
-        .limit(10);
+        .limit(30);
 
       if (!lastMessages?.length) continue;
 
@@ -75,6 +111,10 @@ Deno.serve(async (req) => {
       const lastMsgTime = new Date(lastMsg.created_at);
       const hoursSinceLastMsg = (now.getTime() - lastMsgTime.getTime()) / (1000 * 60 * 60);
 
+      // Determine funnel stage
+      const allMsgsChronological = [...lastMessages].reverse();
+      const funnelStage = determineFunnelStage(allMsgsChronological);
+
       // Get existing follow-up executions for this conversation
       const { data: existingExecs } = await supabase
         .from("follow_up_executions")
@@ -82,10 +122,12 @@ Deno.serve(async (req) => {
         .eq("conversation_id", conv.id)
         .order("created_at", { ascending: false });
 
-      // Find the right template based on escalation
+      // Find the right template based on niche
       const nicheTemplates = templates.filter(
-        (t: any) => !t.niche_id || t.niche_id === conv.niche_id
+        (t: any) => t.niche_id === conv.niche_id
       );
+
+      if (!nicheTemplates.length) continue;
 
       for (const template of nicheTemplates) {
         // Check active hours
@@ -116,7 +158,6 @@ Deno.serve(async (req) => {
             (m: any) => m.sender_type === "customer"
           );
           if (customerMsgAfterFollowUp) {
-            // Mark as responded
             await supabase
               .from("follow_up_executions")
               .update({ status: "responded", responded_at: now.toISOString() })
@@ -127,20 +168,60 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Build context from last messages
-        const recentMessages = lastMessages
-          .reverse()
+        // Build rich context from conversation history
+        const recentMessages = allMsgsChronological
           .map((m: any) => {
             let content = m.content || "";
             if (!content.trim()) {
               const labels: Record<string, string> = {
-                image: "[Imagem]", video: "[Vídeo]", audio: "[Áudio]",
+                image: "[Imagem enviada]", video: "[Vídeo enviado]", audio: "[Áudio enviado]",
+                document: "[Documento enviado]", sticker: "[Sticker]",
               };
               content = labels[m.message_type] || "[Mídia]";
             }
-            return `${m.sender_type === "customer" ? "Cliente" : "Agente"}: ${content}`;
+            const timestamp = new Date(m.created_at).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
+            return `[${timestamp}] ${m.sender_type === "customer" ? "Cliente" : "Agente"}: ${content}`;
           })
           .join("\n");
+
+        // Get niche-specific knowledge base
+        const nicheKb = (kbItems || []).filter((k: any) => k.niche_id === conv.niche_id);
+        const kbContext = nicheKb.length
+          ? `\n\nBASE DE CONHECIMENTO DO NICHO:\n${nicheKb.map((k: any) => `- ${k.title}: ${k.content.substring(0, 300)}`).join("\n")}`
+          : "";
+
+        // Get niche info
+        const nicheInfo = conv.niche_id ? nichesMap.get(conv.niche_id) : null;
+
+        // Build comprehensive system prompt
+        const systemPrompt = `Você é um especialista em follow-up de vendas via WhatsApp. Gere uma mensagem de follow-up altamente personalizada com base no CONTEXTO COMPLETO da conversa e na ETAPA DO FUNIL em que o lead se encontra.
+
+${nicheInfo ? `NICHO: ${nicheInfo.name}\nCONTEXTO DO NEGÓCIO: ${nicheInfo.system_prompt}` : ""}
+${kbContext}
+
+ETAPA DO FUNIL DO LEAD: ${funnelStage.label} (${funnelStage.stage})
+${funnelStage.description}
+
+ESTRATÉGIA POR ETAPA DO FUNIL:
+- Recebido: O lead acabou de chegar. Seja acolhedor, demonstre que viu o interesse dele e faça uma pergunta aberta para iniciar o diálogo.
+- Contatado: Já houve contato mas sem resposta. Reforce o valor, crie curiosidade ou senso de oportunidade. Não repita a mesma abordagem.
+- Respondeu: O lead respondeu uma vez. Aprofunde o interesse, faça perguntas direcionadas, ofereça mais informações relevantes.
+- Engajado: Lead ativo na conversa. Conduza para o próximo passo concreto (agendamento, proposta, link de pagamento). Seja mais direto.
+
+REGRAS:
+1. A mensagem DEVE ser natural, como se fosse de um humano real, não um robô.
+2. NÃO use saudações genéricas como "Olá, tudo bem?" ou "Boa tarde!".
+3. FAÇA referência ESPECÍFICA ao contexto da conversa — mencione o que o cliente falou, perguntou ou demonstrou interesse.
+4. Nível de urgência: ${template.escalation_level} de ${nicheTemplates.length} (1=suave e amigável, mais alto=mais direto/urgente com senso de escassez).
+5. Tentativa ${attemptsDone + 1} de ${template.max_attempts} para este nível.
+6. Objetivo deste follow-up: ${template.objective}
+7. Use como base o modelo: "${template.message_template}" — mas ADAPTE COMPLETAMENTE ao contexto real da conversa.
+8. Mantenha a mensagem curta (máx 3-4 linhas).
+9. Use emojis com moderação (máx 2).
+10. NUNCA mencione que é um robô, IA ou sistema automatizado.
+11. Se o lead mencionou um produto/serviço específico, FOQUE nele.
+12. ${conv.ad_title ? `O lead veio do anúncio: "${conv.ad_title}". Use isso como contexto se relevante.` : ""}
+13. ${(conv.tags || []).length > 0 ? `Tags do contato: ${conv.tags!.join(", ")}. Podem indicar interesses ou estágio.` : ""}`;
 
         // Use AI to generate personalized follow-up
         const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -152,26 +233,15 @@ Deno.serve(async (req) => {
           body: JSON.stringify({
             model: "google/gemini-3-flash-preview",
             messages: [
-              {
-                role: "system",
-                content: `Você é um especialista em follow-up de vendas via WhatsApp. Gere uma mensagem de follow-up personalizada.
-
-REGRAS:
-1. A mensagem deve ser natural, como se fosse de um humano.
-2. Não use saudações genéricas como "Olá, tudo bem?".
-3. Faça referência ao contexto da conversa anterior.
-4. Nível de urgência atual: ${template.escalation_level} de ${nicheTemplates.length} (1=suave, mais alto=mais direto/urgente).
-5. Tentativa ${attemptsDone + 1} de ${template.max_attempts}.
-6. O objetivo deste follow-up é: ${template.objective}
-7. Use como base o modelo: "${template.message_template}" mas adapte ao contexto.
-8. Mantenha a mensagem curta (máx 3 linhas).
-9. Use emojis com moderação.
-10. NUNCA mencione que é um robô ou IA.`,
-              },
+              { role: "system", content: systemPrompt },
               {
                 role: "user",
                 content: `Nome do cliente: ${conv.contact_name}
-Conversa recente:
+Etapa do funil: ${funnelStage.label}
+Horas sem resposta: ${Math.round(hoursSinceLastMsg)}h
+Status da conversa: ${conv.status}
+
+HISTÓRICO COMPLETO DA CONVERSA:
 ${recentMessages}
 
 Gere a mensagem de follow-up:`,
@@ -216,7 +286,7 @@ Gere a mensagem de follow-up:`,
 
         // Determine which send function to use based on niche connection
         let sendFunction = "whatsapp-send";
-        let sendBody: Record<string, unknown> = {
+        const sendBody: Record<string, unknown> = {
           to: conv.contact_phone,
           message: followUpMessage,
           conversationId: conv.id,
@@ -264,7 +334,7 @@ Gere a mensagem de follow-up:`,
             .eq("attempt_number", attemptsDone + 1);
 
           totalSent++;
-          console.log(`Follow-up sent to ${conv.contact_name} (template: ${template.name}, attempt: ${attemptsDone + 1})`);
+          console.log(`Follow-up sent to ${conv.contact_name} (template: ${template.name}, attempt: ${attemptsDone + 1}, funnel: ${funnelStage.label})`);
         } else {
           console.error(`Failed to send follow-up to ${conv.contact_name}:`, await sendResp.text());
         }
