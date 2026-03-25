@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TopBar from '@/components/layout/TopBar';
 import StatusBadge from '@/components/shared/StatusBadge';
@@ -95,7 +95,8 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
   const [allConnections, setAllConnections] = useState<ConnectionInfo[]>([]);
   const [connectionMap, setConnectionMap] = useState<ConnectionMap>({});
   const [contactTagMap, setContactTagMap] = useState<Record<string, TagOption[]>>({});
-  const [showFilters, setShowFilters] = useState(false);
+  const [showConnectionDropdown, setShowConnectionDropdown] = useState(false);
+  const connectionDropdownRef = useRef<HTMLDivElement>(null);
 
   const fetchTags = async () => {
     const { data } = await supabase.from('tags').select('id, name, color');
@@ -180,6 +181,16 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
       if (debounceTimer) clearTimeout(debounceTimer);
       supabase.removeChannel(channel);
     };
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (connectionDropdownRef.current && !connectionDropdownRef.current.contains(e.target as Node)) {
+        setShowConnectionDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const getConversationConnection = (connConfigId: string | null): ConnectionInfo | null => {
@@ -297,9 +308,9 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
               ))}
             </select>
 
-            <div className="relative shrink-0">
+            <div className="relative shrink-0" ref={connectionDropdownRef}>
               <button
-                onClick={() => setShowFilters(!showFilters)}
+                onClick={() => setShowConnectionDropdown(!showConnectionDropdown)}
                 className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-medium transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring ${
                   selectedConnections.length > 0
                     ? 'border-primary bg-primary/10 text-primary'
@@ -309,8 +320,8 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
                 <Wifi className="h-3 w-3" />
                 {selectedConnections.length > 0 ? `${selectedConnections.length} conexão(ões)` : 'Conexão'}
               </button>
-              {showFilters && (
-                <div className="absolute top-full mt-1 left-0 z-50 min-w-[200px] rounded-lg border border-border bg-card shadow-lg p-2 space-y-1">
+              {showConnectionDropdown && (
+                <div className="absolute top-full mt-1 left-0 z-50 min-w-[220px] rounded-lg border border-border bg-card shadow-lg p-2 space-y-1">
                   {allConnections.map((c) => {
                     const isChecked = selectedConnections.includes(c.id);
                     return (
