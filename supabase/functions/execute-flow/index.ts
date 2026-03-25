@@ -623,7 +623,7 @@ Deno.serve(async (req) => {
           message_type: failedType,
           media_url: failedMediaUrl,
           status: "failed",
-          sender_label: "fluxo",
+          sender_label: requestedLabel || "fluxo",
         });
 
         if (executionId) {
