@@ -336,85 +336,122 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
 
             <div className="h-5 w-px bg-border mx-1 shrink-0" />
 
-            <select
-              value={selectedTag}
-              onChange={(e) => setSelectedTag(e.target.value)}
-              className={`shrink-0 rounded-lg border px-2.5 py-2 text-xs font-medium transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring ${
-                selectedTag !== 'all'
-                  ? 'border-primary bg-primary/10 text-primary'
-                  : 'border-input bg-secondary text-secondary-foreground'
-              }`}
-            >
-              <option value="all">🏷️ Etiqueta</option>
-              {tags.map((t) => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
-            </select>
-
-            <select
-              value={selectedAgent}
-              onChange={(e) => setSelectedAgent(e.target.value)}
-              className={`shrink-0 rounded-lg border px-2.5 py-2 text-xs font-medium transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring ${
-                selectedAgent !== 'all'
-                  ? 'border-primary bg-primary/10 text-primary'
-                  : 'border-input bg-secondary text-secondary-foreground'
-              }`}
-            >
-              <option value="all">👤 Agente</option>
-              {agents.map((a) => (
-                <option key={a.id} value={a.id}>{a.full_name}</option>
-              ))}
-            </select>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
+            <Popover>
+              <PopoverTrigger asChild>
                 <button
-                  className={`shrink-0 flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-ring ${
-                    selectedConnections.length > 0
-                      ? 'border-primary bg-primary/10 text-primary'
-                      : 'border-input bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                  className={`shrink-0 flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
+                    activeFiltersCount > 0
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
                   }`}
                 >
-                  <Wifi className="h-3 w-3" />
-                  <span>{selectedConnections.length > 0 ? `${selectedConnections.length} conexão(ões)` : 'Conexão'}</span>
-                  <ChevronDown className="h-3 w-3" />
+                  <SlidersHorizontal className="h-3.5 w-3.5" />
+                  Filtros
+                  {activeFiltersCount > 0 && (
+                    <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary-foreground/20 text-[10px] font-bold">
+                      {activeFiltersCount}
+                    </span>
+                  )}
                 </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" side="bottom" className="w-64">
-                <DropdownMenuLabel>Filtrar por conexão</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {allConnections.length > 0 ? allConnections.map((c) => {
-                  const isChecked = selectedConnections.includes(c.id);
-                  return (
-                    <DropdownMenuCheckboxItem
-                      key={c.id}
-                      checked={isChecked}
-                      onSelect={(e) => e.preventDefault()}
-                      onCheckedChange={(checked) => {
-                        setSelectedConnections((prev) => {
-                          if (checked) return prev.includes(c.id) ? prev : [...prev, c.id];
-                          return prev.filter((id) => id !== c.id);
-                        });
-                      }}
-                      className="text-xs"
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-72 p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-foreground">Filtros avançados</p>
+                  {activeFiltersCount > 0 && (
+                    <button
+                      onClick={clearFilters}
+                      className="flex items-center gap-1 text-xs font-medium text-destructive hover:text-destructive/80 transition-colors"
                     >
-                      {c.label} ({c.connection_id === 'whatsapp' ? 'Meta' : 'Z-API'})
-                    </DropdownMenuCheckboxItem>
-                  );
-                }) : (
-                  <div className="px-2 py-1.5 text-xs text-muted-foreground">Nenhuma conexão ativa</div>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                      <X className="h-3 w-3" /> Limpar
+                    </button>
+                  )}
+                </div>
 
-            {activeFiltersCount > 0 && (
-              <button
-                onClick={clearFilters}
-                className="shrink-0 flex items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors"
-              >
-                <X className="h-3 w-3" /> Limpar
-              </button>
-            )}
+                {/* Status */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">Status</label>
+                  <select
+                    value={activeFilter === 'all' || activeFilter === 'last_customer' ? 'all' : activeFilter}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val !== 'all') setActiveFilter(val);
+                    }}
+                    className="w-full rounded-lg border border-input bg-background px-2.5 py-2 text-xs font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="all">Todos os status</option>
+                    <option value="new">Novos</option>
+                    <option value="pending">Pendentes</option>
+                    <option value="active">Em atendimento</option>
+                  </select>
+                </div>
+
+                {/* Tag */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">Etiqueta</label>
+                  <select
+                    value={selectedTag}
+                    onChange={(e) => setSelectedTag(e.target.value)}
+                    className={`w-full rounded-lg border px-2.5 py-2 text-xs font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring ${
+                      selectedTag !== 'all'
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-input bg-background text-foreground'
+                    }`}
+                  >
+                    <option value="all">Todas as etiquetas</option>
+                    {tags.map((t) => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Agent */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">Agente</label>
+                  <select
+                    value={selectedAgent}
+                    onChange={(e) => setSelectedAgent(e.target.value)}
+                    className={`w-full rounded-lg border px-2.5 py-2 text-xs font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring ${
+                      selectedAgent !== 'all'
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-input bg-background text-foreground'
+                    }`}
+                  >
+                    <option value="all">Todos os agentes</option>
+                    {agents.map((a) => (
+                      <option key={a.id} value={a.id}>{a.full_name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Connection */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">Conexão</label>
+                  <div className="space-y-1 max-h-40 overflow-y-auto">
+                    {allConnections.length > 0 ? allConnections.map((c) => {
+                      const isChecked = selectedConnections.includes(c.id);
+                      return (
+                        <label key={c.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-secondary/60 cursor-pointer transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              setSelectedConnections((prev) => {
+                                if (e.target.checked) return [...prev, c.id];
+                                return prev.filter((id) => id !== c.id);
+                              });
+                            }}
+                            className="rounded border-input text-primary focus:ring-ring h-3.5 w-3.5"
+                          />
+                          <span className="text-xs text-foreground">{c.label} ({c.connection_id === 'whatsapp' ? 'Meta' : 'Z-API'})</span>
+                        </label>
+                      );
+                    }) : (
+                      <p className="text-xs text-muted-foreground px-2 py-1">Nenhuma conexão ativa</p>
+                    )}
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
 
