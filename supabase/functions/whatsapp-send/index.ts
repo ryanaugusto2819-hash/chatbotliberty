@@ -12,7 +12,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { conversationId, message, type = "text" } = await req.json();
+    const { conversationId, message, type = "text", senderAgentId = null } = await req.json();
 
     if (!conversationId || !message) {
       return new Response(
