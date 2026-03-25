@@ -690,7 +690,7 @@ Deno.serve(async (req) => {
         status: providerMessageId ? "pending" : "sent",
         provider_message_id: providerMessageId,
         provider_status: providerMessageId ? "accepted" : null,
-        sender_label: "fluxo",
+        sender_label: requestedLabel || "fluxo",
       });
 
       if (messageInsertError) {
