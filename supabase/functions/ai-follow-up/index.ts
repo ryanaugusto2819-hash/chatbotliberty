@@ -177,6 +177,7 @@ Deno.serve(async (req) => {
         }
 
         // Build rich context from conversation history
+        const allMsgsChronological = [...lastMessages].reverse();
         const recentMessages = allMsgsChronological
           .map((m: any) => {
             let content = m.content || "";
