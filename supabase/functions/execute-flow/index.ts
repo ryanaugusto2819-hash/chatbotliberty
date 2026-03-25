@@ -462,6 +462,34 @@ Deno.serve(async (req) => {
             text: { body: content + buttonText },
           };
         }
+      } else if (node.node_type === "action") {
+        // Handle action nodes internally (no message sending)
+        const actionType = config.action_type as string;
+        
+        if (actionType === "set_funnel_stage") {
+          const stage = (config.funnel_stage as string) || "etapa_1";
+          await supabase
+            .from("conversations")
+            .update({ funnel_stage: stage })
+            .eq("id", conversationId);
+          
+          console.log(`[execute-flow] Set funnel stage to "${stage}" for conversation ${conversationId}`);
+        }
+        // Other action types (add_tag, remove_tag, transfer_agent, webhook) can be handled here too
+        
+        if (executionId) {
+          await supabase.from("flow_step_logs").insert({
+            execution_id: executionId,
+            node_id: node.id,
+            node_type: node.node_type,
+            node_label: node.label || "Ação",
+            sort_order: node.sort_order,
+            status: "completed",
+          });
+        }
+        completedCount++;
+        results.push({ nodeId: node.id, status: `action_${actionType}` });
+        continue;
       } else {
         if (executionId) {
           await supabase.from("flow_step_logs").insert({

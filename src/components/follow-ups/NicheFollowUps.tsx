@@ -20,11 +20,10 @@ import {
 } from '@/components/ui/alert-dialog';
 
 const FUNNEL_STAGES = [
-  { value: 'new', label: 'Recebido', description: 'Lead novo, sem interação', color: 'bg-muted text-muted-foreground' },
-  { value: 'received', label: 'Recebido (iniciou)', description: 'Lead iniciou contato', color: 'bg-blue-500/10 text-blue-500' },
-  { value: 'contacted', label: 'Contatado', description: 'Aguardando resposta do cliente', color: 'bg-yellow-500/10 text-yellow-500' },
-  { value: 'responded', label: 'Respondeu', description: 'Cliente respondeu ao contato', color: 'bg-orange-500/10 text-orange-500' },
-  { value: 'engaged', label: 'Engajado', description: 'Cliente respondeu 2+ vezes', color: 'bg-green-500/10 text-green-500' },
+  { value: 'etapa_1', label: 'Etapa 1', description: 'Início do funil — primeiro contato', color: 'bg-blue-500/10 text-blue-500' },
+  { value: 'etapa_2', label: 'Etapa 2', description: 'Recebeu informações/preços', color: 'bg-yellow-500/10 text-yellow-500' },
+  { value: 'etapa_3', label: 'Etapa 3', description: 'Negociação / demonstrou intenção', color: 'bg-orange-500/10 text-orange-500' },
+  { value: 'etapa_4', label: 'Etapa 4', description: 'Aguardando pagamento / fechamento', color: 'bg-green-500/10 text-green-500' },
   { value: 'all', label: 'Todas as etapas', description: 'Aplica em qualquer etapa do funil', color: 'bg-primary/10 text-primary' },
 ] as const;
 
@@ -207,7 +206,7 @@ export default function NicheFollowUps({ nicheId }: NicheFollowUpsProps) {
           </div>
 
           {/* Funnel stages visual */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {FUNNEL_STAGES.filter(s => s.value !== 'all').map(stage => {
               const count = templates.filter(t => t.funnel_stage === stage.value).length;
               return (
@@ -227,7 +226,7 @@ export default function NicheFollowUps({ nicheId }: NicheFollowUpsProps) {
           </div>
 
           {templates.map((t, i) => {
-            const stageInfo = FUNNEL_STAGES.find(s => s.value === t.funnel_stage) || FUNNEL_STAGES[5];
+            const stageInfo = FUNNEL_STAGES.find(s => s.value === t.funnel_stage) || FUNNEL_STAGES[4];
             return (
             <motion.div key={t.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
               <Card className={`border ${t.is_active ? 'border-primary/30' : 'border-muted opacity-60'}`}>
