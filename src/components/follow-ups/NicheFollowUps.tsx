@@ -382,13 +382,16 @@ export default function NicheFollowUps({ nicheId }: NicheFollowUpsProps) {
                   </div>
                   <div>
                     <label className="text-sm font-medium flex items-center gap-2 mb-1">
-                      <Target className="h-4 w-4 text-primary" /> Objetivo do Follow-up
+                      <Target className="h-4 w-4 text-primary" /> Objetivo & Instruções para a IA
                     </label>
+                    <p className="text-[11px] text-muted-foreground mb-1.5">
+                      Descreva o objetivo do follow-up e dê contexto e instruções para a IA gerar a mensagem. Quanto mais detalhes, melhor a mensagem gerada.
+                    </p>
                     <Textarea
                       value={t.objective}
                       onChange={e => updateTemplate(t.id, 'objective', e.target.value)}
-                      placeholder="Ex: Reengajar o cliente que demonstrou interesse no produto X"
-                      rows={2}
+                      placeholder="Ex: Cobrar o pagamento da receita que eu enviei para ele. O Valor da Receita é de R$19.90. Eu já enviei todas as informações de pagamento para ele. Seja direto mas educado, mencione o valor e pergunte se precisa de ajuda."
+                      rows={4}
                     />
                   </div>
                   <div>
