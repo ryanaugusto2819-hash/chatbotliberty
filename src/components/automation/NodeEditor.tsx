@@ -15,6 +15,7 @@ interface NodeEditorProps {
   nodeType: string;
   label: string;
   config: NodeConfig;
+  nicheId?: string | null;
   onSave: (nodeId: string, label: string, config: NodeConfig) => void;
   onDelete: (nodeId: string) => void;
   onClose: () => void;
@@ -42,7 +43,7 @@ const conditionFields = [
   { value: 'tag', label: 'Tag' },
 ];
 
-export default function NodeEditor({ nodeId, nodeType, label, config, onSave, onDelete, onClose }: NodeEditorProps) {
+export default function NodeEditor({ nodeId, nodeType, label, config, nicheId, onSave, onDelete, onClose }: NodeEditorProps) {
   const [editLabel, setEditLabel] = useState(label);
   const [editConfig, setEditConfig] = useState<NodeConfig>(config);
   const [uploading, setUploading] = useState(false);
@@ -50,6 +51,8 @@ export default function NodeEditor({ nodeId, nodeType, label, config, onSave, on
   const [newKeyword, setNewKeyword] = useState('');
   const [connections, setConnections] = useState<any[]>([]);
   const [availableTags, setAvailableTags] = useState<any[]>([]);
+  const [agents, setAgents] = useState<any[]>([]);
+  const [funnelStages, setFunnelStages] = useState<any[]>([]);
   const [agents, setAgents] = useState<any[]>([]);
 
   // Load connections, tags, agents as needed
@@ -63,6 +66,10 @@ export default function NodeEditor({ nodeId, nodeType, label, config, onSave, on
         .then(({ data }) => { if (data) setAvailableTags(data); });
       supabase.from('profiles').select('id, full_name')
         .then(({ data }) => { if (data) setAgents(data); });
+      if (nicheId) {
+        supabase.from('niche_funnel_stages').select('*').eq('niche_id', nicheId).order('sort_order')
+          .then(({ data }) => { if (data) setFunnelStages(data); });
+      }
     }
   }, [nodeType]);
   // Reset state when nodeId changes
