@@ -40,7 +40,8 @@ const defaultConversationFilters: PersistedConversationFilters = {
 const getStoredConversationFilters = (): PersistedConversationFilters => {
   if (typeof window === 'undefined') return defaultConversationFilters;
 
-  const stored = window.sessionStorage.getItem(CONVERSATIONS_FILTERS_STORAGE_KEY);
+  const stored = window.localStorage.getItem(CONVERSATIONS_FILTERS_STORAGE_KEY)
+    ?? window.sessionStorage.getItem(CONVERSATIONS_FILTERS_STORAGE_KEY);
   if (!stored) return defaultConversationFilters;
 
   try {
@@ -234,16 +235,19 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
+    const serializedFilters = JSON.stringify({
+      search,
+      activeFilter,
+      selectedTag,
+      selectedAgent,
+      selectedConnections,
+      onlyUnread,
+    } satisfies PersistedConversationFilters);
+
+    window.localStorage.setItem(CONVERSATIONS_FILTERS_STORAGE_KEY, serializedFilters);
     window.sessionStorage.setItem(
       CONVERSATIONS_FILTERS_STORAGE_KEY,
-      JSON.stringify({
-        search,
-        activeFilter,
-        selectedTag,
-        selectedAgent,
-        selectedConnections,
-        onlyUnread,
-      } satisfies PersistedConversationFilters)
+      serializedFilters
     );
   }, [search, activeFilter, selectedTag, selectedAgent, selectedConnections, onlyUnread]);
 
