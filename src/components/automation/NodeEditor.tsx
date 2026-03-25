@@ -53,7 +53,6 @@ export default function NodeEditor({ nodeId, nodeType, label, config, nicheId, o
   const [availableTags, setAvailableTags] = useState<any[]>([]);
   const [agents, setAgents] = useState<any[]>([]);
   const [funnelStages, setFunnelStages] = useState<any[]>([]);
-  const [agents, setAgents] = useState<any[]>([]);
 
   // Load connections, tags, agents as needed
   useEffect(() => {
