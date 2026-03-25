@@ -69,6 +69,22 @@ serve(async (req) => {
       .select("*, automation_flows(name, description)")
       .eq("conversation_id", conversation_id);
 
+    // Load full node details for each executed flow
+    const flowIds = [...new Set((flowExecs || []).map((fe: any) => fe.flow_id))];
+    let allFlowNodes: Record<string, any[]> = {};
+    if (flowIds.length > 0) {
+      const { data: nodes } = await supabase
+        .from("automation_nodes")
+        .select("flow_id, node_type, label, config, sort_order")
+        .in("flow_id", flowIds)
+        .order("sort_order", { ascending: true });
+
+      for (const node of (nodes || [])) {
+        if (!allFlowNodes[node.flow_id]) allFlowNodes[node.flow_id] = [];
+        allFlowNodes[node.flow_id].push(node);
+      }
+    }
+
     // Get niche info if available
     let nicheInfo = null;
     if (conversation.niche_id) {
@@ -137,8 +153,27 @@ serve(async (req) => {
     const flowSummary = (flowExecs || []).map((fe: any) => {
       const flowName = fe.automation_flows?.name || "Desconhecido";
       const flowDesc = fe.automation_flows?.description || "Sem descrição";
-      return `- Fluxo "${flowName}" (${flowDesc}) — Status: ${fe.status}, Nós completados: ${fe.completed_nodes}/${fe.total_nodes}`;
-    }).join("\n");
+      const nodes = allFlowNodes[fe.flow_id] || [];
+      
+      const nodesDetail = nodes.map((n: any, i: number) => {
+        const cfg = n.config || {};
+        let detail = `  ${i + 1}. [${n.node_type}] ${n.label}`;
+        if (n.node_type === 'message' && cfg.text) detail += ` — Texto: "${cfg.text}"`;
+        if (n.node_type === 'audio' && cfg.audioUrl) detail += ` — Áudio: ${cfg.audioUrl}`;
+        if (n.node_type === 'image' && cfg.imageUrl) detail += ` — Imagem: ${cfg.imageUrl}`;
+        if (n.node_type === 'image' && cfg.caption) detail += ` (legenda: "${cfg.caption}")`;
+        if (n.node_type === 'video' && cfg.videoUrl) detail += ` — Vídeo: ${cfg.videoUrl}`;
+        if (n.node_type === 'video' && cfg.caption) detail += ` (legenda: "${cfg.caption}")`;
+        if (n.node_type === 'document' && cfg.documentUrl) detail += ` — Documento: ${cfg.documentUrl}`;
+        if (n.node_type === 'quick_reply' && cfg.text) detail += ` — Texto: "${cfg.text}"`;
+        if (n.node_type === 'quick_reply' && cfg.buttons) detail += ` — Botões: ${JSON.stringify(cfg.buttons)}`;
+        if (n.node_type === 'set_funnel_stage' && cfg.stage) detail += ` — Define etapa: ${cfg.stage}`;
+        if (n.node_type === 'delay' && cfg.seconds) detail += ` — Espera: ${cfg.seconds}s`;
+        return detail;
+      }).join("\n");
+
+      return `- Fluxo "${flowName}" (${flowDesc}) — Status: ${fe.status}, Nós completados: ${fe.completed_nodes}/${fe.total_nodes}\n  CONTEÚDO COMPLETO DO FLUXO:\n${nodesDetail}`;
+    }).join("\n\n");
 
     // Build criteria text
     const criteriaText = evalCriteria.length > 0
