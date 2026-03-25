@@ -548,6 +548,7 @@ export type Database = {
           created_at: string
           delay_hours: number
           escalation_level: number
+          funnel_stage: string
           id: string
           is_active: boolean
           max_attempts: number
@@ -564,6 +565,7 @@ export type Database = {
           created_at?: string
           delay_hours?: number
           escalation_level?: number
+          funnel_stage?: string
           id?: string
           is_active?: boolean
           max_attempts?: number
@@ -580,6 +582,7 @@ export type Database = {
           created_at?: string
           delay_hours?: number
           escalation_level?: number
+          funnel_stage?: string
           id?: string
           is_active?: boolean
           max_attempts?: number

@@ -1,0 +1,1 @@
+ALTER TABLE public.follow_up_templates ADD COLUMN funnel_stage text NOT NULL DEFAULT 'all';

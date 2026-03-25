@@ -130,6 +130,12 @@ Deno.serve(async (req) => {
       if (!nicheTemplates.length) continue;
 
       for (const template of nicheTemplates) {
+        // Check if template matches the lead's funnel stage
+        const templateStage = (template as any).funnel_stage || 'all';
+        if (templateStage !== 'all' && templateStage !== funnelStage.stage) {
+          continue;
+        }
+
         // Check active hours
         const normalizedHour = currentHour < 0 ? currentHour + 24 : currentHour;
         if (normalizedHour < template.active_hours_start || normalizedHour >= template.active_hours_end) {

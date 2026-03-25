@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import {
   Clock, Plus, Trash2, Save, Loader2, Play,
   MessageSquare, CheckCircle, XCircle, AlertTriangle,
-  TrendingUp, Timer, Target, Zap, ArrowUpRight, BarChart3,
+  TrendingUp, Timer, Target, Zap, ArrowUpRight, BarChart3, Filter,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
@@ -13,10 +13,20 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+
+const FUNNEL_STAGES = [
+  { value: 'new', label: 'Recebido', description: 'Lead novo, sem interação', color: 'bg-muted text-muted-foreground' },
+  { value: 'received', label: 'Recebido (iniciou)', description: 'Lead iniciou contato', color: 'bg-blue-500/10 text-blue-500' },
+  { value: 'contacted', label: 'Contatado', description: 'Aguardando resposta do cliente', color: 'bg-yellow-500/10 text-yellow-500' },
+  { value: 'responded', label: 'Respondeu', description: 'Cliente respondeu ao contato', color: 'bg-orange-500/10 text-orange-500' },
+  { value: 'engaged', label: 'Engajado', description: 'Cliente respondeu 2+ vezes', color: 'bg-green-500/10 text-green-500' },
+  { value: 'all', label: 'Todas as etapas', description: 'Aplica em qualquer etapa do funil', color: 'bg-primary/10 text-primary' },
+] as const;
 
 interface FollowUpTemplate {
   id: string;
@@ -31,6 +41,7 @@ interface FollowUpTemplate {
   is_active: boolean;
   niche_id: string | null;
   sort_order: number;
+  funnel_stage: string;
 }
 
 interface FollowUpExecution {
@@ -75,11 +86,12 @@ export default function NicheFollowUps({ nicheId }: NicheFollowUpsProps) {
     setLoading(false);
   };
 
-  const addTemplate = () => {
+  const addTemplate = (stage: string = 'all') => {
     const newLevel = templates.length + 1;
+    const stageInfo = FUNNEL_STAGES.find(s => s.value === stage);
     setTemplates(prev => [...prev, {
       id: crypto.randomUUID(),
-      name: `Follow-up Nível ${newLevel}`,
+      name: `Follow-up ${stageInfo?.label || 'Nível ' + newLevel}`,
       objective: '',
       message_template: '',
       escalation_level: newLevel,
@@ -90,6 +102,7 @@ export default function NicheFollowUps({ nicheId }: NicheFollowUpsProps) {
       is_active: true,
       niche_id: nicheId,
       sort_order: newLevel,
+      funnel_stage: stage,
     }]);
   };
 
@@ -177,14 +190,14 @@ export default function NicheFollowUps({ nicheId }: NicheFollowUpsProps) {
         </div>
 
         {/* Templates Tab */}
-        <TabsContent value="templates" className="space-y-4">
+        <TabsContent value="templates" className="space-y-6">
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">
-              Configure os níveis de escalonamento para este nicho.
+              Configure follow-ups específicos para cada etapa do funil.
             </p>
             <div className="flex gap-2">
-              <button onClick={addTemplate} className="flex items-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-lg text-sm">
-                <Plus className="h-4 w-4" /> Novo Nível
+              <button onClick={() => addTemplate()} className="flex items-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-lg text-sm">
+                <Plus className="h-4 w-4" /> Novo Follow-up
               </button>
               <button onClick={saveTemplates} disabled={saving} className="flex items-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-lg text-sm">
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
@@ -193,12 +206,38 @@ export default function NicheFollowUps({ nicheId }: NicheFollowUpsProps) {
             </div>
           </div>
 
-          {templates.map((t, i) => (
+          {/* Funnel stages visual */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            {FUNNEL_STAGES.filter(s => s.value !== 'all').map(stage => {
+              const count = templates.filter(t => t.funnel_stage === stage.value).length;
+              return (
+                <button
+                  key={stage.value}
+                  onClick={() => addTemplate(stage.value)}
+                  className={`p-3 rounded-lg border border-border/50 text-left transition-all hover:border-primary/50 hover:shadow-sm`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <Badge className={stage.color} variant="outline">{stage.label}</Badge>
+                    <span className="text-xs text-muted-foreground">{count} template{count !== 1 ? 's' : ''}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">{stage.description}</p>
+                </button>
+              );
+            })}
+          </div>
+
+          {templates.map((t, i) => {
+            const stageInfo = FUNNEL_STAGES.find(s => s.value === t.funnel_stage) || FUNNEL_STAGES[5];
+            return (
             <motion.div key={t.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
               <Card className={`border ${t.is_active ? 'border-primary/30' : 'border-muted opacity-60'}`}>
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
+                      <Badge className={stageInfo.color} variant="outline">
+                        <Filter className="h-3 w-3 mr-1" />
+                        {stageInfo.label}
+                      </Badge>
                       <Badge variant={t.escalation_level === 1 ? 'secondary' : t.escalation_level === 2 ? 'default' : 'destructive'}>
                         Nível {t.escalation_level}
                       </Badge>
@@ -234,6 +273,21 @@ export default function NicheFollowUps({ nicheId }: NicheFollowUpsProps) {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium flex items-center gap-2 mb-1">
+                      <Filter className="h-4 w-4 text-primary" /> Etapa do Funil
+                    </label>
+                    <Select value={t.funnel_stage} onValueChange={v => updateTemplate(t.id, 'funnel_stage', v)}>
+                      <SelectTrigger className="w-full md:w-64">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {FUNNEL_STAGES.map(s => (
+                          <SelectItem key={s.value} value={s.value}>{s.label} — {s.description}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div>
                     <label className="text-sm font-medium flex items-center gap-2 mb-1">
                       <Target className="h-4 w-4 text-primary" /> Objetivo do Follow-up
@@ -285,13 +339,14 @@ export default function NicheFollowUps({ nicheId }: NicheFollowUpsProps) {
                 </CardContent>
               </Card>
             </motion.div>
-          ))}
+          )})}
 
           {templates.length === 0 && (
             <div className="text-center py-12 text-muted-foreground">
               <Clock className="h-12 w-12 mx-auto mb-3 opacity-50" />
               <p>Nenhum template de follow-up para este nicho.</p>
-              <button onClick={addTemplate} className="mt-3 text-primary underline">Criar primeiro template</button>
+              <p className="text-sm mt-1">Clique em uma etapa do funil acima para criar um template específico.</p>
+              <button onClick={() => addTemplate()} className="mt-3 text-primary underline">Ou crie um template genérico</button>
             </div>
           )}
         </TabsContent>
