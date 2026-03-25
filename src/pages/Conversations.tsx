@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TopBar from '@/components/layout/TopBar';
 import StatusBadge from '@/components/shared/StatusBadge';
@@ -95,7 +95,8 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
   const [allConnections, setAllConnections] = useState<ConnectionInfo[]>([]);
   const [connectionMap, setConnectionMap] = useState<ConnectionMap>({});
   const [contactTagMap, setContactTagMap] = useState<Record<string, TagOption[]>>({});
-  const [showFilters, setShowFilters] = useState(false);
+  const [showConnectionDropdown, setShowConnectionDropdown] = useState(false);
+  const connectionDropdownRef = useRef<HTMLDivElement>(null);
 
   const fetchTags = async () => {
     const { data } = await supabase.from('tags').select('id, name, color');
