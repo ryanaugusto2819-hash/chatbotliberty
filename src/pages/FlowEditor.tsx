@@ -539,6 +539,7 @@ export default function FlowEditor() {
             nodeType={selectedNode.data.nodeType as string}
             label={selectedNode.data.label as string}
             config={(selectedNode.data.config as Record<string, unknown>) || {}}
+            nicheId={flowNicheId}
             onSave={handleNodeSave}
             onDelete={handleNodeDelete}
             onClose={() => setSelectedNode(null)}
