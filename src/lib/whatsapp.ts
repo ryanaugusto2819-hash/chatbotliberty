@@ -29,7 +29,7 @@ export async function sendWhatsAppMessage(
   const functionName = zapiConnected ? "zapi-send" : "whatsapp-send";
 
   const { data, error } = await supabase.functions.invoke(functionName, {
-    body: { conversationId, message, senderAgentId },
+    body: { conversationId, message, senderAgentId, senderLabel: 'humano' },
   });
 
   if (error) throw error;
