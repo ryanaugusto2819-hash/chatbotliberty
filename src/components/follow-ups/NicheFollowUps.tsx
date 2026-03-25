@@ -52,6 +52,7 @@ interface FollowUpTemplate {
   niche_id: string | null;
   sort_order: number;
   funnel_stage: string;
+  trigger_condition: string;
 }
 
 interface FollowUpExecution {
@@ -143,6 +144,7 @@ export default function NicheFollowUps({ nicheId }: NicheFollowUpsProps) {
       niche_id: nicheId,
       sort_order: newLevel,
       funnel_stage: stage,
+      trigger_condition: '',
     }]);
   };
 
@@ -405,31 +407,54 @@ export default function NicheFollowUps({ nicheId }: NicheFollowUpsProps) {
                       rows={3}
                     />
                   </div>
+                  <div>
+                    <label className="text-sm font-medium flex items-center gap-2 mb-1">
+                      <Zap className="h-4 w-4 text-primary" /> Quando ativar este Follow-up?
+                    </label>
+                    <p className="text-[11px] text-muted-foreground mb-1.5">
+                      Descreva a condição ou situação em que a IA deve disparar este follow-up.
+                    </p>
+                    <Textarea
+                      value={t.trigger_condition || ''}
+                      onChange={e => updateTemplate(t.id, 'trigger_condition', e.target.value)}
+                      placeholder="Ex: Quando o cliente não responder após receber o valor do produto. Ou: Quando o cliente disse que iria pagar mas ainda não enviou o comprovante."
+                      rows={2}
+                    />
+                  </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
                       <label className="text-sm font-medium flex items-center gap-2 mb-1">
-                        <Timer className="h-4 w-4 text-primary" /> Atraso (horas)
+                        <Timer className="h-4 w-4 text-primary" /> Atraso entre Follow-ups
                       </label>
-                      <Input type="number" min={1} value={t.delay_hours} onChange={e => updateTemplate(t.id, 'delay_hours', parseInt(e.target.value) || 1)} />
+                      <div className="flex items-center gap-2">
+                        <Input type="number" min={1} value={t.delay_hours} onChange={e => updateTemplate(t.id, 'delay_hours', parseInt(e.target.value) || 1)} />
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">horas</span>
+                      </div>
                     </div>
                     <div>
                       <label className="text-sm font-medium flex items-center gap-2 mb-1">
-                        <Zap className="h-4 w-4 text-primary" /> Máx. Tentativas
+                        <ArrowUpRight className="h-4 w-4 text-primary" /> Quantos Follow-ups
                       </label>
                       <Input type="number" min={1} max={10} value={t.max_attempts} onChange={e => updateTemplate(t.id, 'max_attempts', parseInt(e.target.value) || 1)} />
                     </div>
                     <div>
-                      <label className="text-sm font-medium mb-1 block">Horário Início</label>
-                      <Input type="number" min={0} max={23} value={t.active_hours_start} onChange={e => updateTemplate(t.id, 'active_hours_start', parseInt(e.target.value) || 0)} />
+                      <label className="text-sm font-medium flex items-center gap-2 mb-1">
+                        <Clock className="h-4 w-4 text-primary" /> Horário Início
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <Input type="number" min={0} max={23} value={t.active_hours_start} onChange={e => updateTemplate(t.id, 'active_hours_start', parseInt(e.target.value) || 0)} />
+                        <span className="text-xs text-muted-foreground">h</span>
+                      </div>
                     </div>
                     <div>
-                      <label className="text-sm font-medium mb-1 block">Horário Fim</label>
-                      <Input type="number" min={0} max={23} value={t.active_hours_end} onChange={e => updateTemplate(t.id, 'active_hours_end', parseInt(e.target.value) || 23)} />
+                      <label className="text-sm font-medium flex items-center gap-2 mb-1">
+                        <Clock className="h-4 w-4 text-primary" /> Horário Fim
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <Input type="number" min={0} max={23} value={t.active_hours_end} onChange={e => updateTemplate(t.id, 'active_hours_end', parseInt(e.target.value) || 23)} />
+                        <span className="text-xs text-muted-foreground">h</span>
+                      </div>
                     </div>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium mb-1 block">Nível de Escalonamento</label>
-                    <Input type="number" min={1} value={t.escalation_level} onChange={e => updateTemplate(t.id, 'escalation_level', parseInt(e.target.value) || 1)} className="w-32" />
                   </div>
                 </CardContent>
               </Card>

@@ -560,6 +560,7 @@ export type Database = {
           niche_id: string | null
           objective: string
           sort_order: number
+          trigger_condition: string
           updated_at: string
         }
         Insert: {
@@ -577,6 +578,7 @@ export type Database = {
           niche_id?: string | null
           objective?: string
           sort_order?: number
+          trigger_condition?: string
           updated_at?: string
         }
         Update: {
@@ -594,6 +596,7 @@ export type Database = {
           niche_id?: string | null
           objective?: string
           sort_order?: number
+          trigger_condition?: string
           updated_at?: string
         }
         Relationships: [
