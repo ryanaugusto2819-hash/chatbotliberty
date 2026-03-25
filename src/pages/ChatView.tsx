@@ -374,21 +374,27 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
                   msg.status === 'failed' ? 'text-destructive/60' : msg.sender_type === 'agent' ? 'text-primary-foreground/60' : 'text-muted-foreground'
                 }`}>
                   {msg.sender_type === 'agent' && (
-                    <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-px text-[9px] font-semibold ${
-                      msg.sender_agent_id
-                        ? msg.status === 'failed'
-                          ? 'bg-destructive/10 text-destructive/70'
-                          : 'bg-primary-foreground/15 text-primary-foreground/70'
-                        : msg.status === 'failed'
-                          ? 'bg-destructive/10 text-destructive/70'
-                          : 'bg-primary-foreground/15 text-primary-foreground/70'
-                    }`}>
-                      {msg.sender_agent_id ? (
-                        <><UserRound className="h-2.5 w-2.5" /> Agente</>
-                      ) : (
-                        <><Bot className="h-2.5 w-2.5" /> IA</>
-                      )}
-                    </span>
+                    (() => {
+                      const label = msg.sender_label;
+                      const isHuman = label === 'humano' || (!label && msg.sender_agent_id);
+                      const displayLabel = label === 'ia-vendedora' ? 'IA Vendedora'
+                        : label === 'ia-follow-up' ? 'IA Follow-Up'
+                        : label === 'fluxo' ? 'Fluxo'
+                        : label === 'ia-seletora' ? 'IA Seletora'
+                        : isHuman ? 'Humano'
+                        : label ? label
+                        : 'IA';
+                      const Icon = isHuman ? UserRound : Bot;
+                      return (
+                        <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-px text-[9px] font-semibold ${
+                          msg.status === 'failed'
+                            ? 'bg-destructive/10 text-destructive/70'
+                            : 'bg-primary-foreground/15 text-primary-foreground/70'
+                        }`}>
+                          <Icon className="h-2.5 w-2.5" /> {displayLabel}
+                        </span>
+                      );
+                    })()
                   )}
                   <span className="text-[10px]">{format(new Date(msg.created_at), 'HH:mm')}</span>
                   {msg.sender_type === 'agent' && (
