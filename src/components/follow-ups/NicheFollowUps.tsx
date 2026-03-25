@@ -52,6 +52,7 @@ interface FollowUpTemplate {
   niche_id: string | null;
   sort_order: number;
   funnel_stage: string;
+  trigger_condition: string;
 }
 
 interface FollowUpExecution {
