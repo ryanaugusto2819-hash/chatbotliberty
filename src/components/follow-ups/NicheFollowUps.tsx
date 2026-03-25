@@ -19,13 +19,24 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 
-const FUNNEL_STAGES = [
-  { value: 'etapa_1', label: 'Etapa 1', description: 'Início do funil — primeiro contato', color: 'bg-blue-500/10 text-blue-500' },
-  { value: 'etapa_2', label: 'Etapa 2', description: 'Recebeu informações/preços', color: 'bg-yellow-500/10 text-yellow-500' },
-  { value: 'etapa_3', label: 'Etapa 3', description: 'Negociação / demonstrou intenção', color: 'bg-orange-500/10 text-orange-500' },
-  { value: 'etapa_4', label: 'Etapa 4', description: 'Aguardando pagamento / fechamento', color: 'bg-green-500/10 text-green-500' },
-  { value: 'all', label: 'Todas as etapas', description: 'Aplica em qualquer etapa do funil', color: 'bg-primary/10 text-primary' },
-] as const;
+const STAGE_COLORS = [
+  'bg-blue-500/10 text-blue-500',
+  'bg-yellow-500/10 text-yellow-500',
+  'bg-orange-500/10 text-orange-500',
+  'bg-green-500/10 text-green-500',
+  'bg-purple-500/10 text-purple-500',
+  'bg-pink-500/10 text-pink-500',
+];
+
+interface FunnelStage {
+  id: string;
+  stage_key: string;
+  label: string;
+  description: string;
+  strategy: string;
+  sort_order: number;
+  niche_id: string;
+}
 
 interface FollowUpTemplate {
   id: string;
