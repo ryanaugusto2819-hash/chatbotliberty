@@ -107,10 +107,10 @@ Deno.serve(async (req) => {
 
     const fullSystemPrompt = systemPrompt + knowledgeContext;
 
-    // Fetch last 20 messages
+    // Fetch last 20 messages (include media info for vision)
     const { data: messages } = await supabase
       .from("messages")
-      .select("content, sender_type, created_at")
+      .select("content, sender_type, created_at, message_type, media_url")
       .eq("conversation_id", conversationId)
       .order("created_at", { ascending: true })
       .limit(20);
@@ -119,13 +119,46 @@ Deno.serve(async (req) => {
       return jsonResponse({ skipped: true, reason: "No messages" });
     }
 
-    const chatMessages = [
+    // Build chat messages with multimodal support for images
+    const chatMessages: Array<{ role: string; content: unknown }> = [
       { role: "system", content: fullSystemPrompt },
-      ...messages.map((m) => ({
-        role: m.sender_type === "customer" ? "user" : "assistant",
-        content: m.content,
-      })),
     ];
+
+    for (const m of messages) {
+      const role = m.sender_type === "customer" ? "user" : "assistant";
+      const hasImage = m.message_type === "image" && m.media_url;
+
+      if (hasImage && role === "user") {
+        // Send image as multimodal content (vision) for customer messages
+        const parts: Array<{ type: string; text?: string; image_url?: { url: string } }> = [];
+
+        if (m.content?.trim()) {
+          parts.push({ type: "text", text: m.content });
+        } else {
+          parts.push({ type: "text", text: "O cliente enviou esta imagem:" });
+        }
+
+        parts.push({
+          type: "image_url",
+          image_url: { url: m.media_url },
+        });
+
+        chatMessages.push({ role, content: parts });
+      } else {
+        // Text-only message (or non-image media as text description)
+        let text = m.content || "";
+        if (!text.trim() && m.message_type !== "text") {
+          const labels: Record<string, string> = {
+            audio: "[Áudio enviado]",
+            video: "[Vídeo enviado]",
+            document: "[Documento enviado]",
+            sticker: "[Sticker enviado]",
+          };
+          text = labels[m.message_type] || "[Mídia enviada]";
+        }
+        chatMessages.push({ role, content: text });
+      }
+    }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
