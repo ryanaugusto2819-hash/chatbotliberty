@@ -19,13 +19,24 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 
-const FUNNEL_STAGES = [
-  { value: 'etapa_1', label: 'Etapa 1', description: 'Início do funil — primeiro contato', color: 'bg-blue-500/10 text-blue-500' },
-  { value: 'etapa_2', label: 'Etapa 2', description: 'Recebeu informações/preços', color: 'bg-yellow-500/10 text-yellow-500' },
-  { value: 'etapa_3', label: 'Etapa 3', description: 'Negociação / demonstrou intenção', color: 'bg-orange-500/10 text-orange-500' },
-  { value: 'etapa_4', label: 'Etapa 4', description: 'Aguardando pagamento / fechamento', color: 'bg-green-500/10 text-green-500' },
-  { value: 'all', label: 'Todas as etapas', description: 'Aplica em qualquer etapa do funil', color: 'bg-primary/10 text-primary' },
-] as const;
+const STAGE_COLORS = [
+  'bg-blue-500/10 text-blue-500',
+  'bg-yellow-500/10 text-yellow-500',
+  'bg-orange-500/10 text-orange-500',
+  'bg-green-500/10 text-green-500',
+  'bg-purple-500/10 text-purple-500',
+  'bg-pink-500/10 text-pink-500',
+];
+
+interface FunnelStage {
+  id: string;
+  stage_key: string;
+  label: string;
+  description: string;
+  strategy: string;
+  sort_order: number;
+  niche_id: string;
+}
 
 interface FollowUpTemplate {
   id: string;
@@ -63,9 +74,13 @@ interface NicheFollowUpsProps {
 export default function NicheFollowUps({ nicheId }: NicheFollowUpsProps) {
   const [templates, setTemplates] = useState<FollowUpTemplate[]>([]);
   const [executions, setExecutions] = useState<FollowUpExecution[]>([]);
+  const [stages, setStages] = useState<FunnelStage[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [running, setRunning] = useState(false);
+  const [newStageName, setNewStageName] = useState('');
+  const [newStageDesc, setNewStageDesc] = useState('');
+  const [newStageStrategy, setNewStageStrategy] = useState('');
 
   useEffect(() => {
     fetchAll();
@@ -73,21 +88,47 @@ export default function NicheFollowUps({ nicheId }: NicheFollowUpsProps) {
 
   const fetchAll = async () => {
     setLoading(true);
-    const [tRes, eRes] = await Promise.all([
+    const [tRes, eRes, sRes] = await Promise.all([
       supabase.from('follow_up_templates').select('*').eq('niche_id', nicheId).order('escalation_level'),
       supabase.from('follow_up_executions').select('*').order('created_at', { ascending: false }).limit(200),
+      supabase.from('niche_funnel_stages').select('*').eq('niche_id', nicheId).order('sort_order'),
     ]);
     const tplList = (tRes.data || []) as FollowUpTemplate[];
     setTemplates(tplList);
-    // Filter executions to only those belonging to this niche's templates
+    setStages((sRes.data || []) as FunnelStage[]);
     const tplIds = new Set(tplList.map(t => t.id));
     setExecutions(((eRes.data || []) as FollowUpExecution[]).filter(e => tplIds.has(e.template_id)));
     setLoading(false);
   };
 
+  const addStage = async () => {
+    if (!newStageName.trim()) return;
+    const stageKey = `stage_${Date.now()}`;
+    const { data, error } = await supabase.from('niche_funnel_stages').insert({
+      niche_id: nicheId,
+      stage_key: stageKey,
+      label: newStageName.trim(),
+      description: newStageDesc.trim(),
+      strategy: newStageStrategy.trim(),
+      sort_order: stages.length + 1,
+    }).select().single();
+    if (error) { toast.error('Erro ao criar etapa'); return; }
+    setStages(prev => [...prev, data as FunnelStage]);
+    setNewStageName('');
+    setNewStageDesc('');
+    setNewStageStrategy('');
+    toast.success('Etapa criada!');
+  };
+
+  const deleteStage = async (id: string) => {
+    await supabase.from('niche_funnel_stages').delete().eq('id', id);
+    setStages(prev => prev.filter(s => s.id !== id));
+    toast.success('Etapa removida');
+  };
+
   const addTemplate = (stage: string = 'all') => {
     const newLevel = templates.length + 1;
-    const stageInfo = FUNNEL_STAGES.find(s => s.value === stage);
+    const stageInfo = stages.find(s => s.stage_key === stage);
     setTemplates(prev => [...prev, {
       id: crypto.randomUUID(),
       name: `Follow-up ${stageInfo?.label || 'Nível ' + newLevel}`,
@@ -205,37 +246,88 @@ export default function NicheFollowUps({ nicheId }: NicheFollowUpsProps) {
             </div>
           </div>
 
-          {/* Funnel stages visual */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {FUNNEL_STAGES.filter(s => s.value !== 'all').map(stage => {
-              const count = templates.filter(t => t.funnel_stage === stage.value).length;
-              return (
-                <button
-                  key={stage.value}
-                  onClick={() => addTemplate(stage.value)}
-                  className={`p-3 rounded-lg border border-border/50 text-left transition-all hover:border-primary/50 hover:shadow-sm`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <Badge className={stage.color} variant="outline">{stage.label}</Badge>
-                    <span className="text-xs text-muted-foreground">{count} template{count !== 1 ? 's' : ''}</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">{stage.description}</p>
+          {/* Funnel stages management */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Target className="h-4 w-4 text-primary" /> Etapas do Funil deste Nicho
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {stages.length > 0 && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {stages.map((stage, idx) => {
+                    const count = templates.filter(t => t.funnel_stage === stage.stage_key).length;
+                    const color = STAGE_COLORS[idx % STAGE_COLORS.length];
+                    return (
+                      <div key={stage.id} className="p-3 rounded-lg border border-border/50 text-left group relative">
+                        <button
+                          onClick={() => deleteStage(stage.id)}
+                          className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 p-1 text-destructive hover:bg-destructive/10 rounded transition-all"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                        <div className="flex items-center justify-between mb-1">
+                          <Badge className={color} variant="outline">{stage.label}</Badge>
+                          <span className="text-xs text-muted-foreground">{count} template{count !== 1 ? 's' : ''}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">{stage.description}</p>
+                        <button
+                          onClick={() => addTemplate(stage.stage_key)}
+                          className="mt-2 text-[10px] text-primary hover:underline"
+                        >
+                          + Criar follow-up para esta etapa
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              <div className="flex gap-2 items-end">
+                <div className="flex-1 space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Nova Etapa</label>
+                  <Input
+                    value={newStageName}
+                    onChange={e => setNewStageName(e.target.value)}
+                    placeholder="Ex: Recebeu Preços"
+                    className="h-9"
+                  />
+                </div>
+                <div className="flex-1 space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Descrição</label>
+                  <Input
+                    value={newStageDesc}
+                    onChange={e => setNewStageDesc(e.target.value)}
+                    placeholder="Ex: Lead recebeu tabela de preços"
+                    className="h-9"
+                  />
+                </div>
+                <button onClick={addStage} className="h-9 px-3 bg-primary text-primary-foreground rounded-lg text-sm hover:bg-primary/90">
+                  <Plus className="h-4 w-4" />
                 </button>
-              );
-            })}
-          </div>
+              </div>
+              {stages.length === 0 && (
+                <p className="text-xs text-muted-foreground text-center py-2">
+                  Nenhuma etapa criada. Adicione etapas para segmentar os follow-ups.
+                </p>
+              )}
+            </CardContent>
+          </Card>
 
           {templates.map((t, i) => {
-            const stageInfo = FUNNEL_STAGES.find(s => s.value === t.funnel_stage) || FUNNEL_STAGES[4];
+            const stageIdx = stages.findIndex(s => s.stage_key === t.funnel_stage);
+            const stageInfo = stages.find(s => s.stage_key === t.funnel_stage);
+            const stageColor = stageIdx >= 0 ? STAGE_COLORS[stageIdx % STAGE_COLORS.length] : 'bg-primary/10 text-primary';
+            const stageLabel = stageInfo?.label || (t.funnel_stage === 'all' ? 'Todas' : t.funnel_stage);
             return (
             <motion.div key={t.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
               <Card className={`border ${t.is_active ? 'border-primary/30' : 'border-muted opacity-60'}`}>
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <Badge className={stageInfo.color} variant="outline">
+                      <Badge className={stageColor} variant="outline">
                         <Filter className="h-3 w-3 mr-1" />
-                        {stageInfo.label}
+                        {stageLabel}
                       </Badge>
                       <Badge variant={t.escalation_level === 1 ? 'secondary' : t.escalation_level === 2 ? 'default' : 'destructive'}>
                         Nível {t.escalation_level}
@@ -281,8 +373,9 @@ export default function NicheFollowUps({ nicheId }: NicheFollowUpsProps) {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {FUNNEL_STAGES.map(s => (
-                          <SelectItem key={s.value} value={s.value}>{s.label} — {s.description}</SelectItem>
+                        <SelectItem value="all">Todas as etapas</SelectItem>
+                        {stages.map(s => (
+                          <SelectItem key={s.stage_key} value={s.stage_key}>{s.label} — {s.description}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>

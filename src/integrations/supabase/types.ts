@@ -817,6 +817,47 @@ export type Database = {
           },
         ]
       }
+      niche_funnel_stages: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          label: string
+          niche_id: string
+          sort_order: number
+          stage_key: string
+          strategy: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          id?: string
+          label: string
+          niche_id: string
+          sort_order?: number
+          stage_key: string
+          strategy?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          label?: string
+          niche_id?: string
+          sort_order?: number
+          stage_key?: string
+          strategy?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "niche_funnel_stages_niche_id_fkey"
+            columns: ["niche_id"]
+            isOneToOne: false
+            referencedRelation: "niches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       niches: {
         Row: {
           auto_reply_enabled: boolean
