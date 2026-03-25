@@ -309,6 +309,7 @@ export type Database = {
           contact_phone: string
           created_at: string
           ctwa_clid: string | null
+          funnel_stage: string
           id: string
           niche_id: string | null
           resolved_at: string | null
@@ -326,6 +327,7 @@ export type Database = {
           contact_phone: string
           created_at?: string
           ctwa_clid?: string | null
+          funnel_stage?: string
           id?: string
           niche_id?: string | null
           resolved_at?: string | null
@@ -343,6 +345,7 @@ export type Database = {
           contact_phone?: string
           created_at?: string
           ctwa_clid?: string | null
+          funnel_stage?: string
           id?: string
           niche_id?: string | null
           resolved_at?: string | null

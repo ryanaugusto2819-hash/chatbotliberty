@@ -1,0 +1,1 @@
+ALTER TABLE public.conversations ADD COLUMN funnel_stage text NOT NULL DEFAULT 'etapa_1';
