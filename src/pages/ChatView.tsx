@@ -99,6 +99,9 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
   const [contactTags, setContactTags] = useState<ContactTag[]>([]);
   const [assignedAgent, setAssignedAgent] = useState<AgentProfile | null>(null);
   const [assignmentHistory, setAssignmentHistory] = useState<AssignmentHistory[]>([]);
+  const [showSaleDialog, setShowSaleDialog] = useState(false);
+  const [saleData, setSaleData] = useState({ revenue: '', creative: '', campaign: '' });
+  const [sendingSale, setSendingSale] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
