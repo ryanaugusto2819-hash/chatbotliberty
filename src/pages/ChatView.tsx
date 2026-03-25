@@ -239,6 +239,38 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
     }
   };
 
+  const handleSendSale = async () => {
+    if (!saleData.revenue || sendingSale) return;
+    setSendingSale(true);
+    try {
+      // Parse ad_title for campaign/creative info (format: "Campanha › Conjunto › Anúncio")
+      const adParts = conversation?.ad_title?.split(' › ') || [];
+      const payload = {
+        creative: saleData.creative || adParts[2] || adParts[0] || 'direto',
+        campaign: saleData.campaign || adParts[0] || 'direto',
+        revenue: parseFloat(saleData.revenue) || 0,
+        country: 'brasil',
+        sales: 1,
+        date: new Date().toISOString().split('T')[0],
+      };
+
+      const res = await fetch('https://simuftsgwryjubmkbnaj.supabase.co/functions/v1/webhookSales', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) throw new Error('Webhook failed');
+      toast.success('Venda registrada com sucesso!');
+      setShowSaleDialog(false);
+      setSaleData({ revenue: '', creative: '', campaign: '' });
+    } catch (err) {
+      console.error('Sale webhook error:', err);
+      toast.error('Erro ao registrar venda');
+    } finally {
+      setSendingSale(false);
+    }
+
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center">
