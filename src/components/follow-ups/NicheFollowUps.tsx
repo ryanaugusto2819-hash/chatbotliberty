@@ -246,25 +246,73 @@ export default function NicheFollowUps({ nicheId }: NicheFollowUpsProps) {
             </div>
           </div>
 
-          {/* Funnel stages visual */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {FUNNEL_STAGES.filter(s => s.value !== 'all').map(stage => {
-              const count = templates.filter(t => t.funnel_stage === stage.value).length;
-              return (
-                <button
-                  key={stage.value}
-                  onClick={() => addTemplate(stage.value)}
-                  className={`p-3 rounded-lg border border-border/50 text-left transition-all hover:border-primary/50 hover:shadow-sm`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <Badge className={stage.color} variant="outline">{stage.label}</Badge>
-                    <span className="text-xs text-muted-foreground">{count} template{count !== 1 ? 's' : ''}</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">{stage.description}</p>
+          {/* Funnel stages management */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Target className="h-4 w-4 text-primary" /> Etapas do Funil deste Nicho
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {stages.length > 0 && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {stages.map((stage, idx) => {
+                    const count = templates.filter(t => t.funnel_stage === stage.stage_key).length;
+                    const color = STAGE_COLORS[idx % STAGE_COLORS.length];
+                    return (
+                      <div key={stage.id} className="p-3 rounded-lg border border-border/50 text-left group relative">
+                        <button
+                          onClick={() => deleteStage(stage.id)}
+                          className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 p-1 text-destructive hover:bg-destructive/10 rounded transition-all"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                        <div className="flex items-center justify-between mb-1">
+                          <Badge className={color} variant="outline">{stage.label}</Badge>
+                          <span className="text-xs text-muted-foreground">{count} template{count !== 1 ? 's' : ''}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">{stage.description}</p>
+                        <button
+                          onClick={() => addTemplate(stage.stage_key)}
+                          className="mt-2 text-[10px] text-primary hover:underline"
+                        >
+                          + Criar follow-up para esta etapa
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              <div className="flex gap-2 items-end">
+                <div className="flex-1 space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Nova Etapa</label>
+                  <Input
+                    value={newStageName}
+                    onChange={e => setNewStageName(e.target.value)}
+                    placeholder="Ex: Recebeu Preços"
+                    className="h-9"
+                  />
+                </div>
+                <div className="flex-1 space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Descrição</label>
+                  <Input
+                    value={newStageDesc}
+                    onChange={e => setNewStageDesc(e.target.value)}
+                    placeholder="Ex: Lead recebeu tabela de preços"
+                    className="h-9"
+                  />
+                </div>
+                <button onClick={addStage} className="h-9 px-3 bg-primary text-primary-foreground rounded-lg text-sm hover:bg-primary/90">
+                  <Plus className="h-4 w-4" />
                 </button>
-              );
-            })}
-          </div>
+              </div>
+              {stages.length === 0 && (
+                <p className="text-xs text-muted-foreground text-center py-2">
+                  Nenhuma etapa criada. Adicione etapas para segmentar os follow-ups.
+                </p>
+              )}
+            </CardContent>
+          </Card>
 
           {templates.map((t, i) => {
             const stageInfo = FUNNEL_STAGES.find(s => s.value === t.funnel_stage) || FUNNEL_STAGES[4];
