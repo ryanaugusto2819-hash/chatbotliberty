@@ -179,7 +179,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { flowId, conversationId } = await req.json();
+    const { flowId, conversationId, senderLabel: requestedLabel } = await req.json();
 
     if (!flowId || !conversationId) {
       return createJsonResponse({ error: "flowId and conversationId are required" }, 400);
@@ -623,7 +623,7 @@ Deno.serve(async (req) => {
           message_type: failedType,
           media_url: failedMediaUrl,
           status: "failed",
-          sender_label: "fluxo",
+          sender_label: requestedLabel || "fluxo",
         });
 
         if (executionId) {
@@ -690,7 +690,7 @@ Deno.serve(async (req) => {
         status: providerMessageId ? "pending" : "sent",
         provider_message_id: providerMessageId,
         provider_status: providerMessageId ? "accepted" : null,
-        sender_label: "fluxo",
+        sender_label: requestedLabel || "fluxo",
       });
 
       if (messageInsertError) {
