@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import TopBar from '@/components/layout/TopBar';
 import StatusBadge from '@/components/shared/StatusBadge';
 import { supabase } from '@/integrations/supabase/client';
-import { Search, Loader2, X, Smartphone, Globe, Wifi, MessageCircle, ChevronDown } from 'lucide-react';
+import { Search, Loader2, X, Smartphone, Globe, Wifi, MessageCircle, ChevronDown, SlidersHorizontal } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -16,6 +16,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 const CONVERSATIONS_FILTERS_STORAGE_KEY = 'conversations-filters';
 
