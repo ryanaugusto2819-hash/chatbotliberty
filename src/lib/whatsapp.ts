@@ -4,9 +4,17 @@ export async function sendWhatsAppMessage(
   conversationId: string,
   message: string
 ) {
-  // Get current user ID to tag as human sender
+  // Get current user's profile ID to tag as human sender
   const { data: { user } } = await supabase.auth.getUser();
-  const senderAgentId = user?.id ?? null;
+  let senderAgentId: string | null = null;
+  if (user?.id) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    senderAgentId = profile?.id ?? null;
+  }
 
   // Check which provider is connected
   const { data: connections } = await supabase
