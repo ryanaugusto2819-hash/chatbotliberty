@@ -55,6 +55,7 @@ interface MessageData {
   provider_error?: string | null;
   provider_status?: string | null;
   sender_agent_id?: string | null;
+  sender_label?: string | null;
 }
 
 interface ParsedProviderError {
