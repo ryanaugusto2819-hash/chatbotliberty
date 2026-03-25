@@ -86,7 +86,7 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
   const [activeFilter, setActiveFilter] = useState<string>('all');
   const [selectedTag, setSelectedTag] = useState<string>('all');
   const [selectedAgent, setSelectedAgent] = useState<string>('all');
-  const [selectedConnection, setSelectedConnection] = useState<string>('all');
+  const [selectedConnections, setSelectedConnections] = useState<string[]>([]);
   const [onlyUnread, setOnlyUnread] = useState(false);
   const [conversations, setConversations] = useState<ConversationRow[]>([]);
   const [loading, setLoading] = useState(true);
