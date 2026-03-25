@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Clock, Plus, Trash2, Save, Loader2, Play,
@@ -127,10 +127,10 @@ export default function NicheFollowUps({ nicheId }: NicheFollowUpsProps) {
     toast.success('Etapa removida');
   };
 
-  const addTemplate = (stage: string = 'all') => {
+  const addTemplate = async (stage: string = 'all') => {
     const newLevel = templates.length + 1;
     const stageInfo = stages.find(s => s.stage_key === stage);
-    setTemplates(prev => [...prev, {
+    const newTemplate: FollowUpTemplate = {
       id: crypto.randomUUID(),
       name: `Follow-up ${stageInfo?.label || 'Nível ' + newLevel}`,
       objective: '',
@@ -145,11 +145,34 @@ export default function NicheFollowUps({ nicheId }: NicheFollowUpsProps) {
       sort_order: newLevel,
       funnel_stage: stage,
       trigger_condition: '',
-    }]);
+    };
+    setTemplates(prev => [...prev, newTemplate]);
+    const { id, ...data } = newTemplate;
+    await supabase.from('follow_up_templates').upsert({ id, ...data, niche_id: nicheId });
   };
 
+  const saveTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  const autoSaveTemplate = useCallback(async (template: FollowUpTemplate) => {
+    const { id, ...data } = template;
+    const { error } = await supabase.from('follow_up_templates').upsert({ id, ...data, niche_id: nicheId });
+    if (error) {
+      console.error('Auto-save error:', error);
+    }
+  }, [nicheId]);
+
   const updateTemplate = (id: string, field: keyof FollowUpTemplate, value: unknown) => {
-    setTemplates(prev => prev.map(t => t.id === id ? { ...t, [field]: value } : t));
+    setTemplates(prev => {
+      const updated = prev.map(t => t.id === id ? { ...t, [field]: value } : t);
+      const template = updated.find(t => t.id === id);
+      if (template) {
+        if (saveTimerRef.current[id]) clearTimeout(saveTimerRef.current[id]);
+        saveTimerRef.current[id] = setTimeout(() => {
+          autoSaveTemplate(template);
+        }, 1000);
+      }
+      return updated;
+    });
   };
 
   const deleteTemplate = async (id: string) => {
