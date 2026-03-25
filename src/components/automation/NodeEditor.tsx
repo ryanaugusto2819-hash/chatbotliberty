@@ -700,27 +700,32 @@ export default function NodeEditor({ nodeId, nodeType, label, config, nicheId, o
             {(editConfig.action_type as string) === 'set_funnel_stage' && (
               <div className="space-y-2">
                 <label className={labelClass}>Etapa do Funil</label>
-                <div className="space-y-1.5">
-                  {[
-                    { value: 'etapa_1', label: 'Etapa 1', desc: 'Início do funil — primeiro contato' },
-                    { value: 'etapa_2', label: 'Etapa 2', desc: 'Recebeu informações/preços' },
-                    { value: 'etapa_3', label: 'Etapa 3', desc: 'Negociação / demonstrou intenção' },
-                    { value: 'etapa_4', label: 'Etapa 4', desc: 'Aguardando pagamento / fechamento' },
-                  ].map((stage) => (
-                    <button
-                      key={stage.value}
-                      onClick={() => setEditConfig((p) => ({ ...p, funnel_stage: stage.value, funnel_stage_label: stage.label }))}
-                      className={`w-full rounded-lg border p-2.5 text-left transition-all ${
-                        (editConfig.funnel_stage as string) === stage.value
-                          ? 'border-primary bg-primary/5 ring-1 ring-primary'
-                          : 'border-border hover:border-primary/30 hover:bg-secondary/50'
-                      }`}
-                    >
-                      <p className="text-xs font-medium text-card-foreground">{stage.label}</p>
-                      <p className="text-[10px] text-muted-foreground">{stage.desc}</p>
-                    </button>
-                  ))}
-                </div>
+                {funnelStages.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {funnelStages.map((stage) => (
+                      <button
+                        key={stage.stage_key}
+                        onClick={() => setEditConfig((p) => ({ ...p, funnel_stage: stage.stage_key, funnel_stage_label: stage.label }))}
+                        className={`w-full rounded-lg border p-2.5 text-left transition-all ${
+                          (editConfig.funnel_stage as string) === stage.stage_key
+                            ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                            : 'border-border hover:border-primary/30 hover:bg-secondary/50'
+                        }`}
+                      >
+                        <p className="text-xs font-medium text-card-foreground">{stage.label}</p>
+                        <p className="text-[10px] text-muted-foreground">{stage.description}</p>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed border-border p-4 text-center space-y-1">
+                    <Target className="h-5 w-5 text-muted-foreground mx-auto" />
+                    <p className="text-[11px] text-muted-foreground">
+                      {nicheId ? 'Nenhuma etapa configurada para este nicho.' : 'Este fluxo não está vinculado a um nicho.'}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">Configure as etapas na aba "Follow-ups" do nicho.</p>
+                  </div>
+                )}
               </div>
             )}
 
