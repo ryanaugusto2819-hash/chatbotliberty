@@ -275,6 +275,7 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
     setSelectedTag('all');
     setSelectedAgent('all');
     setSelectedConnections([]);
+    if (!['all', 'last_customer'].includes(activeFilter)) setActiveFilter('all');
   };
 
   const handleConversationClick = (conversationId: string) => {
