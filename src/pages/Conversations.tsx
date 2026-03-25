@@ -17,6 +17,50 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
+const CONVERSATIONS_FILTERS_STORAGE_KEY = 'conversations-filters';
+
+interface PersistedConversationFilters {
+  search: string;
+  activeFilter: string;
+  selectedTag: string;
+  selectedAgent: string;
+  selectedConnections: string[];
+  onlyUnread: boolean;
+}
+
+const defaultConversationFilters: PersistedConversationFilters = {
+  search: '',
+  activeFilter: 'all',
+  selectedTag: 'all',
+  selectedAgent: 'all',
+  selectedConnections: [],
+  onlyUnread: false,
+};
+
+const getStoredConversationFilters = (): PersistedConversationFilters => {
+  if (typeof window === 'undefined') return defaultConversationFilters;
+
+  const stored = window.sessionStorage.getItem(CONVERSATIONS_FILTERS_STORAGE_KEY);
+  if (!stored) return defaultConversationFilters;
+
+  try {
+    const parsed = JSON.parse(stored);
+
+    return {
+      search: typeof parsed.search === 'string' ? parsed.search : defaultConversationFilters.search,
+      activeFilter: typeof parsed.activeFilter === 'string' ? parsed.activeFilter : defaultConversationFilters.activeFilter,
+      selectedTag: typeof parsed.selectedTag === 'string' ? parsed.selectedTag : defaultConversationFilters.selectedTag,
+      selectedAgent: typeof parsed.selectedAgent === 'string' ? parsed.selectedAgent : defaultConversationFilters.selectedAgent,
+      selectedConnections: Array.isArray(parsed.selectedConnections)
+        ? parsed.selectedConnections.filter((value: unknown): value is string => typeof value === 'string')
+        : defaultConversationFilters.selectedConnections,
+      onlyUnread: typeof parsed.onlyUnread === 'boolean' ? parsed.onlyUnread : defaultConversationFilters.onlyUnread,
+    };
+  } catch {
+    return defaultConversationFilters;
+  }
+};
+
 interface ConversationRow {
   id: string;
   contact_name: string;
@@ -89,12 +133,13 @@ interface ConversationsProps {
 
 export default function Conversations({ embedded, selectedId, onSelectConversation }: ConversationsProps = {}) {
   const navigate = useNavigate();
-  const [search, setSearch] = useState('');
-  const [activeFilter, setActiveFilter] = useState<string>('all');
-  const [selectedTag, setSelectedTag] = useState<string>('all');
-  const [selectedAgent, setSelectedAgent] = useState<string>('all');
-  const [selectedConnections, setSelectedConnections] = useState<string[]>([]);
-  const [onlyUnread, setOnlyUnread] = useState(false);
+  const storedFilters = getStoredConversationFilters();
+  const [search, setSearch] = useState(storedFilters.search);
+  const [activeFilter, setActiveFilter] = useState<string>(storedFilters.activeFilter);
+  const [selectedTag, setSelectedTag] = useState<string>(storedFilters.selectedTag);
+  const [selectedAgent, setSelectedAgent] = useState<string>(storedFilters.selectedAgent);
+  const [selectedConnections, setSelectedConnections] = useState<string[]>(storedFilters.selectedConnections);
+  const [onlyUnread, setOnlyUnread] = useState(storedFilters.onlyUnread);
   const [conversations, setConversations] = useState<ConversationRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [tags, setTags] = useState<TagOption[]>([]);
@@ -185,6 +230,22 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
       supabase.removeChannel(channel);
     };
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    window.sessionStorage.setItem(
+      CONVERSATIONS_FILTERS_STORAGE_KEY,
+      JSON.stringify({
+        search,
+        activeFilter,
+        selectedTag,
+        selectedAgent,
+        selectedConnections,
+        onlyUnread,
+      } satisfies PersistedConversationFilters)
+    );
+  }, [search, activeFilter, selectedTag, selectedAgent, selectedConnections, onlyUnread]);
 
   const getConversationConnection = (connConfigId: string | null): ConnectionInfo | null => {
     if (!connConfigId) return null;
