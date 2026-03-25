@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   X, MessageSquare, Clock, Image, Music, Video, Upload, Loader2,
-  FileText, GitFork, Zap, Bot, ListOrdered, Trash2, Save, Link2, Cog, Tag
+  FileText, GitFork, Zap, Bot, ListOrdered, Trash2, Save, Link2, Cog, Tag, Target
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
