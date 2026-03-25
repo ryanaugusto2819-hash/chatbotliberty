@@ -69,6 +69,17 @@ Deno.serve(async (req) => {
       ? await supabase.from("knowledge_base_items").select("title, content, niche_id").in("niche_id", nicheIds).limit(50)
       : { data: [] };
 
+    // Get funnel stages per niche
+    const { data: allStages } = nicheIds.length
+      ? await supabase.from("niche_funnel_stages").select("*").in("niche_id", nicheIds).order("sort_order")
+      : { data: [] };
+    // Build a map: niche_id -> Map<stage_key, {label, description, strategy}>
+    const nicheStagesMap = new Map<string, Map<string, { label: string; description: string; strategy: string }>>();
+    for (const s of (allStages || [])) {
+      if (!nicheStagesMap.has(s.niche_id)) nicheStagesMap.set(s.niche_id, new Map());
+      nicheStagesMap.get(s.niche_id)!.set(s.stage_key, { label: s.label, description: s.description, strategy: s.strategy });
+    }
+
     // Find conversations that are NOT resolved
     const { data: conversations } = await supabase
       .from("conversations")
