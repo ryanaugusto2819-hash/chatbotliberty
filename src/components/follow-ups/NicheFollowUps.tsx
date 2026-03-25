@@ -148,8 +148,28 @@ export default function NicheFollowUps({ nicheId }: NicheFollowUpsProps) {
     }]);
   };
 
+  const saveTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  const autoSaveTemplate = useCallback(async (template: FollowUpTemplate) => {
+    const { id, ...data } = template;
+    const { error } = await supabase.from('follow_up_templates').upsert({ id, ...data, niche_id: nicheId });
+    if (error) {
+      console.error('Auto-save error:', error);
+    }
+  }, [nicheId]);
+
   const updateTemplate = (id: string, field: keyof FollowUpTemplate, value: unknown) => {
-    setTemplates(prev => prev.map(t => t.id === id ? { ...t, [field]: value } : t));
+    setTemplates(prev => {
+      const updated = prev.map(t => t.id === id ? { ...t, [field]: value } : t);
+      const template = updated.find(t => t.id === id);
+      if (template) {
+        if (saveTimerRef.current[id]) clearTimeout(saveTimerRef.current[id]);
+        saveTimerRef.current[id] = setTimeout(() => {
+          autoSaveTemplate(template);
+        }, 1000);
+      }
+      return updated;
+    });
   };
 
   const deleteTemplate = async (id: string) => {
