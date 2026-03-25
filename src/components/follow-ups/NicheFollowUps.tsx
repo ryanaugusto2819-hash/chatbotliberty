@@ -74,9 +74,13 @@ interface NicheFollowUpsProps {
 export default function NicheFollowUps({ nicheId }: NicheFollowUpsProps) {
   const [templates, setTemplates] = useState<FollowUpTemplate[]>([]);
   const [executions, setExecutions] = useState<FollowUpExecution[]>([]);
+  const [stages, setStages] = useState<FunnelStage[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [running, setRunning] = useState(false);
+  const [newStageName, setNewStageName] = useState('');
+  const [newStageDesc, setNewStageDesc] = useState('');
+  const [newStageStrategy, setNewStageStrategy] = useState('');
 
   useEffect(() => {
     fetchAll();
@@ -84,21 +88,47 @@ export default function NicheFollowUps({ nicheId }: NicheFollowUpsProps) {
 
   const fetchAll = async () => {
     setLoading(true);
-    const [tRes, eRes] = await Promise.all([
+    const [tRes, eRes, sRes] = await Promise.all([
       supabase.from('follow_up_templates').select('*').eq('niche_id', nicheId).order('escalation_level'),
       supabase.from('follow_up_executions').select('*').order('created_at', { ascending: false }).limit(200),
+      supabase.from('niche_funnel_stages').select('*').eq('niche_id', nicheId).order('sort_order'),
     ]);
     const tplList = (tRes.data || []) as FollowUpTemplate[];
     setTemplates(tplList);
-    // Filter executions to only those belonging to this niche's templates
+    setStages((sRes.data || []) as FunnelStage[]);
     const tplIds = new Set(tplList.map(t => t.id));
     setExecutions(((eRes.data || []) as FollowUpExecution[]).filter(e => tplIds.has(e.template_id)));
     setLoading(false);
   };
 
+  const addStage = async () => {
+    if (!newStageName.trim()) return;
+    const stageKey = `stage_${Date.now()}`;
+    const { data, error } = await supabase.from('niche_funnel_stages').insert({
+      niche_id: nicheId,
+      stage_key: stageKey,
+      label: newStageName.trim(),
+      description: newStageDesc.trim(),
+      strategy: newStageStrategy.trim(),
+      sort_order: stages.length + 1,
+    }).select().single();
+    if (error) { toast.error('Erro ao criar etapa'); return; }
+    setStages(prev => [...prev, data as FunnelStage]);
+    setNewStageName('');
+    setNewStageDesc('');
+    setNewStageStrategy('');
+    toast.success('Etapa criada!');
+  };
+
+  const deleteStage = async (id: string) => {
+    await supabase.from('niche_funnel_stages').delete().eq('id', id);
+    setStages(prev => prev.filter(s => s.id !== id));
+    toast.success('Etapa removida');
+  };
+
   const addTemplate = (stage: string = 'all') => {
     const newLevel = templates.length + 1;
-    const stageInfo = FUNNEL_STAGES.find(s => s.value === stage);
+    const stageInfo = stages.find(s => s.stage_key === stage);
     setTemplates(prev => [...prev, {
       id: crypto.randomUUID(),
       name: `Follow-up ${stageInfo?.label || 'Nível ' + newLevel}`,
