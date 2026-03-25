@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { sendWhatsAppMessage } from '@/lib/whatsapp';
 import StatusBadge from '@/components/shared/StatusBadge';
-import { ArrowLeft, Send, Paperclip, MoreVertical, User, Clock, CheckCheck, Check, Loader2, Phone, MessageSquare, Tag, Calendar, Hash, History, AlertTriangle, RefreshCw, Bot, UserRound } from 'lucide-react';
+import { ArrowLeft, Send, Paperclip, MoreVertical, User, Clock, CheckCheck, Check, Loader2, Phone, MessageSquare, Tag, Calendar, Hash, History, AlertTriangle, RefreshCw, Bot, UserRound, DollarSign } from 'lucide-react';
 import FlowTrigger from '@/components/automation/FlowTrigger';
 import QuickMessages from '@/components/chat/QuickMessages';
 import TagManager from '@/components/tags/TagManager';
@@ -99,6 +99,9 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
   const [contactTags, setContactTags] = useState<ContactTag[]>([]);
   const [assignedAgent, setAssignedAgent] = useState<AgentProfile | null>(null);
   const [assignmentHistory, setAssignmentHistory] = useState<AssignmentHistory[]>([]);
+  const [showSaleDialog, setShowSaleDialog] = useState(false);
+  const [saleData, setSaleData] = useState({ revenue: '', creative: '', campaign: '' });
+  const [sendingSale, setSendingSale] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -233,6 +236,39 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
       toast.error('Erro ao enviar mensagem. Verifique a conexão do WhatsApp.');
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleSendSale = async () => {
+    if (!saleData.revenue || sendingSale) return;
+    setSendingSale(true);
+    try {
+      // Parse ad_title for campaign/creative info (format: "Campanha › Conjunto › Anúncio")
+      const adParts = conversation?.ad_title?.split(' › ') || [];
+      const payload = {
+        creative: saleData.creative || adParts[2] || adParts[0] || 'direto',
+        campaign: saleData.campaign || adParts[0] || 'direto',
+        revenue: parseFloat(saleData.revenue) || 0,
+        country: 'brasil',
+        sales: 1,
+        date: new Date().toISOString().split('T')[0],
+      };
+
+      const res = await fetch('https://simuftsgwryjubmkbnaj.supabase.co/functions/v1/webhookSales', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) throw new Error('Webhook failed');
+      toast.success('Venda registrada com sucesso!');
+      setShowSaleDialog(false);
+      setSaleData({ revenue: '', creative: '', campaign: '' });
+    } catch (err) {
+      console.error('Sale webhook error:', err);
+      toast.error('Erro ao registrar venda');
+    } finally {
+      setSendingSale(false);
     }
   };
 
@@ -481,6 +517,76 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
         </div>
 
         <div className="p-4 space-y-5 flex-1">
+          {/* Register Sale */}
+          <div>
+            <button
+              onClick={() => {
+                const adParts = conversation.ad_title?.split(' › ') || [];
+                setSaleData({
+                  revenue: '',
+                  creative: adParts[2] || adParts[0] || '',
+                  campaign: adParts[0] || '',
+                });
+                setShowSaleDialog(true);
+              }}
+              className="w-full flex items-center justify-center gap-2 rounded-lg bg-green-600 hover:bg-green-700 text-white py-2.5 px-4 text-sm font-medium transition-colors"
+            >
+              <DollarSign className="h-4 w-4" />
+              Registrar Venda
+            </button>
+          </div>
+
+          {showSaleDialog && (
+            <div className="rounded-lg border border-border bg-background p-4 space-y-3">
+              <p className="text-sm font-semibold text-card-foreground">Dados da Venda</p>
+              <div>
+                <label className="text-xs text-muted-foreground">Valor (R$) *</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={saleData.revenue}
+                  onChange={(e) => setSaleData(prev => ({ ...prev, revenue: e.target.value }))}
+                  placeholder="197.00"
+                  className="w-full mt-1 rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">Criativo</label>
+                <input
+                  type="text"
+                  value={saleData.creative}
+                  onChange={(e) => setSaleData(prev => ({ ...prev, creative: e.target.value }))}
+                  placeholder="nome-do-criativo"
+                  className="w-full mt-1 rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">Campanha</label>
+                <input
+                  type="text"
+                  value={saleData.campaign}
+                  onChange={(e) => setSaleData(prev => ({ ...prev, campaign: e.target.value }))}
+                  placeholder="nome-da-campanha"
+                  className="w-full mt-1 rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowSaleDialog(false)}
+                  className="flex-1 rounded-lg border border-border py-2 text-sm text-muted-foreground hover:bg-secondary transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSendSale}
+                  disabled={!saleData.revenue || sendingSale}
+                  className="flex-1 rounded-lg bg-green-600 hover:bg-green-700 text-white py-2 text-sm font-medium transition-colors disabled:opacity-50"
+                >
+                  {sendingSale ? <Loader2 className="h-4 w-4 animate-spin mx-auto" /> : 'Enviar'}
+                </button>
+              </div>
+            </div>
+          )}
           {/* Contact Details */}
           <div>
             <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
