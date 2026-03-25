@@ -30,71 +30,79 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<AppRole | null>(null);
   const [isApproved, setIsApproved] = useState(false);
 
-  const fetchUserMeta = async (userId: string) => {
-    const [profileRes, roleRes] = await Promise.all([
-      supabase.from('profiles').select('is_approved').eq('user_id', userId).single(),
-      supabase.from('user_roles').select('role').eq('user_id', userId),
-    ]);
-
-    setIsApproved(profileRes.data?.is_approved ?? false);
-
-    const roles = roleRes.data?.map((r) => r.role) ?? [];
-    if (roles.includes('admin')) setRole('admin');
-    else if (roles.includes('supervisor')) setRole('supervisor');
-    else setRole('agent');
-  };
-
   useEffect(() => {
     let mounted = true;
+    let requestId = 0;
 
-    const initSession = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!mounted) return;
-        setSession(session);
-        if (session?.user) {
-          await fetchUserMeta(session.user.id);
-        }
-      } catch (e) {
-        console.error('Error fetching session:', e);
-      } finally {
-        if (mounted) setLoading(false);
-      }
+    const resetAuthState = () => {
+      setRole(null);
+      setIsApproved(false);
+      setLoading(false);
     };
 
-    initSession();
+    const fetchUserMeta = async (userId: string) => {
+      const currentRequestId = ++requestId;
+      setLoading(true);
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (!mounted) return;
-        setSession(session);
-      if (session?.user) {
-          if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
-            if (mounted) setLoading(true);
-            try {
-              await fetchUserMeta(session.user.id);
-            } catch (e) {
-              console.error('Error fetching user meta:', e);
-            } finally {
-              if (mounted) setLoading(false);
-            }
-            return;
-          }
+      try {
+        const [profileRes, roleRes] = await Promise.all([
+          supabase.from('profiles').select('is_approved').eq('user_id', userId).maybeSingle(),
+          supabase.from('user_roles').select('role').eq('user_id', userId),
+        ]);
 
-          fetchUserMeta(session.user.id).catch((e) =>
-            console.error('Error fetching user meta:', e)
-          );
-          if (mounted) setLoading(false);
-        } else {
-          setRole(null);
-          setIsApproved(false);
+        if (!mounted || currentRequestId !== requestId) return;
+
+        setIsApproved(profileRes.data?.is_approved ?? false);
+
+        const roles = roleRes.data?.map((r) => r.role) ?? [];
+        if (roles.includes('admin')) setRole('admin');
+        else if (roles.includes('supervisor')) setRole('supervisor');
+        else setRole('agent');
+      } catch (e) {
+        if (!mounted || currentRequestId !== requestId) return;
+        console.error('Error fetching user meta:', e);
+        setRole(null);
+        setIsApproved(false);
+      } finally {
+        if (mounted && currentRequestId === requestId) {
           setLoading(false);
         }
       }
-    );
+    };
+
+    const syncSession = (nextSession: Session | null) => {
+      if (!mounted) return;
+
+      setSession(nextSession);
+
+      if (!nextSession?.user) {
+        requestId += 1;
+        resetAuthState();
+        return;
+      }
+
+      void fetchUserMeta(nextSession.user.id);
+    };
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      syncSession(nextSession);
+    });
+
+    supabase.auth
+      .getSession()
+      .then(({ data: { session: currentSession } }) => {
+        syncSession(currentSession);
+      })
+      .catch((e) => {
+        console.error('Error fetching session:', e);
+        if (mounted) setLoading(false);
+      });
 
     return () => {
       mounted = false;
+      requestId += 1;
       subscription.unsubscribe();
     };
   }, []);
