@@ -132,8 +132,9 @@ Deno.serve(async (req) => {
 
       for (const template of nicheTemplates) {
         // Check if template matches the lead's funnel stage
-        const templateStage = (template as any).funnel_stage || 'all';
-        if (templateStage !== 'all' && templateStage !== funnelStage.stage) {
+        const templateStage = template.funnel_stage || 'all';
+        const convStage = conv.funnel_stage || 'etapa_1';
+        if (templateStage !== 'all' && templateStage !== convStage) {
           continue;
         }
 
