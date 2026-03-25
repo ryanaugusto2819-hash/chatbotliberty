@@ -263,18 +263,46 @@ export default function AiSettings() {
           {/* Niche tabs */}
           <div className="flex flex-wrap gap-2 mb-4">
             {niches.map((niche) => (
-              <button
-                key={niche.id}
-                onClick={() => setSelectedNicheId(niche.id)}
-                className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                  selectedNicheId === niche.id
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-                }`}
-              >
-                <Layers className="h-3.5 w-3.5" />
-                {niche.name}
-              </button>
+              <div key={niche.id} className="flex items-center gap-0.5">
+                <button
+                  onClick={() => setSelectedNicheId(niche.id)}
+                  className={`flex items-center gap-2 rounded-l-lg px-4 py-2 text-sm font-medium transition-colors ${
+                    selectedNicheId === niche.id
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                  }`}
+                >
+                  <Layers className="h-3.5 w-3.5" />
+                  {niche.name}
+                </button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <button
+                      className={`rounded-r-lg px-2 py-2 text-sm transition-colors ${
+                        selectedNicheId === niche.id
+                          ? 'bg-primary text-primary-foreground hover:bg-destructive'
+                          : 'bg-secondary text-secondary-foreground hover:bg-destructive hover:text-destructive-foreground'
+                      }`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Excluir nicho "{niche.name}"?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Isso removerá o nicho, suas conexões vinculadas e configurações. Conversas existentes não serão apagadas, mas perderão a associação com este nicho. Esta ação não pode ser desfeita.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => deleteNiche(niche.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                        Excluir
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
             ))}
           </div>
 
