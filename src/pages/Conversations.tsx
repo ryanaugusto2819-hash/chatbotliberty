@@ -257,7 +257,7 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
     return connectionMap[connConfigId] || null;
   };
 
-  const activeFiltersCount = (selectedTag !== 'all' ? 1 : 0) + (selectedAgent !== 'all' ? 1 : 0) + (selectedConnections.length > 0 ? 1 : 0);
+  const activeFiltersCount = (selectedTag !== 'all' ? 1 : 0) + (selectedAgent !== 'all' ? 1 : 0) + (selectedConnections.length > 0 ? 1 : 0) + (!['all', 'last_customer'].includes(activeFilter) ? 1 : 0);
 
   const filtered = conversations.filter((c) => {
     const matchesSearch = c.contact_name.toLowerCase().includes(search.toLowerCase()) || c.contact_phone.includes(search);
