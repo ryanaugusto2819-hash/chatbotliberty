@@ -270,6 +270,7 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
     } finally {
       setSendingSale(false);
     }
+  };
 
   if (loading) {
     return (
