@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -29,6 +29,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState<AppRole | null>(null);
   const [isApproved, setIsApproved] = useState(false);
+  const currentUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -80,6 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const blockUi = options?.blockUi ?? false;
 
       setSession(nextSession);
+      currentUserIdRef.current = nextSession?.user?.id ?? null;
 
       if (!nextSession?.user) {
         requestId += 1;
@@ -103,7 +105,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, nextSession) => {
-      const shouldBlockUi = event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED';
+      const nextUserId = nextSession?.user?.id ?? null;
+      const isBackgroundSessionRefresh =
+        event === 'SIGNED_IN' &&
+        hasInitialized &&
+        nextUserId !== null &&
+        nextUserId === currentUserIdRef.current;
+
+      const shouldBlockUi =
+        event === 'SIGNED_OUT' ||
+        event === 'USER_UPDATED' ||
+        (event === 'SIGNED_IN' && !isBackgroundSessionRefresh);
+
       syncSession(nextSession, { blockUi: shouldBlockUi });
     });
 
