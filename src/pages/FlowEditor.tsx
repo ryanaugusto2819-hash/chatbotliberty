@@ -186,6 +186,7 @@ export default function FlowEditor() {
       const at = config?.action_type as string;
       if (at === 'add_tag') return `+ ${(config?.tag_name as string) || 'etiqueta'}`;
       if (at === 'remove_tag') return `- ${(config?.tag_name as string) || 'etiqueta'}`;
+      if (at === 'set_funnel_stage') return `🎯 ${(config?.funnel_stage_label as string) || (config?.funnel_stage as string) || 'etapa'}`;
       if (at === 'transfer_agent') return `→ ${(config?.agent_name as string) || 'agente'}`;
       if (at === 'webhook') return (config?.webhook_url as string)?.slice(0, 30) || 'webhook';
       return 'Ação';

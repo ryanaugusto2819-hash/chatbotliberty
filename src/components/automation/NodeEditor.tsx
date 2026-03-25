@@ -593,6 +593,7 @@ export default function NodeEditor({ nodeId, nodeType, label, config, onSave, on
               >
                 <option value="add_tag">Adicionar Etiqueta</option>
                 <option value="remove_tag">Remover Etiqueta</option>
+                <option value="set_funnel_stage">Definir Etapa do Funil</option>
                 <option value="transfer_agent">Transferir para Agente</option>
                 <option value="webhook">Enviar Webhook</option>
               </select>
@@ -689,6 +690,34 @@ export default function NodeEditor({ nodeId, nodeType, label, config, onSave, on
               </div>
             )}
 
+            {/* Set funnel stage */}
+            {(editConfig.action_type as string) === 'set_funnel_stage' && (
+              <div className="space-y-2">
+                <label className={labelClass}>Etapa do Funil</label>
+                <div className="space-y-1.5">
+                  {[
+                    { value: 'etapa_1', label: 'Etapa 1', desc: 'Início do funil — primeiro contato' },
+                    { value: 'etapa_2', label: 'Etapa 2', desc: 'Recebeu informações/preços' },
+                    { value: 'etapa_3', label: 'Etapa 3', desc: 'Negociação / demonstrou intenção' },
+                    { value: 'etapa_4', label: 'Etapa 4', desc: 'Aguardando pagamento / fechamento' },
+                  ].map((stage) => (
+                    <button
+                      key={stage.value}
+                      onClick={() => setEditConfig((p) => ({ ...p, funnel_stage: stage.value, funnel_stage_label: stage.label }))}
+                      className={`w-full rounded-lg border p-2.5 text-left transition-all ${
+                        (editConfig.funnel_stage as string) === stage.value
+                          ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                          : 'border-border hover:border-primary/30 hover:bg-secondary/50'
+                      }`}
+                    >
+                      <p className="text-xs font-medium text-card-foreground">{stage.label}</p>
+                      <p className="text-[10px] text-muted-foreground">{stage.desc}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Webhook */}
             {(editConfig.action_type as string) === 'webhook' && (
               <div className="space-y-2">
@@ -739,13 +768,15 @@ export default function NodeEditor({ nodeId, nodeType, label, config, onSave, on
 
             <div className="rounded-lg bg-rose-50 dark:bg-rose-900/10 border border-rose-200 dark:border-rose-800 p-3">
               <p className="text-[11px] text-rose-700 dark:text-rose-300">
-                ⚙️ {(editConfig.action_type as string) === 'add_tag' || !editConfig.action_type
-                  ? 'Adiciona uma etiqueta ao contato da conversa'
-                  : (editConfig.action_type as string) === 'remove_tag'
-                  ? 'Remove uma etiqueta do contato da conversa'
-                  : (editConfig.action_type as string) === 'transfer_agent'
-                  ? 'Transfere a conversa para o agente selecionado'
-                  : 'Envia uma requisição HTTP para o endpoint configurado'}
+                 ⚙️ {(editConfig.action_type as string) === 'add_tag' || !editConfig.action_type
+                   ? 'Adiciona uma etiqueta ao contato da conversa'
+                   : (editConfig.action_type as string) === 'remove_tag'
+                   ? 'Remove uma etiqueta do contato da conversa'
+                   : (editConfig.action_type as string) === 'set_funnel_stage'
+                   ? 'Define em qual etapa do funil o lead se encontra — isso determina qual IA de follow-up será acionada'
+                   : (editConfig.action_type as string) === 'transfer_agent'
+                   ? 'Transfere a conversa para o agente selecionado'
+                   : 'Envia uma requisição HTTP para o endpoint configurado'}
               </p>
             </div>
           </div>
