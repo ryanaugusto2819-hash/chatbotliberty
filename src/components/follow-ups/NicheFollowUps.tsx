@@ -315,16 +315,19 @@ export default function NicheFollowUps({ nicheId }: NicheFollowUpsProps) {
           </Card>
 
           {templates.map((t, i) => {
-            const stageInfo = FUNNEL_STAGES.find(s => s.value === t.funnel_stage) || FUNNEL_STAGES[4];
+            const stageIdx = stages.findIndex(s => s.stage_key === t.funnel_stage);
+            const stageInfo = stages.find(s => s.stage_key === t.funnel_stage);
+            const stageColor = stageIdx >= 0 ? STAGE_COLORS[stageIdx % STAGE_COLORS.length] : 'bg-primary/10 text-primary';
+            const stageLabel = stageInfo?.label || (t.funnel_stage === 'all' ? 'Todas' : t.funnel_stage);
             return (
             <motion.div key={t.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
               <Card className={`border ${t.is_active ? 'border-primary/30' : 'border-muted opacity-60'}`}>
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <Badge className={stageInfo.color} variant="outline">
+                      <Badge className={stageColor} variant="outline">
                         <Filter className="h-3 w-3 mr-1" />
-                        {stageInfo.label}
+                        {stageLabel}
                       </Badge>
                       <Badge variant={t.escalation_level === 1 ? 'secondary' : t.escalation_level === 2 ? 'default' : 'destructive'}>
                         Nível {t.escalation_level}
@@ -370,8 +373,9 @@ export default function NicheFollowUps({ nicheId }: NicheFollowUpsProps) {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {FUNNEL_STAGES.map(s => (
-                          <SelectItem key={s.value} value={s.value}>{s.label} — {s.description}</SelectItem>
+                        <SelectItem value="all">Todas as etapas</SelectItem>
+                        {stages.map(s => (
+                          <SelectItem key={s.stage_key} value={s.stage_key}>{s.label} — {s.description}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
