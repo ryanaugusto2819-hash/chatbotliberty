@@ -33,16 +33,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true;
     let requestId = 0;
+    let hasInitialized = false;
 
     const resetAuthState = () => {
       setRole(null);
       setIsApproved(false);
-      setLoading(false);
     };
 
-    const fetchUserMeta = async (userId: string) => {
+    const fetchUserMeta = async (userId: string, showBlockingLoader = false) => {
       const currentRequestId = ++requestId;
-      setLoading(true);
+
+      if (showBlockingLoader) {
+        setLoading(true);
+      }
 
       try {
         const [profileRes, roleRes] = await Promise.all([
@@ -64,40 +67,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setRole(null);
         setIsApproved(false);
       } finally {
-        if (mounted && currentRequestId === requestId) {
+        if (mounted && currentRequestId === requestId && showBlockingLoader) {
           setLoading(false);
         }
       }
     };
 
-    const syncSession = (nextSession: Session | null) => {
+    const syncSession = (nextSession: Session | null, options?: { initialize?: boolean; blockUi?: boolean }) => {
       if (!mounted) return;
+
+      const isInitialize = options?.initialize ?? false;
+      const blockUi = options?.blockUi ?? false;
 
       setSession(nextSession);
 
       if (!nextSession?.user) {
         requestId += 1;
         resetAuthState();
+        if (isInitialize || blockUi) {
+          setLoading(false);
+        }
+        if (isInitialize) {
+          hasInitialized = true;
+        }
         return;
       }
 
-      void fetchUserMeta(nextSession.user.id);
+      void fetchUserMeta(nextSession.user.id, blockUi || !hasInitialized);
+
+      if (isInitialize) {
+        hasInitialized = true;
+      }
     };
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      syncSession(nextSession);
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      const shouldBlockUi = event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED';
+      syncSession(nextSession, { blockUi: shouldBlockUi });
     });
 
     supabase.auth
       .getSession()
       .then(({ data: { session: currentSession } }) => {
-        syncSession(currentSession);
+        syncSession(currentSession, { initialize: true, blockUi: true });
       })
       .catch((e) => {
         console.error('Error fetching session:', e);
-        if (mounted) setLoading(false);
+        if (mounted) {
+          setLoading(false);
+          hasInitialized = true;
+        }
       });
 
     return () => {
