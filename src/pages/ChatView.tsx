@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { sendWhatsAppMessage } from '@/lib/whatsapp';
 import StatusBadge from '@/components/shared/StatusBadge';
-import { ArrowLeft, Send, Paperclip, MoreVertical, User, Clock, CheckCheck, Check, Loader2, Phone, MessageSquare, Tag, Calendar, Hash, History, AlertTriangle, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Send, Paperclip, MoreVertical, User, Clock, CheckCheck, Check, Loader2, Phone, MessageSquare, Tag, Calendar, Hash, History, AlertTriangle, RefreshCw, Bot, UserRound } from 'lucide-react';
 import FlowTrigger from '@/components/automation/FlowTrigger';
 import QuickMessages from '@/components/chat/QuickMessages';
 import TagManager from '@/components/tags/TagManager';
@@ -54,6 +54,7 @@ interface MessageData {
   media_url?: string | null;
   provider_error?: string | null;
   provider_status?: string | null;
+  sender_agent_id?: string | null;
 }
 
 interface ParsedProviderError {
@@ -368,9 +369,26 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
                   </div>
                 )}
 
-                <div className={`flex items-center justify-end gap-1 mt-1 ${
+                <div className={`flex items-center justify-end gap-1.5 mt-1 ${
                   msg.status === 'failed' ? 'text-destructive/60' : msg.sender_type === 'agent' ? 'text-primary-foreground/60' : 'text-muted-foreground'
                 }`}>
+                  {msg.sender_type === 'agent' && (
+                    <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-px text-[9px] font-semibold ${
+                      msg.sender_agent_id
+                        ? msg.status === 'failed'
+                          ? 'bg-destructive/10 text-destructive/70'
+                          : 'bg-primary-foreground/15 text-primary-foreground/70'
+                        : msg.status === 'failed'
+                          ? 'bg-destructive/10 text-destructive/70'
+                          : 'bg-primary-foreground/15 text-primary-foreground/70'
+                    }`}>
+                      {msg.sender_agent_id ? (
+                        <><UserRound className="h-2.5 w-2.5" /> Agente</>
+                      ) : (
+                        <><Bot className="h-2.5 w-2.5" /> IA</>
+                      )}
+                    </span>
+                  )}
                   <span className="text-[10px]">{format(new Date(msg.created_at), 'HH:mm')}</span>
                   {msg.sender_type === 'agent' && (
                     msg.status === 'failed'

@@ -4,6 +4,10 @@ export async function sendWhatsAppMessage(
   conversationId: string,
   message: string
 ) {
+  // Get current user ID to tag as human sender
+  const { data: { user } } = await supabase.auth.getUser();
+  const senderAgentId = user?.id ?? null;
+
   // Check which provider is connected
   const { data: connections } = await supabase
     .from("connection_configs")
@@ -17,7 +21,7 @@ export async function sendWhatsAppMessage(
   const functionName = zapiConnected ? "zapi-send" : "whatsapp-send";
 
   const { data, error } = await supabase.functions.invoke(functionName, {
-    body: { conversationId, message },
+    body: { conversationId, message, senderAgentId },
   });
 
   if (error) throw error;

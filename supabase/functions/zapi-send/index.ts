@@ -12,7 +12,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { conversationId, message, type = "text" } = await req.json();
+    const { conversationId, message, type = "text", senderAgentId = null } = await req.json();
 
     if (!conversationId || !message) {
       return new Response(
@@ -105,7 +105,7 @@ Deno.serve(async (req) => {
           conversation_id: conversationId,
           content: message,
           sender_type: "agent",
-          sender_agent_id: null,
+          sender_agent_id: senderAgentId,
           message_type: type,
           status: "failed",
           provider_status: "failed",
@@ -129,7 +129,7 @@ Deno.serve(async (req) => {
         conversation_id: conversationId,
         content: message,
         sender_type: "agent",
-        sender_agent_id: null,
+        sender_agent_id: senderAgentId,
         message_type: type,
         status: providerMessageId ? "pending" : "sent",
         provider_message_id: providerMessageId,
