@@ -97,8 +97,8 @@ interface ConnectionInfo {
 
 type ConnectionMap = Record<string, ConnectionInfo>;
 
-const statusFilters = ['all', 'new', 'pending', 'active', 'last_customer'] as const;
-const statusLabels: Record<string, string> = { all: 'Todos', new: 'Novos', pending: 'Pendentes', active: 'Em atendimento', last_customer: 'Última Msg Cliente' };
+const statusFilters = ['all', 'last_customer'] as const;
+const statusLabels: Record<string, string> = { all: 'Todos', last_customer: 'Última Msg Cliente' };
 
 function ConnectionBadge({ conn }: { conn: ConnectionInfo | null }) {
   if (!conn) return null;
