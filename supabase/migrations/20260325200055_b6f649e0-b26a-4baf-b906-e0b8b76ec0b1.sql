@@ -1,0 +1,1 @@
+ALTER TABLE public.follow_up_templates ADD COLUMN IF NOT EXISTS trigger_condition text NOT NULL DEFAULT '';
