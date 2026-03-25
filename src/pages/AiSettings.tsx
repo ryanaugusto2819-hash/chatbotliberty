@@ -3,7 +3,7 @@ import TopBar from '@/components/layout/TopBar';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Layers, Plus, Trash2, Save, Loader2, Bot, GitBranch, BookOpen,
-  Pencil, Check, X, MessageSquare, Sparkles, Phone, Wifi, WifiOff,
+  Pencil, Check, X, MessageSquare, Sparkles, Phone, Wifi, WifiOff, Clock,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import KnowledgeBase from '@/components/ai/KnowledgeBase';
+import NicheFollowUps from '@/components/follow-ups/NicheFollowUps';
 
 interface Niche {
   id: string;
@@ -395,6 +396,9 @@ export default function AiSettings() {
               </TabsTrigger>
               <TabsTrigger value="knowledge" className="flex-1 gap-2">
                 <BookOpen className="h-4 w-4" /> Conhecimento
+              </TabsTrigger>
+              <TabsTrigger value="followups" className="flex-1 gap-2">
+                <Clock className="h-4 w-4" /> Follow-ups
               </TabsTrigger>
               <TabsTrigger value="connection" className="flex-1 gap-2">
                 <Phone className="h-4 w-4" /> Conexão
