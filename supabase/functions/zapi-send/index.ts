@@ -12,7 +12,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { conversationId, message, type = "text", senderAgentId = null } = await req.json();
+    const { conversationId, message, type = "text", senderAgentId = null, senderLabel = null } = await req.json();
 
     if (!conversationId || !message) {
       return new Response(
@@ -110,6 +110,7 @@ Deno.serve(async (req) => {
           status: "failed",
           provider_status: "failed",
           provider_error: providerError,
+          sender_label: senderLabel || (senderAgentId ? "humano" : null),
         })
         .select()
         .single();
@@ -134,6 +135,7 @@ Deno.serve(async (req) => {
         status: providerMessageId ? "pending" : "sent",
         provider_message_id: providerMessageId,
         provider_status: providerMessageId ? "accepted" : null,
+        sender_label: senderLabel || (senderAgentId ? "humano" : null),
       })
       .select()
       .single();
