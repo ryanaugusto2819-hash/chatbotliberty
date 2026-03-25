@@ -93,6 +93,7 @@ export default function FlowEditor() {
   const [flowDescription, setFlowDescription] = useState('');
   const [flowActive, setFlowActive] = useState(false);
   const [manualOnly, setManualOnly] = useState(false);
+  const [flowNicheId, setFlowNicheId] = useState<string | null>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [loading, setLoading] = useState(true);
@@ -123,6 +124,7 @@ export default function FlowEditor() {
       setFlowDescription(flowRes.data.description || '');
       setFlowActive(flowRes.data.is_active);
       setManualOnly((flowRes.data as any).manual_only ?? false);
+      setFlowNicheId(flowRes.data.niche_id || null);
     }
 
     if (nodesRes.data && nodesRes.data.length > 0) {
