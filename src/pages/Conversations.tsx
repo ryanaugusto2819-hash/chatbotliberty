@@ -183,6 +183,16 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
     };
   }, []);
 
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (connectionDropdownRef.current && !connectionDropdownRef.current.contains(e.target as Node)) {
+        setShowConnectionDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const getConversationConnection = (connConfigId: string | null): ConnectionInfo | null => {
     if (!connConfigId) return null;
     return connectionMap[connConfigId] || null;
