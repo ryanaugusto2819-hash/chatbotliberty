@@ -68,15 +68,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       async (event, session) => {
         if (!mounted) return;
         setSession(session);
-        if (session?.user) {
+      if (session?.user) {
           if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
             if (mounted) setLoading(true);
-            await fetchUserMeta(session.user.id);
-            if (mounted) setLoading(false);
+            try {
+              await fetchUserMeta(session.user.id);
+            } catch (e) {
+              console.error('Error fetching user meta:', e);
+            } finally {
+              if (mounted) setLoading(false);
+            }
             return;
           }
 
-          void fetchUserMeta(session.user.id);
+          fetchUserMeta(session.user.id).catch((e) =>
+            console.error('Error fetching user meta:', e)
+          );
           if (mounted) setLoading(false);
         } else {
           setRole(null);
