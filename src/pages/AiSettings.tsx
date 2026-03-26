@@ -14,6 +14,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import KnowledgeBase from '@/components/ai/KnowledgeBase';
 import NicheFollowUps from '@/components/follow-ups/NicheFollowUps';
+import AutoReplyLogs from '@/components/ai/AutoReplyLogs';
 
 interface Niche {
   id: string;
@@ -397,6 +398,9 @@ export default function AiSettings() {
               <TabsTrigger value="knowledge" className="flex-1 gap-2">
                 <BookOpen className="h-4 w-4" /> Conhecimento
               </TabsTrigger>
+              <TabsTrigger value="autoreply-logs" className="flex-1 gap-2">
+                <MessageSquare className="h-4 w-4" /> Logs IA
+              </TabsTrigger>
               <TabsTrigger value="followups" className="flex-1 gap-2">
                 <Clock className="h-4 w-4" /> Follow-ups
               </TabsTrigger>
@@ -616,6 +620,17 @@ export default function AiSettings() {
                     <strong className="text-foreground">Dica:</strong> Um nicho pode ter várias conexões. Cada conexão só pode estar vinculada a um nicho por vez para evitar conflitos.
                   </p>
                 </div>
+              </motion.div>
+            </TabsContent>
+
+            {/* Auto-Reply Logs Tab */}
+            <TabsContent value="autoreply-logs">
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="rounded-xl border border-border bg-card p-6 shadow-elevated"
+              >
+                <AutoReplyLogs nicheId={selectedNicheId!} />
               </motion.div>
             </TabsContent>
 
