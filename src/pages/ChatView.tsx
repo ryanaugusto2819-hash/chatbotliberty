@@ -64,9 +64,12 @@ const parseProviderError = (providerError?: string | null): ParsedProviderError 
 // ─── Memoized message bubble ───
 interface MessageBubbleProps {
   msg: ChatMessage;
+  onDelete?: (messageId: string) => void;
 }
 
-const MessageBubble = memo(function MessageBubble({ msg }: MessageBubbleProps) {
+const MessageBubble = memo(function MessageBubble({ msg, onDelete }: MessageBubbleProps) {
+  const [showMenu, setShowMenu] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const providerError = parseProviderError(msg.provider_error);
 
   return (
