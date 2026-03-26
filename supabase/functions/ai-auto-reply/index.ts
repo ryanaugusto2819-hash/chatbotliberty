@@ -75,6 +75,51 @@ Deno.serve(async (req) => {
       return jsonResponse({ skipped: true, reason: "Auto-reply disabled" });
     }
 
+    // --- DELAY 60s: wait and check if a human or flow-selector already replied ---
+    const { data: lastCustomerMsg } = await supabase
+      .from("messages")
+      .select("created_at")
+      .eq("conversation_id", conversationId)
+      .eq("sender_type", "customer")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (!lastCustomerMsg) {
+      return jsonResponse({ skipped: true, reason: "No customer message found" });
+    }
+
+    const customerMsgTime = new Date(lastCustomerMsg.created_at).getTime();
+    const now = Date.now();
+    const elapsed = now - customerMsgTime;
+    const DELAY_MS = 60_000; // 1 minute
+
+    if (elapsed < DELAY_MS) {
+      const waitTime = DELAY_MS - elapsed;
+      console.log(`[ai-auto-reply] Waiting ${Math.round(waitTime / 1000)}s before checking...`);
+      await new Promise((resolve) => setTimeout(resolve, waitTime));
+    }
+
+    // After waiting, check if someone already responded
+    const { data: recentReplies } = await supabase
+      .from("messages")
+      .select("id, sender_type, sender_label")
+      .eq("conversation_id", conversationId)
+      .neq("sender_type", "customer")
+      .gt("created_at", lastCustomerMsg.created_at)
+      .limit(1);
+
+    if (recentReplies && recentReplies.length > 0) {
+      const reply = recentReplies[0];
+      console.log(`[ai-auto-reply] Skipping: already replied by ${reply.sender_type} (${reply.sender_label})`);
+      return jsonResponse({
+        skipped: true,
+        reason: `Already replied by ${reply.sender_label || reply.sender_type}`,
+      });
+    }
+
+    console.log("[ai-auto-reply] No reply after 60s, generating AI response...");
+
     // Fetch knowledge base items filtered by niche
     let kbQuery = supabase
       .from("knowledge_base_items")
