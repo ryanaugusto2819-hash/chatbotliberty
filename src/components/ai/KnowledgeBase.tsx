@@ -428,6 +428,96 @@ export default function KnowledgeBase({ nicheId }: Props) {
         </div>
       )}
 
+      {activeTab === 'flows' && nicheId && (
+        <div className="space-y-3 mb-6">
+          {loadingFlows ? (
+            <div className="flex justify-center py-6">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : flows.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-border p-6 text-center">
+              <Workflow className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">
+                Nenhum fluxo encontrado neste nicho.
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Crie fluxos de automação na aba "Fluxos" primeiro.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">
+                  {flows.length} fluxo(s) disponível(is) neste nicho
+                </p>
+                <button
+                  onClick={importAllFlows}
+                  disabled={importingFlowId === 'all'}
+                  className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+                >
+                  {importingFlowId === 'all' ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Plus className="h-3.5 w-3.5" />
+                  )}
+                  Importar Todos
+                </button>
+              </div>
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {flows.map((flow) => {
+                  const alreadyImported = isFlowAlreadyImported(flow.name);
+                  return (
+                    <div
+                      key={flow.id}
+                      className="rounded-lg border border-border bg-background p-3 flex items-center justify-between gap-3"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <Workflow className="h-3.5 w-3.5 text-primary shrink-0" />
+                          <span className="text-sm font-medium text-foreground truncate">
+                            {flow.name}
+                          </span>
+                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                            flow.is_active
+                              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                              : 'bg-secondary text-muted-foreground'
+                          }`}>
+                            {flow.is_active ? 'Ativo' : 'Inativo'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5 ml-5.5">
+                          {flow.nodes.length} etapa(s)
+                          {flow.description && ` · ${flow.description.substring(0, 60)}`}
+                        </p>
+                      </div>
+                      {alreadyImported ? (
+                        <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400 shrink-0">
+                          <Check className="h-3.5 w-3.5" />
+                          Importado
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => importFlow(flow)}
+                          disabled={importingFlowId === flow.id}
+                          className="shrink-0 flex items-center gap-1 rounded-md bg-accent px-2.5 py-1.5 text-xs font-medium text-accent-foreground hover:bg-accent/80 transition-colors disabled:opacity-50"
+                        >
+                          {importingFlowId === flow.id ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Plus className="h-3 w-3" />
+                          )}
+                          Importar
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Items List */}
       {loading ? (
         <div className="flex justify-center py-6">
