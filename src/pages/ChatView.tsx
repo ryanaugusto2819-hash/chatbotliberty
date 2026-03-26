@@ -545,8 +545,40 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
 
         {/* Input */}
         <div className="border-t border-border bg-card p-4 relative">
+          {/* File preview */}
+          {selectedFile && (
+            <div className="mb-2 flex items-center gap-2 rounded-lg border border-border bg-secondary/50 p-2">
+              {filePreview ? (
+                <img src={filePreview} alt="Preview" className="h-16 w-16 rounded-lg object-cover" />
+              ) : (
+                <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                  <Paperclip className="h-6 w-6" />
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-foreground truncate">{selectedFile.name}</p>
+                <p className="text-[10px] text-muted-foreground">{(selectedFile.size / 1024).toFixed(0)} KB</p>
+              </div>
+              <button onClick={clearSelectedFile} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,video/*,.pdf,.doc,.docx"
+            className="hidden"
+            onChange={handleFileSelect}
+          />
+
           <div className="flex items-end gap-2">
-            <button className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary transition-colors">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary transition-colors"
+              title="Anexar arquivo"
+            >
               <Paperclip className="h-4 w-4" />
             </button>
             <QuickMessages onSelect={(content) => setInput(content)} />
@@ -556,17 +588,17 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }}}
-                placeholder="Digite uma mensagem..."
+                placeholder={selectedFile ? "Legenda (opcional)..." : "Digite uma mensagem..."}
                 rows={1}
                 className="w-full resize-none rounded-xl border border-input bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
             <button
               onClick={handleSend}
-              disabled={sending || !input.trim()}
+              disabled={sending || uploading || (!input.trim() && !selectedFile)}
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
             >
-              {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              {sending || uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             </button>
           </div>
         </div>
