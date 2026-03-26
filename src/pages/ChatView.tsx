@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { sendWhatsAppMessage } from '@/lib/whatsapp';
@@ -7,10 +7,10 @@ import { ArrowLeft, Send, Paperclip, MoreVertical, User, Clock, CheckCheck, Chec
 import FlowTrigger from '@/components/automation/FlowTrigger';
 import QuickMessages from '@/components/chat/QuickMessages';
 import TagManager from '@/components/tags/TagManager';
-import { motion } from 'framer-motion';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
+import { useChatMessages, type ChatMessage } from '@/hooks/useChatMessages';
 
 interface ConversationData {
   id: string;
@@ -44,20 +44,6 @@ interface AssignmentHistory {
   unassigned_at: string | null;
 }
 
-interface MessageData {
-  id: string;
-  content: string;
-  sender_type: string;
-  message_type: string;
-  status: string;
-  created_at: string;
-  media_url?: string | null;
-  provider_error?: string | null;
-  provider_status?: string | null;
-  sender_agent_id?: string | null;
-  sender_label?: string | null;
-}
-
 interface ParsedProviderError {
   code?: number | string;
   title?: string;
@@ -67,20 +53,135 @@ interface ParsedProviderError {
 
 const parseProviderError = (providerError?: string | null): ParsedProviderError | null => {
   if (!providerError) return null;
-
   try {
     const parsed = JSON.parse(providerError);
-    return {
-      code: parsed?.code,
-      title: parsed?.title,
-      message: parsed?.message,
-      details: parsed?.error_data?.details,
-    };
+    return { code: parsed?.code, title: parsed?.title, message: parsed?.message, details: parsed?.error_data?.details };
   } catch {
     return { message: providerError };
   }
 };
 
+// ─── Memoized message bubble ───
+interface MessageBubbleProps {
+  msg: ChatMessage;
+}
+
+const MessageBubble = memo(function MessageBubble({ msg }: MessageBubbleProps) {
+  const providerError = parseProviderError(msg.provider_error);
+
+  return (
+    <div className={`flex ${msg.sender_type === 'agent' ? 'justify-end' : 'justify-start'}`}>
+      <div
+        className={`max-w-[70%] rounded-2xl px-4 py-2.5 ${
+          msg.status === 'failed'
+            ? 'bg-destructive/10 border border-destructive/30 text-destructive rounded-br-md'
+            : msg.sender_type === 'agent'
+              ? 'bg-primary text-primary-foreground rounded-br-md'
+              : 'bg-card border border-border text-card-foreground rounded-bl-md'
+        }`}
+      >
+        {/* Failed banner */}
+        {msg.status === 'failed' && (
+          <div className="flex items-center gap-1.5 mb-2 pb-1.5 border-b border-destructive/20">
+            <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
+            <span className="text-[11px] font-medium text-destructive">Falha no envio</span>
+          </div>
+        )}
+
+        {/* Image */}
+        {msg.message_type === 'image' && msg.media_url && (
+          <div className="mb-1.5">
+            <img
+              src={msg.media_url}
+              alt="Imagem"
+              className={`rounded-lg max-w-full max-h-64 object-cover cursor-pointer ${msg.status === 'failed' ? 'opacity-50' : ''}`}
+              onClick={() => window.open(msg.media_url!, '_blank')}
+              loading="lazy"
+            />
+          </div>
+        )}
+
+        {/* Audio */}
+        {msg.message_type === 'audio' && msg.media_url && (
+          <div className={`mb-1.5 min-w-[220px] ${msg.status === 'failed' ? 'opacity-50' : ''}`}>
+            <audio controls preload="none" className="w-full h-10 rounded-lg" style={{ filter: msg.sender_type === 'agent' && msg.status !== 'failed' ? 'invert(1) hue-rotate(180deg)' : 'none' }}>
+              <source src={msg.media_url} />
+            </audio>
+          </div>
+        )}
+
+        {/* Video */}
+        {msg.message_type === 'video' && msg.media_url && (
+          <div className={`mb-1.5 ${msg.status === 'failed' ? 'opacity-50' : ''}`}>
+            <video controls preload="none" className="rounded-lg max-w-full max-h-64">
+              <source src={msg.media_url} />
+            </video>
+          </div>
+        )}
+
+        {/* Text content */}
+        {msg.content && !(msg.message_type === 'audio' && msg.media_url && !msg.content.trim()) && (
+          <p className={`text-sm leading-relaxed whitespace-pre-wrap ${msg.status === 'failed' ? 'text-destructive/80' : ''}`}>{msg.content}</p>
+        )}
+
+        {/* Fallback for media without URL */}
+        {(['image', 'audio', 'video'].includes(msg.message_type)) && !msg.media_url && !msg.content && (
+          <p className="text-sm leading-relaxed italic opacity-70">
+            {msg.message_type === 'image' ? '📷 Imagem' : msg.message_type === 'audio' ? '🎵 Áudio' : '🎬 Vídeo'}
+          </p>
+        )}
+
+        {msg.status === 'failed' && providerError && (
+          <div className="mt-2 rounded-xl border border-destructive/20 bg-destructive/5 p-2 text-[11px] text-destructive/90 space-y-1">
+            {providerError.code && <p><span className="font-semibold">Código:</span> {providerError.code}</p>}
+            {(providerError.title || providerError.message) && <p><span className="font-semibold">Erro:</span> {providerError.title || providerError.message}</p>}
+            {providerError.details && <p><span className="font-semibold">Detalhe:</span> {providerError.details}</p>}
+          </div>
+        )}
+
+        <div className={`flex items-center justify-end gap-1.5 mt-1 ${
+          msg.status === 'failed' ? 'text-destructive/60' : msg.sender_type === 'agent' ? 'text-primary-foreground/60' : 'text-muted-foreground'
+        }`}>
+          {msg.sender_type === 'agent' && (() => {
+            const label = msg.sender_label;
+            const isHuman = label === 'humano' || (!label && msg.sender_agent_id);
+            const displayLabel = label === 'ia-vendedora' ? 'IA Vendedora'
+              : label === 'ia-follow-up' ? 'IA Follow-Up'
+              : label === 'fluxo' ? 'Fluxo'
+              : label === 'ia-seletora' ? 'IA Seletora'
+              : isHuman ? 'Humano'
+              : label ? label
+              : 'IA';
+            const Icon = isHuman ? UserRound : Bot;
+            return (
+              <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-px text-[9px] font-semibold ${
+                msg.status === 'failed'
+                  ? 'bg-destructive/10 text-destructive/70'
+                  : 'bg-primary-foreground/15 text-primary-foreground/70'
+              }`}>
+                <Icon className="h-2.5 w-2.5" /> {displayLabel}
+              </span>
+            );
+          })()}
+          <span className="text-[10px]">{format(new Date(msg.created_at), 'HH:mm')}</span>
+          {msg.sender_type === 'agent' && (
+            msg.status === 'failed'
+              ? <AlertTriangle className="h-3 w-3 text-destructive" />
+              : msg.status === 'read'
+                ? <CheckCheck className="h-3 w-3 text-blue-400" />
+                : msg.status === 'delivered'
+                  ? <CheckCheck className="h-3 w-3 opacity-80" />
+                  : msg.status === 'pending'
+                    ? <Clock className="h-3 w-3" />
+                    : <Check className="h-3 w-3" />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+});
+
+// ─── Main component ───
 interface ChatViewProps {
   embedded?: boolean;
   conversationId?: string;
@@ -93,8 +194,7 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
   const navigate = useNavigate();
   const [input, setInput] = useState('');
   const [conversation, setConversation] = useState<ConversationData | null>(null);
-  const [messages, setMessages] = useState<MessageData[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [convLoading, setConvLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [contactTags, setContactTags] = useState<ContactTag[]>([]);
   const [assignedAgent, setAssignedAgent] = useState<AgentProfile | null>(null);
@@ -105,8 +205,14 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
   const [saleRegistered, setSaleRegistered] = useState<Record<string, boolean>>({});
   const [blockedConnections, setBlockedConnections] = useState<{ id: string; label: string; status: string }[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const isLoadingOlderRef = useRef(false);
 
-  // Check for blocked/error connections
+  const { messages, setMessages, loading: msgsLoading, hasMore, loadMore, loadingMore, markAsRead } = useChatMessages(id);
+
+  const loading = convLoading || msgsLoading;
+
+  // Check for blocked connections (once, then every 5min)
   useEffect(() => {
     const checkConnections = async () => {
       const { data } = await supabase
@@ -115,11 +221,7 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
         .eq('is_connected', true);
       if (data) {
         const blocked = data.filter(c => c.status === 'error' || c.status === 'blocked');
-        setBlockedConnections(blocked.map(c => ({
-          id: c.id,
-          label: c.label || c.connection_id,
-          status: c.status,
-        })));
+        setBlockedConnections(blocked.map(c => ({ id: c.id, label: c.label || c.connection_id, status: c.status })));
       }
     };
     checkConnections();
@@ -127,21 +229,44 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
     return () => clearInterval(interval);
   }, []);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  // Scroll to bottom on new messages (but not when loading older)
+  useEffect(() => {
+    if (!isLoadingOlderRef.current && messages.length > 0) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages.length]);
 
-  const fetchConversation = async () => {
+  // Mark as read on initial load
+  useEffect(() => {
+    if (!msgsLoading && messages.length > 0) {
+      markAsRead();
+    }
+  }, [msgsLoading]);
+
+  const handleLoadMore = useCallback(async () => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    const prevHeight = container.scrollHeight;
+    isLoadingOlderRef.current = true;
+
+    await loadMore();
+
+    requestAnimationFrame(() => {
+      container.scrollTop += container.scrollHeight - prevHeight;
+      isLoadingOlderRef.current = false;
+    });
+  }, [loadMore]);
+
+  const fetchConversation = useCallback(async () => {
     if (!id) return;
     const { data } = await supabase
       .from('conversations')
-      .select('*')
+      .select('id, contact_name, contact_phone, status, tags, updated_at, created_at, assigned_agent_id, ctwa_clid, source_id, ad_title')
       .eq('id', id)
       .single();
     if (data) {
       setConversation(data);
 
-      // Run sub-queries in parallel
       const [agentResult, tagsResult, historyResult] = await Promise.all([
         data.assigned_agent_id
           ? supabase.from('profiles').select('id, full_name, avatar_url').eq('id', data.assigned_agent_id).single()
@@ -165,54 +290,17 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
         })));
       }
     }
-  };
-
-  const fetchMessages = async () => {
-    if (!id) return;
-    const { data } = await supabase
-      .from('messages')
-      .select('*')
-      .eq('conversation_id', id)
-      .order('created_at', { ascending: true });
-    if (data) setMessages(data);
-    setLoading(false);
-  };
-
-  const markMessagesAsRead = async () => {
-    if (!id) return;
-    await supabase
-      .from('messages')
-      .update({ status: 'read' })
-      .eq('conversation_id', id)
-      .eq('sender_type', 'customer')
-      .neq('status', 'read');
-  };
+    setConvLoading(false);
+  }, [id]);
 
   useEffect(() => {
+    setConvLoading(true);
+    setConversation(null);
     fetchConversation();
-    fetchMessages().then(() => markMessagesAsRead());
 
+    // Listen for conversation updates only
     const channel = supabase
-      .channel(`chat-${id}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${id}` }, (payload) => {
-        const incomingMessage = payload.new as MessageData;
-
-        setMessages(prev => {
-          if (prev.some(message => message.id === incomingMessage.id)) {
-            return prev;
-          }
-
-          return [...prev, incomingMessage];
-        });
-
-        if (incomingMessage.sender_type === 'customer') {
-          markMessagesAsRead();
-        }
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `conversation_id=eq.${id}` }, (payload) => {
-        const updatedMessage = payload.new as MessageData;
-        setMessages(prev => prev.map(message => message.id === updatedMessage.id ? updatedMessage : message));
-      })
+      .channel(`chat-conv-${id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations', filter: `id=eq.${id}` }, () => {
         fetchConversation();
       })
@@ -221,19 +309,14 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
     return () => { supabase.removeChannel(channel); };
   }, [id]);
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
   const handleSend = async () => {
     if (!input.trim() || !id || sending) return;
     const msg = input.trim();
     setInput('');
     setSending(true);
 
-    // Optimistic: show message instantly
     const optimisticId = `optimistic-${Date.now()}`;
-    const optimisticMsg: MessageData = {
+    const optimisticMsg: ChatMessage = {
       id: optimisticId,
       content: msg,
       sender_type: 'agent',
@@ -248,32 +331,24 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
       const result = await sendWhatsAppMessage(id, msg);
 
       if (result?.savedMessage) {
-        const savedMsg = result.savedMessage as MessageData;
+        const savedMsg = result.savedMessage as ChatMessage;
         setMessages(prev => {
           const withoutOptimistic = prev.filter(m => m.id !== optimisticId);
-          if (withoutOptimistic.some(m => m.id === savedMsg.id)) {
-            return withoutOptimistic;
-          }
+          if (withoutOptimistic.some(m => m.id === savedMsg.id)) return withoutOptimistic;
           return [...withoutOptimistic, savedMsg];
         });
-        // If the saved message is failed, show error toast
         if (savedMsg.status === 'failed') {
           toast.error('Erro ao enviar mensagem. Verifique a conexão do WhatsApp.');
         }
       } else {
-        // Remove optimistic if no saved message returned
         setMessages(prev => prev.filter(m => m.id !== optimisticId));
       }
-
-      fetchConversation();
     } catch (err: any) {
       console.error('Send error:', err);
-      // Before marking as failed, check if the message was actually saved in DB
-      // (edge function may have succeeded but response was lost)
       try {
         const { data: recentMsgs } = await supabase
           .from('messages')
-          .select('*')
+          .select('id, content, sender_type, message_type, status, created_at, media_url, provider_error, provider_status, sender_agent_id, sender_label')
           .eq('conversation_id', id)
           .eq('content', msg)
           .eq('sender_type', 'agent')
@@ -282,21 +357,18 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
 
         const recentMsg = recentMsgs?.[0];
         if (recentMsg && (Date.now() - new Date(recentMsg.created_at).getTime()) < 15000) {
-          // Message was actually saved — replace optimistic with real one
           setMessages(prev => {
             const withoutOptimistic = prev.filter(m => m.id !== optimisticId);
             if (withoutOptimistic.some(m => m.id === recentMsg.id)) return withoutOptimistic;
-            return [...withoutOptimistic, recentMsg as MessageData];
+            return [...withoutOptimistic, recentMsg as ChatMessage];
           });
           if (recentMsg.status === 'failed') {
             toast.error('Erro ao enviar mensagem. Verifique a conexão do WhatsApp.');
           }
-          fetchConversation();
           return;
         }
       } catch { /* ignore fallback check errors */ }
 
-      // Truly failed — no DB record found
       setMessages(prev => prev.map(m => m.id === optimisticId ? { ...m, status: 'failed' } : m));
       toast.error('Erro ao enviar mensagem. Verifique a conexão do WhatsApp.');
     } finally {
@@ -389,141 +461,23 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
         )}
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-3 scrollbar-thin bg-background">
-          {messages.map((msg, i) => (
-            (() => {
-              const providerError = parseProviderError(msg.provider_error);
-              return (
-            <motion.div
-              key={msg.id}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.2, delay: Math.min(i * 0.04, 0.5) }}
-              className={`flex ${msg.sender_type === 'agent' ? 'justify-end' : 'justify-start'}`}
-            >
-              <div
-                className={`max-w-[70%] rounded-2xl px-4 py-2.5 ${
-                  msg.status === 'failed'
-                    ? 'bg-destructive/10 border border-destructive/30 text-destructive rounded-br-md'
-                    : msg.sender_type === 'agent'
-                      ? 'bg-primary text-primary-foreground rounded-br-md'
-                      : 'bg-card border border-border text-card-foreground rounded-bl-md'
-                }`}
+        <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-6 space-y-3 scrollbar-thin bg-background">
+          {/* Load older messages */}
+          {hasMore && (
+            <div className="flex justify-center pb-2">
+              <button
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+                className="flex items-center gap-1.5 rounded-lg bg-secondary px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors disabled:opacity-50"
               >
-                {/* Failed banner */}
-                {msg.status === 'failed' && (
-                  <div className="flex items-center gap-1.5 mb-2 pb-1.5 border-b border-destructive/20">
-                    <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
-                    <span className="text-[11px] font-medium text-destructive">Falha no envio</span>
-                  </div>
-                )}
+                {loadingMore ? <Loader2 className="h-3 w-3 animate-spin" /> : <History className="h-3 w-3" />}
+                Carregar mensagens anteriores
+              </button>
+            </div>
+          )}
 
-                {/* Image */}
-                {msg.message_type === 'image' && msg.media_url && (
-                  <div className="mb-1.5">
-                    <img
-                      src={msg.media_url}
-                      alt="Imagem"
-                      className={`rounded-lg max-w-full max-h-64 object-cover cursor-pointer ${msg.status === 'failed' ? 'opacity-50' : ''}`}
-                      onClick={() => window.open(msg.media_url!, '_blank')}
-                      loading="lazy"
-                    />
-                  </div>
-                )}
-
-                {/* Audio */}
-                {msg.message_type === 'audio' && msg.media_url && (
-                  <div className={`mb-1.5 min-w-[220px] ${msg.status === 'failed' ? 'opacity-50' : ''}`}>
-                    <audio controls preload="none" className="w-full h-10 rounded-lg" style={{ filter: msg.sender_type === 'agent' && msg.status !== 'failed' ? 'invert(1) hue-rotate(180deg)' : 'none' }}>
-                      <source src={msg.media_url} />
-                    </audio>
-                  </div>
-                )}
-
-                {/* Video */}
-                {msg.message_type === 'video' && msg.media_url && (
-                  <div className={`mb-1.5 ${msg.status === 'failed' ? 'opacity-50' : ''}`}>
-                    <video controls preload="none" className="rounded-lg max-w-full max-h-64">
-                      <source src={msg.media_url} />
-                    </video>
-                  </div>
-                )}
-
-                {/* Text content */}
-                {msg.content && !(msg.message_type === 'audio' && msg.media_url && !msg.content.trim()) && (
-                  <p className={`text-sm leading-relaxed whitespace-pre-wrap ${msg.status === 'failed' ? 'text-destructive/80' : ''}`}>{msg.content}</p>
-                )}
-
-                {/* Fallback for media without URL */}
-                {(['image', 'audio', 'video'].includes(msg.message_type)) && !msg.media_url && !msg.content && (
-                  <p className="text-sm leading-relaxed italic opacity-70">
-                    {msg.message_type === 'image' ? '📷 Imagem' : msg.message_type === 'audio' ? '🎵 Áudio' : '🎬 Vídeo'}
-                  </p>
-                )}
-
-                {msg.status === 'failed' && providerError && (
-                  <div className="mt-2 rounded-xl border border-destructive/20 bg-destructive/5 p-2 text-[11px] text-destructive/90 space-y-1">
-                    {providerError.code && (
-                      <p>
-                        <span className="font-semibold">Código:</span> {providerError.code}
-                      </p>
-                    )}
-                    {(providerError.title || providerError.message) && (
-                      <p>
-                        <span className="font-semibold">Erro:</span> {providerError.title || providerError.message}
-                      </p>
-                    )}
-                    {providerError.details && (
-                      <p>
-                        <span className="font-semibold">Detalhe:</span> {providerError.details}
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                <div className={`flex items-center justify-end gap-1.5 mt-1 ${
-                  msg.status === 'failed' ? 'text-destructive/60' : msg.sender_type === 'agent' ? 'text-primary-foreground/60' : 'text-muted-foreground'
-                }`}>
-                  {msg.sender_type === 'agent' && (
-                    (() => {
-                      const label = msg.sender_label;
-                      const isHuman = label === 'humano' || (!label && msg.sender_agent_id);
-                      const displayLabel = label === 'ia-vendedora' ? 'IA Vendedora'
-                        : label === 'ia-follow-up' ? 'IA Follow-Up'
-                        : label === 'fluxo' ? 'Fluxo'
-                        : label === 'ia-seletora' ? 'IA Seletora'
-                        : isHuman ? 'Humano'
-                        : label ? label
-                        : 'IA';
-                      const Icon = isHuman ? UserRound : Bot;
-                      return (
-                        <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-px text-[9px] font-semibold ${
-                          msg.status === 'failed'
-                            ? 'bg-destructive/10 text-destructive/70'
-                            : 'bg-primary-foreground/15 text-primary-foreground/70'
-                        }`}>
-                          <Icon className="h-2.5 w-2.5" /> {displayLabel}
-                        </span>
-                      );
-                    })()
-                  )}
-                  <span className="text-[10px]">{format(new Date(msg.created_at), 'HH:mm')}</span>
-                  {msg.sender_type === 'agent' && (
-                    msg.status === 'failed'
-                      ? <AlertTriangle className="h-3 w-3 text-destructive" />
-                      : msg.status === 'read'
-                        ? <CheckCheck className="h-3 w-3 text-blue-400" />
-                        : msg.status === 'delivered'
-                          ? <CheckCheck className="h-3 w-3 opacity-80" />
-                          : msg.status === 'pending'
-                            ? <Clock className="h-3 w-3" />
-                            : <Check className="h-3 w-3" />
-                  )}
-                </div>
-              </div>
-            </motion.div>
-              );
-            })()
+          {messages.map((msg) => (
+            <MessageBubble key={msg.id} msg={msg} />
           ))}
           <div ref={messagesEndRef} />
         </div>
@@ -603,12 +557,7 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
               <button
                 onClick={() => {
                   const adParts = conversation.ad_title?.split(' › ') || [];
-                  setSaleData({
-                    valor: '',
-                    campanha: adParts[0] || '',
-                    pais: 'brasil',
-                    moeda: 'BRL',
-                  });
+                  setSaleData({ valor: '', campanha: adParts[0] || '', pais: 'brasil', moeda: 'BRL' });
                   setShowSaleDialog(true);
                 }}
                 className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white py-1.5 px-3 text-xs font-medium transition-colors"
@@ -686,6 +635,7 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
               </div>
             </div>
           )}
+
           {/* Contact Details */}
           <div>
             <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
@@ -775,11 +725,9 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
                 <div className="space-y-3">
                   {assignmentHistory.map((h, i) => (
                     <div key={h.id} className="relative flex gap-3">
-                      {/* Timeline line */}
                       {i < assignmentHistory.length - 1 && (
                         <div className="absolute left-[11px] top-6 bottom-0 w-px bg-border" />
                       )}
-                      {/* Dot */}
                       <div className={`flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full ${
                         !h.unassigned_at ? 'bg-primary/20 ring-2 ring-primary/30' : 'bg-muted'
                       }`}>
