@@ -85,7 +85,7 @@ export default function AiSettings() {
     const [nichesRes, flowsRes, connectionsRes] = await Promise.all([
       supabase.from('niches').select('*').order('created_at', { ascending: true }),
       supabase.from('automation_flows').select('id, name, description, is_active, niche_id').order('name'),
-      supabase.from('connection_configs').select('id, connection_id, label, status, is_connected').order('created_at'),
+      supabase.from('connection_configs').select('id, connection_id, label, status, is_connected').in('connection_id', ['whatsapp', 'zapi']).order('created_at'),
     ]);
 
     const nicheList = (nichesRes.data || []) as unknown as Niche[];
