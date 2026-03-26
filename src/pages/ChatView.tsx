@@ -561,22 +561,26 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="text-[11px] text-muted-foreground">País</label>
-                  <input
-                    type="text"
+                  <select
                     value={saleData.pais}
-                    onChange={(e) => setSaleData(prev => ({ ...prev, pais: e.target.value }))}
-                    placeholder="brasil"
+                    onChange={(e) => {
+                      const pais = e.target.value;
+                      const moeda = pais === 'uruguay' ? 'UYU' : 'BRL';
+                      setSaleData(prev => ({ ...prev, pais, moeda }));
+                    }}
                     className="w-full mt-1 rounded-lg border border-input bg-background px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
+                  >
+                    <option value="brasil">Brasil</option>
+                    <option value="uruguay">Uruguay</option>
+                  </select>
                 </div>
                 <div>
                   <label className="text-[11px] text-muted-foreground">Moeda</label>
                   <input
                     type="text"
                     value={saleData.moeda}
-                    onChange={(e) => setSaleData(prev => ({ ...prev, moeda: e.target.value }))}
-                    placeholder="BRL"
-                    className="w-full mt-1 rounded-lg border border-input bg-background px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
+                    readOnly
+                    className="w-full mt-1 rounded-lg border border-input bg-muted px-3 py-1.5 text-xs"
                   />
                 </div>
               </div>
