@@ -307,6 +307,20 @@ export default function ConnectionCard({ connection, onDeleted, onUpdated }: Con
                   <span className="text-right font-medium">{formatDiagnosticValue(diagnostics?.phone || values.phone_display)}</span>
                 </div>
                 <div className="flex items-start justify-between gap-3">
+                  <span className="text-muted-foreground">Status do Número</span>
+                  <span className={`text-right font-medium ${
+                    ['FLAGGED', 'RESTRICTED', 'RATE_LIMITED', 'BANNED', 'BLOCKED', 'DISABLED'].includes(String(diagnostics?.phone_status || '').toUpperCase()) 
+                      ? 'text-destructive' : ''
+                  }`}>{formatDiagnosticValue(diagnostics?.phone_status)}</span>
+                </div>
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-muted-foreground">Qualidade</span>
+                  <span className={`text-right font-medium ${
+                    String(diagnostics?.quality_rating || '').toUpperCase() === 'RED' ? 'text-destructive' 
+                    : String(diagnostics?.quality_rating || '').toUpperCase() === 'YELLOW' ? 'text-amber-600' : ''
+                  }`}>{formatDiagnosticValue(diagnostics?.quality_rating)}</span>
+                </div>
+                <div className="flex items-start justify-between gap-3">
                   <span className="text-muted-foreground">Erro</span>
                   <span className="text-right font-medium text-destructive">{formatDiagnosticValue(diagnostics?.error)}</span>
                 </div>
