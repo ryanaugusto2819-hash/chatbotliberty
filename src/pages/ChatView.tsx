@@ -104,30 +104,38 @@ const MessageBubble = memo(function MessageBubble({ msg }: MessageBubbleProps) {
         {/* Audio */}
         {msg.message_type === 'audio' && msg.media_url && (
           <div className={`mb-1.5 min-w-[220px] ${msg.status === 'failed' ? 'opacity-50' : ''}`}>
-            <audio controls preload="none" className="w-full h-10 rounded-lg" style={{ filter: msg.sender_type === 'agent' && msg.status !== 'failed' ? 'invert(1) hue-rotate(180deg)' : 'none' }}>
+            <audio controls preload="metadata" className="w-full h-10 rounded-lg" style={{ filter: msg.sender_type === 'agent' && msg.status !== 'failed' ? 'invert(1) hue-rotate(180deg)' : 'none' }}>
               <source src={msg.media_url} />
             </audio>
+          </div>
+        )}
+
+        {/* Audio without media_url — show transcription or fallback */}
+        {msg.message_type === 'audio' && !msg.media_url && (
+          <div className="flex items-center gap-2 min-w-[180px]">
+            <span className="text-lg">🎵</span>
+            <span className="text-sm italic opacity-70">Áudio (indisponível)</span>
           </div>
         )}
 
         {/* Video */}
         {msg.message_type === 'video' && msg.media_url && (
           <div className={`mb-1.5 ${msg.status === 'failed' ? 'opacity-50' : ''}`}>
-            <video controls preload="none" className="rounded-lg max-w-full max-h-64">
+            <video controls preload="metadata" className="rounded-lg max-w-full max-h-64">
               <source src={msg.media_url} />
             </video>
           </div>
         )}
 
-        {/* Text content */}
+        {/* Text content — always show for audio with transcription */}
         {msg.content && !(msg.message_type === 'audio' && msg.media_url && !msg.content.trim()) && (
           <p className={`text-sm leading-relaxed whitespace-pre-wrap ${msg.status === 'failed' ? 'text-destructive/80' : ''}`}>{msg.content}</p>
         )}
 
-        {/* Fallback for media without URL */}
-        {(['image', 'audio', 'video'].includes(msg.message_type)) && !msg.media_url && !msg.content && (
+        {/* Fallback for image/video without URL and no content */}
+        {(['image', 'video'].includes(msg.message_type)) && !msg.media_url && !msg.content && (
           <p className="text-sm leading-relaxed italic opacity-70">
-            {msg.message_type === 'image' ? '📷 Imagem' : msg.message_type === 'audio' ? '🎵 Áudio' : '🎬 Vídeo'}
+            {msg.message_type === 'image' ? '📷 Imagem' : '🎬 Vídeo'}
           </p>
         )}
 
