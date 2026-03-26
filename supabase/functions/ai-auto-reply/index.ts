@@ -304,7 +304,7 @@ Deno.serve(async (req) => {
       sender_type: "agent",
       message_type: "text",
       status: "sent",
-      sender_label: "ia-vendedora",
+      sender_label: "ia-auto-reply",
     });
 
     await supabase
