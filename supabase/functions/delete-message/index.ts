@@ -26,7 +26,7 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Fetch the message to get provider_message_id and conversation info
+    // Fetch the message
     const { data: message, error: fetchError } = await serviceClient
       .from("messages")
       .select("id, provider_message_id, conversation_id, sender_type")
@@ -40,14 +40,15 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Try to delete from WhatsApp if it's an agent message with provider_message_id
+    // Try to delete from WhatsApp/Z-API
     let whatsappDeleted = false;
-    if (message.provider_message_id && message.sender_type === "agent") {
+    let whatsappError: string | null = null;
+
+    if (message.provider_message_id) {
       try {
-        // Get conversation to find the connection
         const { data: conv } = await serviceClient
           .from("conversations")
-          .select("connection_config_id, niche_id")
+          .select("connection_config_id, contact_phone")
           .eq("id", message.conversation_id)
           .single();
 
@@ -62,34 +63,71 @@ Deno.serve(async (req) => {
             const cfg = connConfig.config as Record<string, string>;
 
             if (connConfig.connection_id === "whatsapp" && cfg?.access_token && cfg?.phone_number_id) {
-              // Meta Cloud API — delete message
+              // Meta Cloud API — delete message for everyone
+              // POST to /{phone_number_id}/messages with message_id
               const deleteRes = await fetch(
-                `https://graph.facebook.com/v21.0/${cfg.phone_number_id}/messages/${message.provider_message_id}`,
+                `https://graph.facebook.com/v21.0/${cfg.phone_number_id}/messages`,
                 {
                   method: "DELETE",
-                  headers: { Authorization: `Bearer ${cfg.access_token}` },
+                  headers: {
+                    Authorization: `Bearer ${cfg.access_token}`,
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    messaging_product: "whatsapp",
+                    message_id: message.provider_message_id,
+                  }),
                 }
               );
-              whatsappDeleted = deleteRes.ok;
-              if (!deleteRes.ok) {
-                console.log(`WhatsApp delete failed: ${deleteRes.status} — ${await deleteRes.text()}`);
+
+              if (deleteRes.ok) {
+                whatsappDeleted = true;
+              } else {
+                const errBody = await deleteRes.text();
+                console.error(`Meta delete failed [${deleteRes.status}]: ${errBody}`);
+                try {
+                  const parsed = JSON.parse(errBody);
+                  const metaErr = parsed?.error;
+                  whatsappError = metaErr?.error_user_msg || metaErr?.message || `Erro ${deleteRes.status}`;
+                } catch {
+                  whatsappError = `Erro HTTP ${deleteRes.status}`;
+                }
               }
             } else if (connConfig.connection_id === "zapi" && cfg?.instance_id && cfg?.token) {
               // Z-API — delete message
+              const phone = conv.contact_phone?.replace(/\D/g, "") || "";
               const zapiRes = await fetch(
-                `https://api.z-api.io/instances/${cfg.instance_id}/token/${cfg.token}/messages/${message.provider_message_id}`,
-                { method: "DELETE" }
+                `https://api.z-api.io/instances/${cfg.instance_id}/token/${cfg.token}/delete-message`,
+                {
+                  method: "DELETE",
+                  headers: { "Content-Type": "application/json", ...(cfg.client_token ? { "Client-Token": cfg.client_token } : {}) },
+                  body: JSON.stringify({
+                    phone,
+                    messageId: message.provider_message_id,
+                    owner: message.sender_type === "agent",
+                  }),
+                }
               );
-              whatsappDeleted = zapiRes.ok;
+
+              if (zapiRes.ok) {
+                whatsappDeleted = true;
+              } else {
+                const errText = await zapiRes.text();
+                console.error(`Z-API delete failed [${zapiRes.status}]: ${errText}`);
+                whatsappError = `Erro Z-API: ${zapiRes.status}`;
+              }
             }
           }
         }
       } catch (err) {
-        console.error("WhatsApp delete error (non-blocking):", err);
+        console.error("WhatsApp delete error:", err);
+        whatsappError = err instanceof Error ? err.message : "Erro desconhecido";
       }
+    } else {
+      whatsappError = "Mensagem sem ID do provedor — não é possível excluir do WhatsApp";
     }
 
-    // Delete from database
+    // Always delete from database
     const { error: deleteError } = await serviceClient
       .from("messages")
       .delete()
@@ -97,13 +135,13 @@ Deno.serve(async (req) => {
 
     if (deleteError) {
       return new Response(
-        JSON.stringify({ error: "Failed to delete message", details: deleteError.message }),
+        JSON.stringify({ error: "Failed to delete from database", details: deleteError.message }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     return new Response(
-      JSON.stringify({ success: true, whatsappDeleted }),
+      JSON.stringify({ success: true, whatsappDeleted, whatsappError }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
