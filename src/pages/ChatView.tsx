@@ -259,7 +259,8 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
 
   const { messages, setMessages, loading: msgsLoading, hasMore, loadMore, loadingMore, markAsRead } = useChatMessages(id);
 
-  const loading = convLoading || msgsLoading;
+  // Only block UI on messages loading — conversation metadata loads in background
+  const loading = msgsLoading;
 
   // Check for blocked connections (once, then every 5min)
   useEffect(() => {
@@ -557,7 +558,7 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
     );
   }
 
-  if (!conversation) {
+  if (!conversation && !convLoading) {
     return (
       <div className="flex h-screen items-center justify-center text-muted-foreground">
         Conversa não encontrada
@@ -575,15 +576,15 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
               <ArrowLeft className="h-4 w-4" />
             </button>
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-sm font-semibold text-accent-foreground">
-              {conversation.contact_name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+              {conversation ? conversation.contact_name.split(' ').map(n => n[0]).join('').slice(0, 2) : '..'}
             </div>
             <div>
-              <p className="text-sm font-semibold text-card-foreground">{conversation.contact_name}</p>
-              <p className="text-[11px] text-muted-foreground">{conversation.contact_phone}</p>
+              <p className="text-sm font-semibold text-card-foreground">{conversation?.contact_name || 'Carregando...'}</p>
+              <p className="text-[11px] text-muted-foreground">{conversation?.contact_phone || ''}</p>
             </div>
           </div>
           <div className="flex items-center gap-1">
-            <StatusBadge status={conversation.status as 'new' | 'pending' | 'active' | 'resolved'} />
+            {conversation && <StatusBadge status={conversation.status as 'new' | 'pending' | 'active' | 'resolved'} />}
             <button className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary transition-colors">
               <MoreVertical className="h-4 w-4" />
             </button>
