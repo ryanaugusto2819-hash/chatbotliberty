@@ -103,7 +103,29 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
   const [saleData, setSaleData] = useState({ valor: '', campanha: '', pais: 'brasil', moeda: 'BRL' });
   const [sendingSale, setSendingSale] = useState(false);
   const [saleRegistered, setSaleRegistered] = useState<Record<string, boolean>>({});
+  const [blockedConnections, setBlockedConnections] = useState<{ id: string; label: string; status: string }[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Check for blocked/error connections
+  useEffect(() => {
+    const checkConnections = async () => {
+      const { data } = await supabase
+        .from('connection_configs')
+        .select('id, label, status, connection_id')
+        .eq('is_connected', true);
+      if (data) {
+        const blocked = data.filter(c => c.status === 'error' || c.status === 'blocked');
+        setBlockedConnections(blocked.map(c => ({
+          id: c.id,
+          label: c.label || c.connection_id,
+          status: c.status,
+        })));
+      }
+    };
+    checkConnections();
+    const interval = setInterval(checkConnections, 60_000);
+    return () => clearInterval(interval);
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
