@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import {
   Clock, Plus, Trash2, Save, Loader2, Play,
   MessageSquare, CheckCircle, XCircle, AlertTriangle,
-  TrendingUp, Timer, Target, Zap, ArrowUpRight, BarChart3, Filter,
+  TrendingUp, Timer, Target, Zap, ArrowUpRight, BarChart3, Filter, ExternalLink,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
