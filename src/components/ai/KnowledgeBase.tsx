@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { BookOpen, Plus, Trash2, Upload, FileText, MessageSquare, Loader2 } from 'lucide-react';
+import { BookOpen, Plus, Trash2, Upload, FileText, MessageSquare, Loader2, Workflow, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 
@@ -14,7 +14,15 @@ interface KBItem {
   created_at: string;
 }
 
-type TabType = 'text' | 'qa' | 'file';
+interface FlowWithNodes {
+  id: string;
+  name: string;
+  description: string | null;
+  is_active: boolean;
+  nodes: { node_type: string; label: string; config: any; sort_order: number }[];
+}
+
+type TabType = 'text' | 'qa' | 'file' | 'flows';
 
 interface Props {
   nicheId?: string;
