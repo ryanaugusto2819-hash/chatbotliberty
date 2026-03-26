@@ -70,7 +70,7 @@ export default function AutoReplyLogs({ nicheId }: Props) {
           .select('conversation_id, content, created_at, sender_label')
           .in('conversation_id', convoIds)
           .eq('sender_type', 'agent')
-          .is('sender_label', null)
+          .or('sender_label.is.null,sender_label.eq.ia-auto-reply')
           .order('created_at', { ascending: false }),
       ]);
 
