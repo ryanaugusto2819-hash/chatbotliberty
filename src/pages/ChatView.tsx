@@ -493,10 +493,16 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
       });
       const result = await res.json();
       if (!res.ok) {
-        toast.error('Erro ao excluir mensagem');
+        toast.error('Erro ao excluir mensagem do banco');
         return;
       }
-      toast.success(result.whatsappDeleted ? 'Mensagem excluída do CRM e WhatsApp' : 'Mensagem excluída do CRM');
+      if (result.whatsappDeleted) {
+        toast.success('✅ Mensagem excluída do CRM e do WhatsApp');
+      } else if (result.whatsappError) {
+        toast.warning(`⚠️ Excluída do CRM, mas falhou no WhatsApp: ${result.whatsappError}`, { duration: 6000 });
+      } else {
+        toast.success('Mensagem excluída do CRM');
+      }
     } catch {
       toast.error('Erro ao excluir mensagem');
     }
