@@ -1036,6 +1036,35 @@ export type Database = {
           updated_at: string
         }[]
       }
+      get_inbox_page: {
+        Args: {
+          p_agent_id?: string
+          p_connection_ids?: string[]
+          p_last_customer?: boolean
+          p_limit?: number
+          p_offset?: number
+          p_only_unread?: boolean
+          p_search?: string
+          p_status?: string
+          p_tag_id?: string
+        }
+        Returns: {
+          assigned_agent_id: string
+          connection_config_id: string
+          contact_name: string
+          contact_phone: string
+          contact_tags: Json
+          id: string
+          last_message: string
+          last_message_sender: string
+          niche_id: string
+          status: string
+          tags: string[]
+          total_count: number
+          unread_count: number
+          updated_at: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

@@ -1,22 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import TopBar from '@/components/layout/TopBar';
 import StatusBadge from '@/components/shared/StatusBadge';
 import { supabase } from '@/integrations/supabase/client';
-import { Search, Loader2, X, Smartphone, Globe, Wifi, MessageCircle, ChevronDown, SlidersHorizontal } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Search, Loader2, X, Smartphone, Globe, MessageCircle, SlidersHorizontal } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useInboxQuery, type InboxFilters, type InboxConversation, type ContactTagInfo } from '@/hooks/useInboxQuery';
 
 const CONVERSATIONS_FILTERS_STORAGE_KEY = 'conversations-filters';
 
@@ -40,21 +33,18 @@ const defaultConversationFilters: PersistedConversationFilters = {
 
 const getStoredConversationFilters = (): PersistedConversationFilters => {
   if (typeof window === 'undefined') return defaultConversationFilters;
-
   const stored = window.localStorage.getItem(CONVERSATIONS_FILTERS_STORAGE_KEY)
     ?? window.sessionStorage.getItem(CONVERSATIONS_FILTERS_STORAGE_KEY);
   if (!stored) return defaultConversationFilters;
-
   try {
     const parsed = JSON.parse(stored);
-
     return {
       search: typeof parsed.search === 'string' ? parsed.search : defaultConversationFilters.search,
       activeFilter: typeof parsed.activeFilter === 'string' ? parsed.activeFilter : defaultConversationFilters.activeFilter,
       selectedTag: typeof parsed.selectedTag === 'string' ? parsed.selectedTag : defaultConversationFilters.selectedTag,
       selectedAgent: typeof parsed.selectedAgent === 'string' ? parsed.selectedAgent : defaultConversationFilters.selectedAgent,
       selectedConnections: Array.isArray(parsed.selectedConnections)
-        ? parsed.selectedConnections.filter((value: unknown): value is string => typeof value === 'string')
+        ? parsed.selectedConnections.filter((v: unknown): v is string => typeof v === 'string')
         : defaultConversationFilters.selectedConnections,
       onlyUnread: typeof parsed.onlyUnread === 'boolean' ? parsed.onlyUnread : defaultConversationFilters.onlyUnread,
     };
@@ -63,46 +53,71 @@ const getStoredConversationFilters = (): PersistedConversationFilters => {
   }
 };
 
-interface ConversationRow {
-  id: string;
-  contact_name: string;
-  contact_phone: string;
-  status: string;
-  tags: string[] | null;
-  updated_at: string;
-  last_message?: string;
-  unread_count?: number;
-  assigned_agent_id: string | null;
-  niche_id: string | null;
-  last_message_sender?: string;
-  connection_config_id: string | null;
-}
-
-interface TagOption {
-  id: string;
-  name: string;
-  color: string;
-}
-
-interface AgentOption {
-  id: string;
-  full_name: string;
-}
-
 interface ConnectionInfo {
   id: string;
   label: string;
   connection_id: string;
 }
 
-type ConnectionMap = Record<string, ConnectionInfo>;
-
 const statusFilters = ['all', 'last_customer'] as const;
 const statusLabels: Record<string, string> = { all: 'Todos', last_customer: 'Última Msg Cliente' };
 
+// ─── Memoized conversation item ───
+interface ConversationItemProps {
+  conversation: InboxConversation;
+  isSelected: boolean;
+  connectionInfo: ConnectionInfo | null;
+  onClick: (id: string) => void;
+}
+
+const ConversationItem = memo(function ConversationItem({ conversation: c, isSelected, connectionInfo, onClick }: ConversationItemProps) {
+  const cTags = c.contact_tags || [];
+
+  return (
+    <button
+      onClick={() => onClick(c.id)}
+      className={`flex items-center gap-4 w-full px-5 py-4 text-left hover:bg-secondary/40 transition-colors ${
+        isSelected ? 'bg-primary/5 border-l-2 border-primary' : ''
+      }`}
+    >
+      <div className="relative shrink-0">
+        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-accent text-sm font-semibold text-accent-foreground">
+          {c.contact_name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+        </div>
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between mb-0.5">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <p className={`text-sm font-semibold truncate ${c.unread_count > 0 ? 'text-card-foreground' : 'text-card-foreground/80'}`}>{c.contact_name}</p>
+            <ConnectionBadge conn={connectionInfo} />
+          </div>
+          <span className="text-[11px] text-muted-foreground shrink-0 ml-2">
+            {formatDistanceToNow(new Date(c.updated_at), { addSuffix: true, locale: ptBR })}
+          </span>
+        </div>
+        <p className={`text-xs truncate ${c.unread_count > 0 ? 'text-card-foreground font-medium' : 'text-muted-foreground'}`}>{c.last_message}</p>
+        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+          <StatusBadge status={c.status as 'new' | 'pending' | 'active' | 'resolved'} />
+          {cTags.map(t => (
+            <span
+              key={t.id}
+              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium text-white"
+              style={{ backgroundColor: t.color }}
+            >
+              {t.name}
+            </span>
+          ))}
+          {c.unread_count > 0 && (
+            <span className="ml-auto h-2.5 w-2.5 rounded-full bg-primary shrink-0" />
+          )}
+        </div>
+      </div>
+    </button>
+  );
+});
+
 function ConnectionBadge({ conn }: { conn: ConnectionInfo | null }) {
   if (!conn) return null;
-
   const isMeta = conn.connection_id === 'whatsapp';
   const Icon = isMeta ? Globe : Smartphone;
 
@@ -127,6 +142,7 @@ function ConnectionBadge({ conn }: { conn: ConnectionInfo | null }) {
   );
 }
 
+// ─── Main component ───
 interface ConversationsProps {
   embedded?: boolean;
   selectedId?: string;
@@ -136,141 +152,99 @@ interface ConversationsProps {
 export default function Conversations({ embedded, selectedId, onSelectConversation }: ConversationsProps = {}) {
   const navigate = useNavigate();
   const storedFilters = getStoredConversationFilters();
-  const [search, setSearch] = useState(storedFilters.search);
+  const [searchInput, setSearchInput] = useState(storedFilters.search);
+  const [debouncedSearch, setDebouncedSearch] = useState(storedFilters.search);
   const [activeFilter, setActiveFilter] = useState<string>(storedFilters.activeFilter);
   const [selectedTag, setSelectedTag] = useState<string>(storedFilters.selectedTag);
   const [selectedAgent, setSelectedAgent] = useState<string>(storedFilters.selectedAgent);
   const [selectedConnections, setSelectedConnections] = useState<string[]>(storedFilters.selectedConnections);
   const [onlyUnread, setOnlyUnread] = useState(storedFilters.onlyUnread);
-  const [conversations, setConversations] = useState<ConversationRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [tags, setTags] = useState<TagOption[]>([]);
-  const [agents, setAgents] = useState<AgentOption[]>([]);
-  const [allConnections, setAllConnections] = useState<ConnectionInfo[]>([]);
-  const [connectionMap, setConnectionMap] = useState<ConnectionMap>({});
-  const [contactTagMap, setContactTagMap] = useState<Record<string, TagOption[]>>({});
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
-  const fetchTags = async () => {
-    const { data } = await supabase.from('tags').select('id, name, color');
-    if (data) setTags(data);
-  };
-
-  const fetchAgents = async () => {
-    const { data } = await supabase.from('profiles').select('id, full_name');
-    if (data) setAgents(data);
-  };
-
-  const fetchConnections = async () => {
-    const { data: configs } = await supabase
-      .from('connection_configs')
-      .select('id, label, connection_id')
-      .eq('is_connected', true);
-
-    if (configs) {
-      setAllConnections(configs.map(c => ({ id: c.id, label: c.label, connection_id: c.connection_id })));
-
-      const map: ConnectionMap = {};
-      configs.forEach((c: any) => {
-        map[c.id] = { id: c.id, label: c.label, connection_id: c.connection_id };
-      });
-      setConnectionMap(map);
-    }
-  };
-
-  const fetchContactTags = async () => {
-    const { data } = await supabase.from('contact_tags').select('contact_phone, tag_id, tags(id, name, color)');
-    if (data) {
-      const map: Record<string, TagOption[]> = {};
-      data.forEach((ct: any) => {
-        if (!map[ct.contact_phone]) map[ct.contact_phone] = [];
-        if (ct.tags) map[ct.contact_phone].push(ct.tags);
-      });
-      setContactTagMap(map);
-    }
-  };
-
-  const fetchConversations = async () => {
-    const { data, error } = await supabase.rpc('get_conversations_with_last_message');
-
-    if (error) {
-      console.error('Error fetching conversations:', error);
-      setLoading(false);
-      return;
-    }
-
-    setConversations(
-      (data || []).map((c: any) => ({
-        ...c,
-        unread_count: c.unread_count || 0,
-      }))
-    );
-    setLoading(false);
-  };
-
+  // Debounce search input
   useEffect(() => {
-    fetchConversations();
-    fetchTags();
-    fetchAgents();
-    fetchContactTags();
-    fetchConnections();
+    const timer = setTimeout(() => setDebouncedSearch(searchInput), 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
-    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-    const debouncedFetch = () => {
-      if (document.hidden) return;
-      if (debounceTimer) clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => fetchConversations(), 2000);
-    };
+  // Compute filters for the query
+  const inboxFilters = useMemo<InboxFilters>(() => ({
+    search: debouncedSearch,
+    status: !['all', 'last_customer'].includes(activeFilter) ? activeFilter : '',
+    agentId: selectedAgent !== 'all' ? selectedAgent : null,
+    connectionIds: selectedConnections,
+    tagId: selectedTag !== 'all' ? selectedTag : null,
+    onlyUnread,
+    lastCustomer: activeFilter === 'last_customer',
+  }), [debouncedSearch, activeFilter, selectedAgent, selectedConnections, selectedTag, onlyUnread]);
 
-    const channel = supabase
-      .channel('conversations-realtime')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'conversations' }, debouncedFetch)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations' }, debouncedFetch)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, debouncedFetch)
-      .subscribe();
+  const { conversations, totalCount, isLoading, isFetchingNextPage, hasNextPage, fetchNextPage } = useInboxQuery(inboxFilters);
 
-    return () => {
-      if (debounceTimer) clearTimeout(debounceTimer);
-      supabase.removeChannel(channel);
-    };
-  }, []);
+  // Filter dropdown options
+  const { data: tags = [] } = useQuery({
+    queryKey: ['filter-tags'],
+    queryFn: async () => {
+      const { data } = await supabase.from('tags').select('id, name, color');
+      return data || [];
+    },
+    staleTime: 300_000,
+  });
 
+  const { data: agents = [] } = useQuery({
+    queryKey: ['filter-agents'],
+    queryFn: async () => {
+      const { data } = await supabase.from('profiles').select('id, full_name');
+      return data || [];
+    },
+    staleTime: 300_000,
+  });
+
+  const { data: allConnections = [] } = useQuery({
+    queryKey: ['filter-connections'],
+    queryFn: async () => {
+      const { data } = await supabase.from('connection_configs').select('id, label, connection_id').eq('is_connected', true);
+      return (data || []).map(c => ({ id: c.id, label: c.label, connection_id: c.connection_id })) as ConnectionInfo[];
+    },
+    staleTime: 300_000,
+  });
+
+  const connectionMap = useMemo(() => {
+    const map: Record<string, ConnectionInfo> = {};
+    allConnections.forEach(c => { map[c.id] = c; });
+    return map;
+  }, [allConnections]);
+
+  // Persist filters
   useEffect(() => {
     if (typeof window === 'undefined') return;
-
-    const serializedFilters = JSON.stringify({
-      search,
+    const serialized = JSON.stringify({
+      search: searchInput,
       activeFilter,
       selectedTag,
       selectedAgent,
       selectedConnections,
       onlyUnread,
     } satisfies PersistedConversationFilters);
+    window.localStorage.setItem(CONVERSATIONS_FILTERS_STORAGE_KEY, serialized);
+    window.sessionStorage.setItem(CONVERSATIONS_FILTERS_STORAGE_KEY, serialized);
+  }, [searchInput, activeFilter, selectedTag, selectedAgent, selectedConnections, onlyUnread]);
 
-    window.localStorage.setItem(CONVERSATIONS_FILTERS_STORAGE_KEY, serializedFilters);
-    window.sessionStorage.setItem(
-      CONVERSATIONS_FILTERS_STORAGE_KEY,
-      serializedFilters
+  // Infinite scroll observer
+  useEffect(() => {
+    if (!sentinelRef.current || !hasNextPage) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { threshold: 0.1 },
     );
-  }, [search, activeFilter, selectedTag, selectedAgent, selectedConnections, onlyUnread]);
-
-  const getConversationConnection = (connConfigId: string | null): ConnectionInfo | null => {
-    if (!connConfigId) return null;
-    return connectionMap[connConfigId] || null;
-  };
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const activeFiltersCount = (selectedTag !== 'all' ? 1 : 0) + (selectedAgent !== 'all' ? 1 : 0) + (selectedConnections.length > 0 ? 1 : 0) + (!['all', 'last_customer'].includes(activeFilter) ? 1 : 0);
-
-  const filtered = conversations.filter((c) => {
-    const matchesSearch = c.contact_name.toLowerCase().includes(search.toLowerCase()) || c.contact_phone.includes(search);
-    const matchesStatus = activeFilter === 'all'
-      || (activeFilter === 'last_customer' ? c.last_message_sender === 'customer' : c.status === activeFilter);
-    const matchesTag = selectedTag === 'all' || (contactTagMap[c.contact_phone] || []).some(t => t.id === selectedTag);
-    const matchesAgent = selectedAgent === 'all' || c.assigned_agent_id === selectedAgent;
-    const conn = getConversationConnection(c.connection_config_id);
-    const matchesConnection = selectedConnections.length === 0 || (conn && selectedConnections.includes(conn.id));
-    const matchesUnread = !onlyUnread || (c.unread_count && c.unread_count > 0);
-    return matchesSearch && matchesStatus && matchesTag && matchesAgent && matchesConnection && matchesUnread;
-  });
 
   const clearFilters = () => {
     setSelectedTag('all');
@@ -279,21 +253,21 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
     if (!['all', 'last_customer'].includes(activeFilter)) setActiveFilter('all');
   };
 
-  const handleConversationClick = (conversationId: string) => {
+  const handleConversationClick = useCallback((conversationId: string) => {
     if (onSelectConversation) {
       onSelectConversation(conversationId);
     } else {
       navigate(`/conversations/${conversationId}`);
     }
-  };
+  }, [onSelectConversation, navigate]);
 
   return (
     <div className={embedded ? 'flex flex-col h-full overflow-hidden' : ''}>
-      {!embedded && <TopBar title="Conversas" subtitle={`${conversations.length} conversas totais`} />}
+      {!embedded && <TopBar title="Conversas" subtitle={`${totalCount} conversas totais`} />}
       {embedded && (
         <div className="px-4 pt-4 pb-2 border-b border-border">
           <h2 className="text-sm font-semibold text-foreground">Conversas</h2>
-          <p className="text-[11px] text-muted-foreground">{conversations.length} conversas</p>
+          <p className="text-[11px] text-muted-foreground">{totalCount} conversas</p>
         </div>
       )}
       <div className={`${embedded ? 'p-3 flex-1 overflow-hidden flex flex-col' : 'p-6'} space-y-4`}>
@@ -302,8 +276,8 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
                 placeholder="Buscar por nome ou número..."
                 className="w-full rounded-lg border border-input bg-card pl-10 pr-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               />
@@ -458,62 +432,28 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
         </div>
 
         <div className={`rounded-xl border border-border bg-card shadow-elevated overflow-hidden ${embedded ? 'flex-1 overflow-y-auto' : ''}`}>
-          {loading ? (
+          {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
           ) : (
             <div className="divide-y divide-border">
-              {filtered.map((c, i) => {
-                const cTags = contactTagMap[c.contact_phone] || [];
-                const conn = getConversationConnection(c.connection_config_id);
-                return (
-                  <motion.button
-                    key={c.id}
-                    initial={{ opacity: 0, x: -8 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.2, delay: i * 0.03 }}
-                    onClick={() => handleConversationClick(c.id)}
-                    className={`flex items-center gap-4 w-full px-5 py-4 text-left hover:bg-secondary/40 transition-colors ${
-                      selectedId === c.id ? 'bg-primary/5 border-l-2 border-primary' : ''
-                    }`}
-                  >
-                    <div className="relative shrink-0">
-                      <div className="flex h-11 w-11 items-center justify-center rounded-full bg-accent text-sm font-semibold text-accent-foreground">
-                        {c.contact_name.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                      </div>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-0.5">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <p className={`text-sm font-semibold truncate ${c.unread_count && c.unread_count > 0 ? 'text-card-foreground' : 'text-card-foreground/80'}`}>{c.contact_name}</p>
-                          <ConnectionBadge conn={conn} />
-                        </div>
-                        <span className="text-[11px] text-muted-foreground shrink-0 ml-2">
-                          {formatDistanceToNow(new Date(c.updated_at), { addSuffix: true, locale: ptBR })}
-                        </span>
-                      </div>
-                      <p className={`text-xs truncate ${c.unread_count && c.unread_count > 0 ? 'text-card-foreground font-medium' : 'text-muted-foreground'}`}>{c.last_message}</p>
-                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                        <StatusBadge status={c.status as 'new' | 'pending' | 'active' | 'resolved'} />
-                        {cTags.map(t => (
-                          <span
-                            key={t.id}
-                            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium text-white"
-                            style={{ backgroundColor: t.color }}
-                          >
-                            {t.name}
-                          </span>
-                        ))}
-                        {c.unread_count != null && c.unread_count > 0 && (
-                          <span className="ml-auto h-2.5 w-2.5 rounded-full bg-primary shrink-0" />
-                        )}
-                      </div>
-                    </div>
-                  </motion.button>
-                );
-              })}
-              {filtered.length === 0 && (
+              {conversations.map((c) => (
+                <ConversationItem
+                  key={c.id}
+                  conversation={c}
+                  isSelected={selectedId === c.id}
+                  connectionInfo={c.connection_config_id ? connectionMap[c.connection_config_id] || null : null}
+                  onClick={handleConversationClick}
+                />
+              ))}
+              {/* Infinite scroll sentinel */}
+              {hasNextPage && (
+                <div ref={sentinelRef} className="flex items-center justify-center py-4">
+                  {isFetchingNextPage && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+                </div>
+              )}
+              {conversations.length === 0 && (
                 <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
                   Nenhuma conversa encontrada
                 </div>
