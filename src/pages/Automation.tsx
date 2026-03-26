@@ -217,6 +217,13 @@ export default function Automation() {
                       <BarChart3 className="h-4 w-4" />
                     </button>
                     <button
+                      onClick={(e) => duplicateFlow(flow.id, e)}
+                      className="text-muted-foreground hover:text-primary transition-colors"
+                      title="Duplicar Fluxo"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </button>
+                    <button
                       onClick={(e) => deleteFlow(flow.id, e)}
                       className="text-muted-foreground hover:text-destructive transition-colors"
                     >
