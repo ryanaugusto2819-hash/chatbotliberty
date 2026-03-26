@@ -122,14 +122,22 @@ export default function FollowUps() {
 
   const runNow = async () => {
     setRunning(true);
+    toast.info('Executando follow-ups... isso pode levar alguns minutos.');
     try {
-      const { data, error } = await supabase.functions.invoke('ai-follow-up');
+      const { data, error } = await supabase.functions.invoke('ai-follow-up', {
+        body: {},
+      });
       if (error) throw error;
       toast.success(`Follow-ups processados: ${data?.processed || 0} enviados`);
       fetchAll();
     } catch (e: any) {
-      toast.error('Erro ao executar follow-ups');
-      console.error(e);
+      if (e?.message?.includes('timeout') || e?.message?.includes('abort')) {
+        toast.info('A execução está em andamento no servidor. Os resultados aparecerão no histórico em breve.');
+        setTimeout(() => fetchAll(), 10000);
+      } else {
+        toast.error(`Erro ao executar follow-ups: ${e?.message || 'erro desconhecido'}`);
+        console.error(e);
+      }
     }
     setRunning(false);
   };
