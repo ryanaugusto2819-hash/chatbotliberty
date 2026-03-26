@@ -1,0 +1,1 @@
+ALTER TABLE public.conversations ADD COLUMN IF NOT EXISTS sale_registered_at timestamp with time zone DEFAULT NULL;

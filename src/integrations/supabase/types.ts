@@ -313,6 +313,7 @@ export type Database = {
           id: string
           niche_id: string | null
           resolved_at: string | null
+          sale_registered_at: string | null
           source_id: string | null
           status: string
           tags: string[] | null
@@ -331,6 +332,7 @@ export type Database = {
           id?: string
           niche_id?: string | null
           resolved_at?: string | null
+          sale_registered_at?: string | null
           source_id?: string | null
           status?: string
           tags?: string[] | null
@@ -349,6 +351,7 @@ export type Database = {
           id?: string
           niche_id?: string | null
           resolved_at?: string | null
+          sale_registered_at?: string | null
           source_id?: string | null
           status?: string
           tags?: string[] | null
