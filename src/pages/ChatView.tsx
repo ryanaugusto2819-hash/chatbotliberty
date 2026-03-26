@@ -334,6 +334,18 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
           </div>
         </div>
 
+        {/* Blocked connection warning */}
+        {blockedConnections.length > 0 && (
+          <div className="mx-4 mt-2 flex items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-2.5 text-sm text-destructive">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <span className="font-medium">
+              ⚠️ {blockedConnections.length === 1 ? 'Conexão com problema' : `${blockedConnections.length} conexões com problemas`}:
+              {' '}{blockedConnections.map(c => c.label).join(', ')}
+              {' '}— Verifique na página de Conexões.
+            </span>
+          </div>
+        )}
+
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-6 space-y-3 scrollbar-thin bg-background">
           {messages.map((msg, i) => (
