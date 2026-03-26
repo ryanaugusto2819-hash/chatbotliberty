@@ -141,12 +141,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       syncSession(nextSession, { blockUi: shouldBlockUi });
     });
 
+    // Safety timeout: if auth takes too long, stop blocking UI
+    const safetyTimeout = setTimeout(() => {
+      if (mounted && !hasInitialized) {
+        console.warn('Auth initialization timed out, unblocking UI');
+        hasInitialized = true;
+        setLoading(false);
+      }
+    }, 8000);
+
     supabase.auth
       .getSession()
       .then(({ data: { session: currentSession } }) => {
+        clearTimeout(safetyTimeout);
         syncSession(currentSession, { initialize: true, blockUi: true });
       })
       .catch((e) => {
+        clearTimeout(safetyTimeout);
         console.error('Error fetching session:', e);
         if (mounted) {
           setLoading(false);
