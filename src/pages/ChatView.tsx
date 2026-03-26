@@ -191,6 +191,7 @@ const MessageBubble = memo(function MessageBubble({ msg, onDelete }: MessageBubb
             const label = msg.sender_label;
             const isHuman = label === 'humano' || (!label && msg.sender_agent_id);
             const displayLabel = label === 'ia-vendedora' ? 'IA Vendedora'
+              : label === 'ia-auto-reply' ? 'IA Vendedora'
               : label === 'ia-follow-up' ? 'IA Follow-Up'
               : label === 'fluxo' ? 'Fluxo'
               : label === 'ia-seletora' ? 'IA Seletora'
