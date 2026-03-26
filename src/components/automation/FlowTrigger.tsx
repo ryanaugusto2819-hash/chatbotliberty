@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { executeFlow } from '@/lib/automation';
-import { GitBranch, Loader2, X } from 'lucide-react';
+import { GitBranch, Loader2, X, Search } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface FlowOption {
@@ -18,6 +18,13 @@ export default function FlowTrigger({ conversationId }: FlowTriggerProps) {
   const [open, setOpen] = useState(false);
   const [flows, setFlows] = useState<FlowOption[]>([]);
   const [executing, setExecuting] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return flows;
+    const q = search.toLowerCase();
+    return flows.filter(f => f.name.toLowerCase().includes(q));
+  }, [flows, search]);
 
   useEffect(() => {
     if (open) {
@@ -70,11 +77,21 @@ export default function FlowTrigger({ conversationId }: FlowTriggerProps) {
           <X className="h-3.5 w-3.5" />
         </button>
       </div>
-      {flows.length === 0 ? (
-        <p className="text-xs text-muted-foreground py-2">Nenhum fluxo criado</p>
+      <div className="relative mb-2">
+        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+        <input
+          type="text"
+          placeholder="Buscar fluxo..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full rounded-lg border border-border bg-background pl-7 pr-3 py-1.5 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+        />
+      </div>
+      {filtered.length === 0 ? (
+        <p className="text-xs text-muted-foreground py-2">{flows.length === 0 ? 'Nenhum fluxo criado' : 'Nenhum resultado'}</p>
       ) : (
         <div className="space-y-1 max-h-40 overflow-y-auto">
-          {flows.map((f) => (
+          {filtered.map((f) => (
             <button
               key={f.id}
               onClick={() => trigger(f.id)}
