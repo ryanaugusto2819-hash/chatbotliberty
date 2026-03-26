@@ -13,7 +13,6 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
-/** Get funnel stage info from database stages map */
 function getFunnelStageInfo(
   stage: string,
   stagesMap: Map<string, { label: string; description: string; strategy: string }>
@@ -44,7 +43,8 @@ Deno.serve(async (req) => {
     }
 
     const now = new Date();
-    const currentHour = now.getUTCHours() - 3; // BRT approximation
+    const currentHour = now.getUTCHours() - 3;
+    const normalizedHour = currentHour < 0 ? currentHour + 24 : currentHour;
 
     // Get all active templates
     const { data: templates } = await supabase
@@ -54,116 +54,125 @@ Deno.serve(async (req) => {
       .order("escalation_level", { ascending: true });
 
     if (!templates?.length) {
+      console.log("[ai-follow-up] No active templates");
       return jsonResponse({ processed: 0, reason: "No active templates" });
     }
 
-    // Get niche data for system prompts & knowledge base
-    const nicheIds = [...new Set(templates.map((t: any) => t.niche_id).filter(Boolean))];
-    const { data: nichesData } = nicheIds.length
-      ? await supabase.from("niches").select("id, name, system_prompt").in("id", nicheIds)
-      : { data: [] };
-    const nichesMap = new Map((nichesData || []).map((n: any) => [n.id, n]));
+    // Filter templates by active hours FIRST
+    const activeTemplates = templates.filter((t: any) => {
+      return normalizedHour >= t.active_hours_start && normalizedHour < t.active_hours_end;
+    });
 
-    // Get knowledge base items for context
-    const { data: kbItems } = nicheIds.length
-      ? await supabase.from("knowledge_base_items").select("title, content, niche_id").in("niche_id", nicheIds).limit(50)
-      : { data: [] };
+    if (!activeTemplates.length) {
+      console.log(`[ai-follow-up] No templates active at hour ${normalizedHour}`);
+      return jsonResponse({ processed: 0, reason: `No templates active at hour ${normalizedHour}` });
+    }
 
-    // Get funnel stages per niche
-    const { data: allStages } = nicheIds.length
-      ? await supabase.from("niche_funnel_stages").select("*").in("niche_id", nicheIds).order("sort_order")
-      : { data: [] };
-    // Build a map: niche_id -> Map<stage_key, {label, description, strategy}>
+    // Find minimum delay to filter conversations efficiently
+    const minDelay = Math.min(...activeTemplates.map((t: any) => t.delay_hours));
+    const cutoffTime = new Date(now.getTime() - minDelay * 60 * 60 * 1000).toISOString();
+
+    // Get niche IDs from active templates
+    const nicheIds = [...new Set(activeTemplates.map((t: any) => t.niche_id).filter(Boolean))];
+
+    if (!nicheIds.length) {
+      console.log("[ai-follow-up] No niches configured in active templates");
+      return jsonResponse({ processed: 0, reason: "No niches in templates" });
+    }
+
+    // Only get conversations that:
+    // 1. Are not resolved
+    // 2. Belong to a niche with active templates
+    // 3. Were updated before the minimum delay cutoff (haven't had activity recently)
+    const { data: conversations } = await supabase
+      .from("conversations")
+      .select("id, contact_name, contact_phone, niche_id, status, updated_at, tags, ad_title, funnel_stage")
+      .neq("status", "resolved")
+      .in("niche_id", nicheIds)
+      .lt("updated_at", cutoffTime)
+      .order("updated_at", { ascending: true })
+      .limit(30);
+
+    if (!conversations?.length) {
+      console.log(`[ai-follow-up] No eligible conversations (cutoff: ${cutoffTime})`);
+      return jsonResponse({ processed: 0, reason: "No eligible conversations" });
+    }
+
+    console.log(`[ai-follow-up] Processing ${conversations.length} conversations (of ${nicheIds.length} niches)`);
+
+    // Load niche data in parallel
+    const [nichesRes, kbRes, stagesRes] = await Promise.all([
+      supabase.from("niches").select("id, name, system_prompt").in("id", nicheIds),
+      supabase.from("knowledge_base_items").select("title, content, niche_id").in("niche_id", nicheIds).limit(50),
+      supabase.from("niche_funnel_stages").select("*").in("niche_id", nicheIds).order("sort_order"),
+    ]);
+
+    const nichesMap = new Map((nichesRes.data || []).map((n: any) => [n.id, n]));
+
     const nicheStagesMap = new Map<string, Map<string, { label: string; description: string; strategy: string }>>();
-    for (const s of (allStages || [])) {
+    for (const s of (stagesRes.data || [])) {
       if (!nicheStagesMap.has(s.niche_id)) nicheStagesMap.set(s.niche_id, new Map());
       nicheStagesMap.get(s.niche_id)!.set(s.stage_key, { label: s.label, description: s.description, strategy: s.strategy });
     }
 
-    // Find conversations that are NOT resolved
-    const { data: conversations } = await supabase
-      .from("conversations")
-      .select("id, contact_name, contact_phone, niche_id, status, updated_at, tags, ad_title, funnel_stage")
-      .neq("status", "resolved");
-
-    if (!conversations?.length) {
-      return jsonResponse({ processed: 0, reason: "No open conversations" });
-    }
-
     let totalSent = 0;
-    let totalSkipped = 0;
 
     for (const conv of conversations) {
-      // Get more messages for richer context (up to 30)
+      // Get recent messages for this conversation
       const { data: lastMessages } = await supabase
         .from("messages")
         .select("sender_type, created_at, content, message_type, media_url")
         .eq("conversation_id", conv.id)
         .order("created_at", { ascending: false })
-        .limit(30);
+        .limit(20);
 
       if (!lastMessages?.length) continue;
 
       const lastMsg = lastMessages[0];
-      // Skip if last message is from customer (they already responded)
+      // Skip if last message is from customer (they already responded, no need for follow-up)
       if (lastMsg.sender_type === "customer") continue;
 
       const lastMsgTime = new Date(lastMsg.created_at);
       const hoursSinceLastMsg = (now.getTime() - lastMsgTime.getTime()) / (1000 * 60 * 60);
 
-      // Use the stored funnel stage from the conversation (set by flow actions)
       const nicheStages = conv.niche_id ? nicheStagesMap.get(conv.niche_id) || new Map() : new Map();
       const funnelStage = getFunnelStageInfo(conv.funnel_stage || "etapa_1", nicheStages);
 
-      // Get existing follow-up executions for this conversation
+      // Get existing follow-up executions
       const { data: existingExecs } = await supabase
         .from("follow_up_executions")
         .select("template_id, attempt_number, status")
         .eq("conversation_id", conv.id)
         .order("created_at", { ascending: false });
 
-      // Find the right template based on niche
-      const nicheTemplates = templates.filter(
-        (t: any) => t.niche_id === conv.niche_id
-      );
-
+      const nicheTemplates = activeTemplates.filter((t: any) => t.niche_id === conv.niche_id);
       if (!nicheTemplates.length) continue;
 
+      let sentForConv = false;
+
       for (const template of nicheTemplates) {
-        // Check if template matches the lead's funnel stage
+        if (sentForConv) break;
+
+        // Check funnel stage match
         const templateStage = template.funnel_stage || 'all';
         const convStage = conv.funnel_stage || 'etapa_1';
-        if (templateStage !== 'all' && templateStage !== convStage) {
-          continue;
-        }
+        if (templateStage !== 'all' && templateStage !== convStage) continue;
 
-        // Check active hours
-        const normalizedHour = currentHour < 0 ? currentHour + 24 : currentHour;
-        if (normalizedHour < template.active_hours_start || normalizedHour >= template.active_hours_end) {
-          continue;
-        }
-
-        // Check if enough time has passed
+        // Check delay
         if (hoursSinceLastMsg < template.delay_hours) continue;
 
-        // Check attempts for this template
-        const templateExecs = (existingExecs || []).filter(
-          (e: any) => e.template_id === template.id
-        );
+        // Check attempts
+        const templateExecs = (existingExecs || []).filter((e: any) => e.template_id === template.id);
         const attemptsDone = templateExecs.length;
-
         if (attemptsDone >= template.max_attempts) continue;
 
-        // Check if already has a pending execution
-        const hasPending = templateExecs.some((e: any) => e.status === "pending");
-        if (hasPending) continue;
+        // Check pending
+        if (templateExecs.some((e: any) => e.status === "pending")) continue;
 
         // Check if customer responded after last follow-up
         const lastExec = templateExecs[0];
         if (lastExec && lastExec.status === "sent") {
-          const customerMsgAfterFollowUp = lastMessages.find(
-            (m: any) => m.sender_type === "customer"
-          );
+          const customerMsgAfterFollowUp = lastMessages.find((m: any) => m.sender_type === "customer");
           if (customerMsgAfterFollowUp) {
             await supabase
               .from("follow_up_executions")
@@ -175,7 +184,7 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Build rich context from conversation history
+        // Build context
         const allMsgsChronological = [...lastMessages].reverse();
         const recentMessages = allMsgsChronological
           .map((m: any) => {
@@ -192,16 +201,13 @@ Deno.serve(async (req) => {
           })
           .join("\n");
 
-        // Get niche-specific knowledge base
-        const nicheKb = (kbItems || []).filter((k: any) => k.niche_id === conv.niche_id);
+        const nicheKb = (kbRes.data || []).filter((k: any) => k.niche_id === conv.niche_id);
         const kbContext = nicheKb.length
           ? `\n\nBASE DE CONHECIMENTO DO NICHO:\n${nicheKb.map((k: any) => `- ${k.title}: ${k.content.substring(0, 300)}`).join("\n")}`
           : "";
 
-        // Get niche info
         const nicheInfo = conv.niche_id ? nichesMap.get(conv.niche_id) : null;
 
-        // Build comprehensive system prompt
         const systemPrompt = `Você é um especialista em follow-up de vendas via WhatsApp. Gere uma mensagem de follow-up altamente personalizada com base no CONTEXTO COMPLETO da conversa e na ETAPA DO FUNIL em que o lead se encontra.
 
 ${nicheInfo ? `NICHO: ${nicheInfo.name}\nCONTEXTO DO NEGÓCIO: ${nicheInfo.system_prompt}` : ""}
@@ -232,7 +238,7 @@ REGRAS:
 12. ${conv.ad_title ? `O lead veio do anúncio: "${conv.ad_title}". Use isso como contexto se relevante.` : ""}
 13. ${(conv.tags || []).length > 0 ? `Tags do contato: ${conv.tags!.join(", ")}. Podem indicar interesses ou estágio.` : ""}`;
 
-        // Use AI to generate personalized follow-up
+        // Generate AI follow-up
         const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
           method: "POST",
           headers: {
@@ -261,13 +267,12 @@ Gere a mensagem de follow-up:`,
         });
 
         if (!aiResponse.ok) {
-          console.error("AI error:", aiResponse.status);
+          console.error(`[ai-follow-up] AI error for ${conv.contact_name}: ${aiResponse.status}`);
           continue;
         }
 
         const aiResult = await aiResponse.json();
         const followUpMessage = aiResult.choices?.[0]?.message?.content?.trim();
-
         if (!followUpMessage) continue;
 
         // Log AI usage
@@ -283,7 +288,7 @@ Gere a mensagem de follow-up:`,
           });
         }
 
-        // Insert follow-up execution as pending
+        // Insert execution
         await supabase.from("follow_up_executions").insert({
           conversation_id: conv.id,
           template_id: template.id,
@@ -293,7 +298,7 @@ Gere a mensagem de follow-up:`,
           message_sent: followUpMessage,
         });
 
-        // Determine which send function to use based on niche connection
+        // Determine send function
         let sendFunction = "whatsapp-send";
         const sendBody: Record<string, unknown> = {
           to: conv.contact_phone,
@@ -344,19 +349,18 @@ Gere a mensagem de follow-up:`,
             .eq("attempt_number", attemptsDone + 1);
 
           totalSent++;
-          console.log(`Follow-up sent to ${conv.contact_name} (template: ${template.name}, attempt: ${attemptsDone + 1}, funnel: ${funnelStage.label})`);
+          sentForConv = true;
+          console.log(`[ai-follow-up] ✅ Sent to ${conv.contact_name} (template: ${template.name}, attempt: ${attemptsDone + 1}, funnel: ${funnelStage.label})`);
         } else {
-          console.error(`Failed to send follow-up to ${conv.contact_name}:`, await sendResp.text());
+          console.error(`[ai-follow-up] ❌ Failed to send to ${conv.contact_name}:`, await sendResp.text());
         }
-
-        // Only send one follow-up per conversation per cycle
-        break;
       }
     }
 
-    return jsonResponse({ processed: totalSent, skipped: totalSkipped });
+    console.log(`[ai-follow-up] Finished: ${totalSent} sent`);
+    return jsonResponse({ processed: totalSent });
   } catch (error) {
-    console.error("Follow-up error:", error);
+    console.error("[ai-follow-up] Error:", error);
     return jsonResponse({ error: "Internal server error" }, 500);
   }
 });
