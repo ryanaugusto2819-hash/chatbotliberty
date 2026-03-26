@@ -73,7 +73,39 @@ const MessageBubble = memo(function MessageBubble({ msg, onDelete }: MessageBubb
   const providerError = parseProviderError(msg.provider_error);
 
   return (
-    <div className={`flex ${msg.sender_type === 'agent' ? 'justify-end' : 'justify-start'}`}>
+    <div
+      className={`group relative flex ${msg.sender_type === 'agent' ? 'justify-end' : 'justify-start'}`}
+      onMouseLeave={() => { setShowMenu(false); setConfirming(false); }}
+    >
+      {/* Delete button — appears on hover */}
+      <div className={`absolute top-1 ${msg.sender_type === 'agent' ? 'left-0 -translate-x-full pr-1' : 'right-0 translate-x-full pl-1'} opacity-0 group-hover:opacity-100 transition-opacity z-10`}>
+        {confirming ? (
+          <div className="flex items-center gap-1 rounded-lg bg-destructive/90 px-2 py-1 shadow-lg">
+            <span className="text-[10px] text-white whitespace-nowrap">Excluir?</span>
+            <button
+              onClick={() => { onDelete?.(msg.id); setConfirming(false); setShowMenu(false); }}
+              className="text-[10px] font-bold text-white hover:underline"
+            >
+              Sim
+            </button>
+            <button
+              onClick={() => setConfirming(false)}
+              className="text-[10px] text-white/70 hover:underline"
+            >
+              Não
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setConfirming(true)}
+            className="flex h-7 w-7 items-center justify-center rounded-full bg-card border border-border shadow-sm hover:bg-destructive/10 hover:text-destructive transition-colors text-muted-foreground"
+            title="Excluir mensagem"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+
       <div
         className={`max-w-[70%] rounded-2xl px-4 py-2.5 ${
           msg.status === 'failed'
