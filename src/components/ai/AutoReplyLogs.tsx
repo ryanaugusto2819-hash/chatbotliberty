@@ -69,7 +69,8 @@ export default function AutoReplyLogs({ nicheId }: Props) {
           .from('messages')
           .select('conversation_id, content, created_at, sender_label')
           .in('conversation_id', convoIds)
-          .eq('sender_label', 'ia-vendedora')
+          .eq('sender_type', 'agent')
+          .is('sender_label', null)
           .order('created_at', { ascending: false }),
       ]);
 
