@@ -14,6 +14,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import KnowledgeBase from '@/components/ai/KnowledgeBase';
 import NicheFollowUps from '@/components/follow-ups/NicheFollowUps';
+import AutoReplyLogs from '@/components/ai/AutoReplyLogs';
 
 interface Niche {
   id: string;
@@ -396,6 +397,9 @@ export default function AiSettings() {
               </TabsTrigger>
               <TabsTrigger value="knowledge" className="flex-1 gap-2">
                 <BookOpen className="h-4 w-4" /> Conhecimento
+              </TabsTrigger>
+              <TabsTrigger value="autoreply-logs" className="flex-1 gap-2">
+                <MessageSquare className="h-4 w-4" /> Logs IA
               </TabsTrigger>
               <TabsTrigger value="followups" className="flex-1 gap-2">
                 <Clock className="h-4 w-4" /> Follow-ups
