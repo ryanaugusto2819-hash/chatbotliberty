@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { BookOpen, Plus, Trash2, Upload, FileText, MessageSquare, Loader2 } from 'lucide-react';
+import { BookOpen, Plus, Trash2, Upload, FileText, MessageSquare, Loader2, Workflow, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 
@@ -14,7 +14,15 @@ interface KBItem {
   created_at: string;
 }
 
-type TabType = 'text' | 'qa' | 'file';
+interface FlowWithNodes {
+  id: string;
+  name: string;
+  description: string | null;
+  is_active: boolean;
+  nodes: { node_type: string; label: string; config: any; sort_order: number }[];
+}
+
+type TabType = 'text' | 'qa' | 'file' | 'flows';
 
 interface Props {
   nicheId?: string;
@@ -171,10 +179,125 @@ export default function KnowledgeBase({ nicheId }: Props) {
     }
   };
 
+  const [flows, setFlows] = useState<FlowWithNodes[]>([]);
+  const [loadingFlows, setLoadingFlows] = useState(false);
+  const [importingFlowId, setImportingFlowId] = useState<string | null>(null);
+
+  const fetchFlows = async () => {
+    if (!nicheId) return;
+    setLoadingFlows(true);
+    const { data: flowData } = await supabase
+      .from('automation_flows')
+      .select('id, name, description, is_active')
+      .eq('niche_id', nicheId)
+      .order('name');
+
+    if (flowData && flowData.length > 0) {
+      const flowIds = flowData.map(f => f.id);
+      const { data: nodesData } = await supabase
+        .from('automation_nodes')
+        .select('flow_id, node_type, label, config, sort_order')
+        .in('flow_id', flowIds)
+        .order('sort_order');
+
+      const mapped: FlowWithNodes[] = flowData.map(f => ({
+        ...f,
+        nodes: (nodesData || []).filter(n => n.flow_id === f.id),
+      }));
+      setFlows(mapped);
+    } else {
+      setFlows([]);
+    }
+    setLoadingFlows(false);
+  };
+
+  useEffect(() => {
+    if (activeTab === 'flows') fetchFlows();
+  }, [activeTab, nicheId]);
+
+  const formatFlowAsKnowledge = (flow: FlowWithNodes): string => {
+    const lines: string[] = [];
+    lines.push(`Fluxo: ${flow.name}`);
+    if (flow.description) lines.push(`Descrição: ${flow.description}`);
+    lines.push(`Status: ${flow.is_active ? 'Ativo' : 'Inativo'}`);
+    lines.push(`Total de etapas: ${flow.nodes.length}`);
+    lines.push('');
+    lines.push('--- ETAPAS DO FLUXO ---');
+
+    for (const node of flow.nodes) {
+      lines.push('');
+      lines.push(`[${node.sort_order + 1}] ${node.label} (${node.node_type})`);
+      const cfg = node.config as Record<string, any> || {};
+
+      if (node.node_type === 'message' || node.node_type === 'text') {
+        if (cfg.text) lines.push(`  Mensagem: ${cfg.text}`);
+        if (cfg.mediaUrl) lines.push(`  Mídia: ${cfg.mediaUrl}`);
+        if (cfg.mediaType) lines.push(`  Tipo de mídia: ${cfg.mediaType}`);
+      } else if (node.node_type === 'delay') {
+        lines.push(`  Atraso: ${cfg.delay || cfg.seconds || 0}s`);
+      } else if (node.node_type === 'set_funnel_stage') {
+        lines.push(`  Define etapa do funil: ${cfg.stage || cfg.stageKey || 'N/A'}`);
+      } else if (node.node_type === 'tag') {
+        lines.push(`  Etiqueta: ${cfg.tagName || cfg.tag || 'N/A'}`);
+      } else if (node.node_type === 'webhook') {
+        lines.push(`  Webhook URL: ${cfg.url || 'N/A'}`);
+      } else if (node.node_type === 'quick_reply') {
+        lines.push(`  Resposta rápida: ${cfg.text || ''}`);
+        if (cfg.buttons) lines.push(`  Botões: ${JSON.stringify(cfg.buttons)}`);
+      } else {
+        const cfgStr = JSON.stringify(cfg);
+        if (cfgStr !== '{}') lines.push(`  Config: ${cfgStr}`);
+      }
+    }
+
+    return lines.join('\n');
+  };
+
+  const importFlow = async (flow: FlowWithNodes) => {
+    setImportingFlowId(flow.id);
+    const content = formatFlowAsKnowledge(flow);
+    const { error } = await supabase.from('knowledge_base_items').insert({
+      type: 'text',
+      title: `Fluxo: ${flow.name}`,
+      content: content.substring(0, 50000),
+      niche_id: nicheId || null,
+    });
+    if (error) {
+      toast.error('Erro ao importar fluxo');
+    } else {
+      toast.success(`Fluxo "${flow.name}" adicionado à base de conhecimento`);
+      fetchItems();
+    }
+    setImportingFlowId(null);
+  };
+
+  const importAllFlows = async () => {
+    if (flows.length === 0) return;
+    setImportingFlowId('all');
+    let success = 0;
+    for (const flow of flows) {
+      const content = formatFlowAsKnowledge(flow);
+      const { error } = await supabase.from('knowledge_base_items').insert({
+        type: 'text',
+        title: `Fluxo: ${flow.name}`,
+        content: content.substring(0, 50000),
+        niche_id: nicheId || null,
+      });
+      if (!error) success++;
+    }
+    toast.success(`${success} fluxo(s) importado(s) com sucesso`);
+    fetchItems();
+    setImportingFlowId(null);
+  };
+
+  const isFlowAlreadyImported = (flowName: string) =>
+    items.some(i => i.title === `Fluxo: ${flowName}`);
+
   const tabs: { key: TabType; label: string; icon: React.ReactNode }[] = [
     { key: 'text', label: 'Texto Livre', icon: <FileText className="h-3.5 w-3.5" /> },
     { key: 'qa', label: 'Perguntas e Respostas', icon: <MessageSquare className="h-3.5 w-3.5" /> },
     { key: 'file', label: 'Arquivos', icon: <Upload className="h-3.5 w-3.5" /> },
+    ...(nicheId ? [{ key: 'flows' as TabType, label: 'Fluxos', icon: <Workflow className="h-3.5 w-3.5" /> }] : []),
   ];
 
   const typeIcon = (type: string) => {
@@ -302,6 +425,96 @@ export default function KnowledgeBase({ nicheId }: Props) {
             onChange={handleFileUpload}
             className="hidden"
           />
+        </div>
+      )}
+
+      {activeTab === 'flows' && nicheId && (
+        <div className="space-y-3 mb-6">
+          {loadingFlows ? (
+            <div className="flex justify-center py-6">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : flows.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-border p-6 text-center">
+              <Workflow className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">
+                Nenhum fluxo encontrado neste nicho.
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Crie fluxos de automação na aba "Fluxos" primeiro.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">
+                  {flows.length} fluxo(s) disponível(is) neste nicho
+                </p>
+                <button
+                  onClick={importAllFlows}
+                  disabled={importingFlowId === 'all'}
+                  className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+                >
+                  {importingFlowId === 'all' ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Plus className="h-3.5 w-3.5" />
+                  )}
+                  Importar Todos
+                </button>
+              </div>
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {flows.map((flow) => {
+                  const alreadyImported = isFlowAlreadyImported(flow.name);
+                  return (
+                    <div
+                      key={flow.id}
+                      className="rounded-lg border border-border bg-background p-3 flex items-center justify-between gap-3"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <Workflow className="h-3.5 w-3.5 text-primary shrink-0" />
+                          <span className="text-sm font-medium text-foreground truncate">
+                            {flow.name}
+                          </span>
+                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                            flow.is_active
+                              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                              : 'bg-secondary text-muted-foreground'
+                          }`}>
+                            {flow.is_active ? 'Ativo' : 'Inativo'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5 ml-5.5">
+                          {flow.nodes.length} etapa(s)
+                          {flow.description && ` · ${flow.description.substring(0, 60)}`}
+                        </p>
+                      </div>
+                      {alreadyImported ? (
+                        <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400 shrink-0">
+                          <Check className="h-3.5 w-3.5" />
+                          Importado
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => importFlow(flow)}
+                          disabled={importingFlowId === flow.id}
+                          className="shrink-0 flex items-center gap-1 rounded-md bg-accent px-2.5 py-1.5 text-xs font-medium text-accent-foreground hover:bg-accent/80 transition-colors disabled:opacity-50"
+                        >
+                          {importingFlowId === flow.id ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Plus className="h-3 w-3" />
+                          )}
+                          Importar
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
       )}
 
