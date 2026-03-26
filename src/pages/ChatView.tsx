@@ -262,6 +262,7 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
       toast.success('Venda registrada com sucesso!');
       setShowSaleDialog(false);
       setSaleData({ valor: '', campanha: '', pais: 'brasil', moeda: 'BRL' });
+      setSaleRegistered(true);
     } catch (err) {
       console.error('Sale webhook error:', err);
       toast.error('Erro ao registrar venda');
