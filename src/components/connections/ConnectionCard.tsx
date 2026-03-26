@@ -321,6 +321,16 @@ export default function ConnectionCard({ connection, onDeleted, onUpdated }: Con
                   }`}>{formatDiagnosticValue(diagnostics?.quality_rating)}</span>
                 </div>
                 <div className="flex items-start justify-between gap-3">
+                  <span className="text-muted-foreground">Limite de Mensagens</span>
+                  <span className="text-right font-medium">{formatDiagnosticValue(diagnostics?.messaging_limit)}</span>
+                </div>
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-muted-foreground">Status da WABA</span>
+                  <span className={`text-right font-medium ${
+                    ['REJECTED', 'DISABLED', 'FLAGGED', 'RESTRICTED'].includes(String(diagnostics?.waba_status || '').toUpperCase())
+                      ? 'text-destructive' : ''
+                  }`}>{formatDiagnosticValue(diagnostics?.waba_status)}</span>
+                <div className="flex items-start justify-between gap-3">
                   <span className="text-muted-foreground">Erro</span>
                   <span className="text-right font-medium text-destructive">{formatDiagnosticValue(diagnostics?.error)}</span>
                 </div>
