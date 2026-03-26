@@ -80,6 +80,8 @@ const PROVIDER_CONFIG: Record<string, {
 
 const STATUS_MAP: Record<string, { icon: React.ReactNode; label: string; classes: string }> = {
   active: { icon: <Wifi className="h-3.5 w-3.5" />, label: 'Ativo', classes: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' },
+  blocked: { icon: <WifiOff className="h-3.5 w-3.5" />, label: 'Bloqueado', classes: 'bg-destructive/10 text-destructive border-destructive/20' },
+  warning: { icon: <AlertCircle className="h-3.5 w-3.5" />, label: 'Qualidade Baixa', classes: 'bg-amber-500/10 text-amber-600 border-amber-500/20' },
   pending_setup: { icon: <AlertCircle className="h-3.5 w-3.5" />, label: 'Pendente', classes: 'bg-amber-500/10 text-amber-600 border-amber-500/20' },
   error: { icon: <WifiOff className="h-3.5 w-3.5" />, label: 'Inativo', classes: 'bg-destructive/10 text-destructive border-destructive/20' },
   unknown: { icon: <AlertCircle className="h-3.5 w-3.5" />, label: 'Não verificado', classes: 'bg-muted text-muted-foreground border-border' },
@@ -157,6 +159,10 @@ export default function ConnectionCard({ connection, onDeleted, onUpdated }: Con
 
       if (response.status === 'active') {
         toast.success('Conexão validada com sucesso!');
+      } else if (response.status === 'blocked') {
+        toast.error(`⚠️ Número BLOQUEADO! ${response.details?.phone_status || ''} — Verifique no Meta Business.`);
+      } else if (response.status === 'warning') {
+        toast.warning('Qualidade do número está baixa (RED). Risco de bloqueio.');
       } else if (response.status === 'pending_setup') {
         toast.warning('Conexão criada, mas ainda pendente de webhook/app.');
       } else {
