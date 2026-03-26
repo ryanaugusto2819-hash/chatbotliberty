@@ -502,7 +502,7 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
     }
   }, []);
 
-
+  const handleSendSale = async () => {
     if (!saleData.valor || sendingSale) return;
     setSendingSale(true);
     try {
