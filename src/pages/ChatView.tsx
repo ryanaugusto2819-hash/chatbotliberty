@@ -210,7 +210,7 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
   const [showSaleDialog, setShowSaleDialog] = useState(false);
   const [saleData, setSaleData] = useState({ valor: '', campanha: '', pais: 'brasil', moeda: 'BRL' });
   const [sendingSale, setSendingSale] = useState(false);
-  const [saleRegistered, setSaleRegistered] = useState<Record<string, boolean>>({});
+  const [saleRegisteredAt, setSaleRegisteredAt] = useState<string | null>(null);
   const [blockedConnections, setBlockedConnections] = useState<{ id: string; label: string; status: string }[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -273,11 +273,12 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
     if (!id) return;
     const { data } = await supabase
       .from('conversations')
-      .select('id, contact_name, contact_phone, status, tags, updated_at, created_at, assigned_agent_id, ctwa_clid, source_id, ad_title')
+      .select('id, contact_name, contact_phone, status, tags, updated_at, created_at, assigned_agent_id, ctwa_clid, source_id, ad_title, sale_registered_at')
       .eq('id', id)
       .single();
     if (data) {
       setConversation(data);
+      setSaleRegisteredAt((data as any).sale_registered_at || null);
 
       const [agentResult, tagsResult, historyResult] = await Promise.all([
         data.assigned_agent_id
@@ -464,10 +465,18 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
       });
 
       if (!res.ok) throw new Error('Webhook failed');
+
+      // Persist sale registration in the database
+      const now = new Date().toISOString();
+      await supabase
+        .from('conversations')
+        .update({ sale_registered_at: now } as any)
+        .eq('id', conversationId!);
+
       toast.success('Venda registrada com sucesso!');
       setShowSaleDialog(false);
       setSaleData({ valor: '', campanha: '', pais: 'brasil', moeda: 'BRL' });
-      setSaleRegistered(prev => ({ ...prev, [conversationId!]: true }));
+      setSaleRegisteredAt(now);
     } catch (err) {
       console.error('Sale webhook error:', err);
       toast.error('Erro ao registrar venda');
@@ -649,7 +658,7 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
         <div className="p-4 space-y-5 flex-1">
           {/* Register Sale */}
           <div>
-            {conversationId && saleRegistered[conversationId] ? (
+            {saleRegisteredAt ? (
               <div className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-green-800 text-white py-1.5 px-3 text-xs font-medium">
                 <CheckCheck className="h-3.5 w-3.5" />
                 Venda Registrada
