@@ -33,12 +33,18 @@ export default function FlowTrigger({ conversationId }: FlowTriggerProps) {
   const trigger = async (flowId: string) => {
     setExecuting(flowId);
     try {
-      await executeFlow(flowId, conversationId);
-      toast.success('Fluxo executado com sucesso');
+      // Fire-and-forget: don't await the full flow execution
+      supabase.functions.invoke("execute-flow", {
+        body: { flowId, conversationId, senderLabel: "humano" },
+      }).then(({ error }) => {
+        if (error) console.error('Flow execution error:', error);
+      });
+      
+      toast.success('Fluxo disparado com sucesso');
       setOpen(false);
     } catch (err) {
       console.error(err);
-      toast.error('Erro ao executar fluxo');
+      toast.error('Erro ao disparar fluxo');
     } finally {
       setExecuting(null);
     }
