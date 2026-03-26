@@ -30,6 +30,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<AppRole | null>(null);
   const [isApproved, setIsApproved] = useState(false);
   const currentUserIdRef = useRef<string | null>(null);
+  const metaCacheRef = useRef<{ userId: string; role: AppRole; isApproved: boolean } | null>(null);
+  const fetchingRef = useRef<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -39,9 +41,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const resetAuthState = () => {
       setRole(null);
       setIsApproved(false);
+      metaCacheRef.current = null;
     };
 
     const fetchUserMeta = async (userId: string, showBlockingLoader = false) => {
+      // Return cached data if available for same user
+      if (metaCacheRef.current?.userId === userId) {
+        setRole(metaCacheRef.current.role);
+        setIsApproved(metaCacheRef.current.isApproved);
+        if (showBlockingLoader) setLoading(false);
+        return;
+      }
+
+      // Deduplicate concurrent fetches for the same user
+      if (fetchingRef.current === userId) return;
+      fetchingRef.current = userId;
+
       const currentRequestId = ++requestId;
 
       if (showBlockingLoader) {
@@ -56,18 +71,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (!mounted || currentRequestId !== requestId) return;
 
-        setIsApproved(profileRes.data?.is_approved ?? false);
+        const approved = profileRes.data?.is_approved ?? false;
+        setIsApproved(approved);
 
         const roles = roleRes.data?.map((r) => r.role) ?? [];
-        if (roles.includes('admin')) setRole('admin');
-        else if (roles.includes('supervisor')) setRole('supervisor');
-        else setRole('agent');
+        let resolvedRole: AppRole = 'agent';
+        if (roles.includes('admin')) resolvedRole = 'admin';
+        else if (roles.includes('supervisor')) resolvedRole = 'supervisor';
+        setRole(resolvedRole);
+
+        // Cache the result
+        metaCacheRef.current = { userId, role: resolvedRole, isApproved: approved };
       } catch (e) {
         if (!mounted || currentRequestId !== requestId) return;
         console.error('Error fetching user meta:', e);
         setRole(null);
         setIsApproved(false);
       } finally {
+        fetchingRef.current = null;
         if (mounted && currentRequestId === requestId && showBlockingLoader) {
           setLoading(false);
         }
