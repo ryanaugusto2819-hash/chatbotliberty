@@ -240,22 +240,41 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
     setInput('');
     setSending(true);
 
+    // Optimistic: show message instantly
+    const optimisticId = `optimistic-${Date.now()}`;
+    const optimisticMsg: MessageData = {
+      id: optimisticId,
+      content: msg,
+      sender_type: 'agent',
+      message_type: 'text',
+      status: 'sending',
+      created_at: new Date().toISOString(),
+      sender_label: 'humano',
+    };
+    setMessages(prev => [...prev, optimisticMsg]);
+
     try {
       const result = await sendWhatsAppMessage(id, msg);
 
       if (result?.savedMessage) {
         setMessages(prev => {
-          if (prev.some(message => message.id === result.savedMessage.id)) {
-            return prev;
+          // Replace optimistic message with real one
+          const withoutOptimistic = prev.filter(m => m.id !== optimisticId);
+          if (withoutOptimistic.some(m => m.id === result.savedMessage.id)) {
+            return withoutOptimistic;
           }
-
-          return [...prev, result.savedMessage as MessageData];
+          return [...withoutOptimistic, result.savedMessage as MessageData];
         });
+      } else {
+        // Remove optimistic if no saved message returned
+        setMessages(prev => prev.filter(m => m.id !== optimisticId));
       }
 
       fetchConversation();
     } catch (err: any) {
       console.error('Send error:', err);
+      // Mark optimistic message as failed
+      setMessages(prev => prev.map(m => m.id === optimisticId ? { ...m, status: 'failed' } : m));
       toast.error('Erro ao enviar mensagem. Verifique a conexão do WhatsApp.');
     } finally {
       setSending(false);
