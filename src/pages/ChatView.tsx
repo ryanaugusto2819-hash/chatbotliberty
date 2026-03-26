@@ -123,7 +123,7 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
       }
     };
     checkConnections();
-    const interval = setInterval(checkConnections, 60_000);
+    const interval = setInterval(checkConnections, 300_000);
     return () => clearInterval(interval);
   }, []);
 
