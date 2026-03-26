@@ -442,6 +442,21 @@ async function processWebhook(body: any) {
         const allowedTypes = ["text", "image", "document", "audio", "video"];
         const normalizedType = allowedTypes.includes(messageType) ? messageType : "text";
 
+        // Deduplication: skip if this provider message was already stored
+        const providerMsgId = msg.id || null;
+        if (providerMsgId) {
+          const { data: duplicate } = await supabase
+            .from("messages")
+            .select("id")
+            .eq("provider_message_id", providerMsgId)
+            .limit(1)
+            .maybeSingle();
+          if (duplicate) {
+            console.log(`[whatsapp-webhook] Duplicate message ${providerMsgId}, skipping`);
+            continue;
+          }
+        }
+
         const { error: msgError } = await supabase.from("messages").insert({
           conversation_id: conversationId,
           content,
@@ -449,6 +464,7 @@ async function processWebhook(body: any) {
           message_type: normalizedType,
           media_url: mediaUrl,
           status: "delivered",
+          provider_message_id: providerMsgId,
         });
 
         if (msgError) {
