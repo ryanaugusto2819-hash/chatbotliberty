@@ -148,7 +148,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         hasInitialized = true;
         setLoading(false);
       }
-    }, 8000);
+    }, 4000);
 
     supabase.auth
       .getSession()
