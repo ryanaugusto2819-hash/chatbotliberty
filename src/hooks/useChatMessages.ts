@@ -109,6 +109,15 @@ export function useChatMessages(conversationId: string | undefined) {
         const msg = payload.new as ChatMessage;
         setMessages((prev) => prev.map((m) => (m.id === msg.id ? msg : m)));
       })
+      .on('postgres_changes', {
+        event: 'DELETE', schema: 'public', table: 'messages',
+        filter: `conversation_id=eq.${conversationId}`,
+      }, (payload) => {
+        const deletedId = (payload.old as any)?.id;
+        if (deletedId) {
+          setMessages((prev) => prev.filter((m) => m.id !== deletedId));
+        }
+      })
       .subscribe();
 
     channelRef.current = channel;

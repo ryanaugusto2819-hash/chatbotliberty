@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { sendWhatsAppMessage } from '@/lib/whatsapp';
 import StatusBadge from '@/components/shared/StatusBadge';
-import { ArrowLeft, Send, Paperclip, MoreVertical, User, Clock, CheckCheck, Check, Loader2, Phone, MessageSquare, Tag, Calendar, Hash, History, AlertTriangle, RefreshCw, Bot, UserRound, DollarSign, Image, X } from 'lucide-react';
+import { ArrowLeft, Send, Paperclip, MoreVertical, User, Clock, CheckCheck, Check, Loader2, Phone, MessageSquare, Tag, Calendar, Hash, History, AlertTriangle, RefreshCw, Bot, UserRound, DollarSign, Image, X, Trash2 } from 'lucide-react';
 import FlowTrigger from '@/components/automation/FlowTrigger';
 import QuickMessages from '@/components/chat/QuickMessages';
 import TagManager from '@/components/tags/TagManager';
@@ -64,13 +64,48 @@ const parseProviderError = (providerError?: string | null): ParsedProviderError 
 // ─── Memoized message bubble ───
 interface MessageBubbleProps {
   msg: ChatMessage;
+  onDelete?: (messageId: string) => void;
 }
 
-const MessageBubble = memo(function MessageBubble({ msg }: MessageBubbleProps) {
+const MessageBubble = memo(function MessageBubble({ msg, onDelete }: MessageBubbleProps) {
+  const [showMenu, setShowMenu] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const providerError = parseProviderError(msg.provider_error);
 
   return (
-    <div className={`flex ${msg.sender_type === 'agent' ? 'justify-end' : 'justify-start'}`}>
+    <div
+      className={`group relative flex ${msg.sender_type === 'agent' ? 'justify-end' : 'justify-start'}`}
+      onMouseLeave={() => { setShowMenu(false); setConfirming(false); }}
+    >
+      {/* Delete button — appears on hover */}
+      <div className={`absolute top-1 ${msg.sender_type === 'agent' ? 'left-0 -translate-x-full pr-1' : 'right-0 translate-x-full pl-1'} opacity-0 group-hover:opacity-100 transition-opacity z-10`}>
+        {confirming ? (
+          <div className="flex items-center gap-1 rounded-lg bg-destructive/90 px-2 py-1 shadow-lg">
+            <span className="text-[10px] text-white whitespace-nowrap">Excluir?</span>
+            <button
+              onClick={() => { onDelete?.(msg.id); setConfirming(false); setShowMenu(false); }}
+              className="text-[10px] font-bold text-white hover:underline"
+            >
+              Sim
+            </button>
+            <button
+              onClick={() => setConfirming(false)}
+              className="text-[10px] text-white/70 hover:underline"
+            >
+              Não
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setConfirming(true)}
+            className="flex h-7 w-7 items-center justify-center rounded-full bg-card border border-border shadow-sm hover:bg-destructive/10 hover:text-destructive transition-colors text-muted-foreground"
+            title="Excluir mensagem"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+
       <div
         className={`max-w-[70%] rounded-2xl px-4 py-2.5 ${
           msg.status === 'failed'
@@ -446,6 +481,27 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
     }
   };
 
+  const handleDeleteMessage = useCallback(async (messageId: string) => {
+    // Optimistic removal
+    setMessages(prev => prev.filter(m => m.id !== messageId));
+    try {
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const res = await fetch(`https://${projectId}.supabase.co/functions/v1/delete-message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}` },
+        body: JSON.stringify({ messageId }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        toast.error('Erro ao excluir mensagem');
+        return;
+      }
+      toast.success(result.whatsappDeleted ? 'Mensagem excluída do CRM e WhatsApp' : 'Mensagem excluída do CRM');
+    } catch {
+      toast.error('Erro ao excluir mensagem');
+    }
+  }, []);
+
   const handleSendSale = async () => {
     if (!saleData.valor || sendingSale) return;
     setSendingSale(true);
@@ -555,7 +611,7 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
           )}
 
           {messages.map((msg) => (
-            <MessageBubble key={msg.id} msg={msg} />
+            <MessageBubble key={msg.id} msg={msg} onDelete={handleDeleteMessage} />
           ))}
           <div ref={messagesEndRef} />
         </div>
