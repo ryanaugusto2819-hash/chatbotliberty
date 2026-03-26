@@ -251,23 +251,35 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Empty AI response" }, 500);
     }
 
-    // Get WhatsApp credentials
-    const { data: waConfig } = await supabase
-      .from("connection_configs")
-      .select("config")
-      .eq("connection_id", "whatsapp")
-      .eq("is_connected", true)
-      .order("updated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    // Get WhatsApp credentials - prefer niche-specific phone number
+    const { data: niche } = nicheId ? await supabase
+      .from("niches")
+      .select("whatsapp_phone_number_id")
+      .eq("id", nicheId)
+      .single() : { data: null };
 
-    const waConfigData = waConfig?.config as Record<string, unknown> | null;
-    const phoneNumberId =
-      (typeof waConfigData?.phone_number_id === "string" && waConfigData.phone_number_id.trim())
-        ? waConfigData.phone_number_id
-        : Deno.env.get("WHATSAPP_PHONE_NUMBER_ID");
+    let phoneNumberId = niche?.whatsapp_phone_number_id || null;
+
+    if (!phoneNumberId) {
+      // Fallback to connection_configs
+      const { data: waConfig } = await supabase
+        .from("connection_configs")
+        .select("config")
+        .eq("connection_id", "whatsapp")
+        .eq("is_connected", true)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const waConfigData = waConfig?.config as Record<string, unknown> | null;
+      phoneNumberId =
+        (typeof waConfigData?.phone_number_id === "string" && waConfigData.phone_number_id.trim())
+          ? waConfigData.phone_number_id
+          : Deno.env.get("WHATSAPP_PHONE_NUMBER_ID") || null;
+    }
 
     const accessToken = Deno.env.get("WHATSAPP_ACCESS_TOKEN");
+    console.log(`[ai-auto-reply] Using phoneNumberId: ${phoneNumberId}, hasAccessToken: ${!!accessToken}`);
 
     // Save message to DB FIRST so it appears in chat/logs regardless of send result
     await supabase.from("messages").insert({
