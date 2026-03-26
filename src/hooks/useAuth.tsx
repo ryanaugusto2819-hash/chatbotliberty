@@ -24,6 +24,29 @@ const AuthContext = createContext<AuthContextType>({
   signOut: async () => {},
 });
 
+/** Fetch with timeout + retry */
+async function fetchWithRetry<T>(
+  fn: () => Promise<T>,
+  { retries = 2, timeoutMs = 5000 }: { retries?: number; timeoutMs?: number } = {}
+): Promise<T> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const result = await Promise.race([
+        fn(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('TIMEOUT')), timeoutMs)
+        ),
+      ]);
+      return result;
+    } catch (e) {
+      if (attempt === retries) throw e;
+      // Wait briefly before retry
+      await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+    }
+  }
+  throw new Error('fetchWithRetry exhausted');
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
@@ -64,10 +87,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        const [profileRes, roleRes] = await Promise.all([
-          supabase.from('profiles').select('is_approved').eq('user_id', userId).maybeSingle(),
-          supabase.from('user_roles').select('role').eq('user_id', userId),
-        ]);
+        const [profileRes, roleRes] = await fetchWithRetry(
+          () => Promise.all([
+            supabase.from('profiles').select('is_approved').eq('user_id', userId).maybeSingle(),
+            supabase.from('user_roles').select('role').eq('user_id', userId),
+          ]),
+          { retries: 2, timeoutMs: 6000 }
+        );
 
         if (!mounted || currentRequestId !== requestId) return;
 
@@ -84,9 +110,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         metaCacheRef.current = { userId, role: resolvedRole, isApproved: approved };
       } catch (e) {
         if (!mounted || currentRequestId !== requestId) return;
-        console.error('Error fetching user meta:', e);
-        setRole(null);
-        setIsApproved(false);
+        console.error('Error fetching user meta (after retries):', e);
+        // If we have a cached value, use it instead of resetting
+        if (metaCacheRef.current?.userId === userId) {
+          setRole(metaCacheRef.current.role);
+          setIsApproved(metaCacheRef.current.isApproved);
+        } else {
+          setRole(null);
+          setIsApproved(false);
+        }
       } finally {
         fetchingRef.current = null;
         if (mounted && currentRequestId === requestId && showBlockingLoader) {
@@ -168,6 +200,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       mounted = false;
       requestId += 1;
+      clearTimeout(safetyTimeout);
       subscription.unsubscribe();
     };
   }, []);
