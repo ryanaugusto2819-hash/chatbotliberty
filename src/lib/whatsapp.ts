@@ -43,6 +43,30 @@ export async function sendWhatsAppMessage(
     body: { conversationId, message, senderAgentId, senderLabel: 'humano' },
   });
 
-  if (error) throw error;
+  // supabase.functions.invoke returns error for non-2xx, but the edge function
+  // may have already saved the message (even as failed). Check data first.
+  if (error) {
+    // Try to parse the error body — the edge function returns savedMessage even on 502
+    let parsed: any = null;
+    try {
+      if (error instanceof Object && 'context' in error) {
+        const ctx = (error as any).context;
+        if (ctx?.body) {
+          const reader = ctx.body.getReader?.();
+          if (reader) {
+            const { value } = await reader.read();
+            parsed = JSON.parse(new TextDecoder().decode(value));
+          }
+        }
+      }
+    } catch { /* ignore parse errors */ }
+
+    // If the edge function saved the message (even as failed), return it
+    if (parsed?.savedMessage) {
+      return parsed;
+    }
+    throw error;
+  }
+
   return data;
 }

@@ -248,14 +248,18 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
       const result = await sendWhatsAppMessage(id, msg);
 
       if (result?.savedMessage) {
+        const savedMsg = result.savedMessage as MessageData;
         setMessages(prev => {
-          // Replace optimistic message with real one
           const withoutOptimistic = prev.filter(m => m.id !== optimisticId);
-          if (withoutOptimistic.some(m => m.id === result.savedMessage.id)) {
+          if (withoutOptimistic.some(m => m.id === savedMsg.id)) {
             return withoutOptimistic;
           }
-          return [...withoutOptimistic, result.savedMessage as MessageData];
+          return [...withoutOptimistic, savedMsg];
         });
+        // If the saved message is failed, show error toast
+        if (savedMsg.status === 'failed') {
+          toast.error('Erro ao enviar mensagem. Verifique a conexão do WhatsApp.');
+        }
       } else {
         // Remove optimistic if no saved message returned
         setMessages(prev => prev.filter(m => m.id !== optimisticId));
@@ -264,7 +268,35 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
       fetchConversation();
     } catch (err: any) {
       console.error('Send error:', err);
-      // Mark optimistic message as failed
+      // Before marking as failed, check if the message was actually saved in DB
+      // (edge function may have succeeded but response was lost)
+      try {
+        const { data: recentMsgs } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('conversation_id', id)
+          .eq('content', msg)
+          .eq('sender_type', 'agent')
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        const recentMsg = recentMsgs?.[0];
+        if (recentMsg && (Date.now() - new Date(recentMsg.created_at).getTime()) < 15000) {
+          // Message was actually saved — replace optimistic with real one
+          setMessages(prev => {
+            const withoutOptimistic = prev.filter(m => m.id !== optimisticId);
+            if (withoutOptimistic.some(m => m.id === recentMsg.id)) return withoutOptimistic;
+            return [...withoutOptimistic, recentMsg as MessageData];
+          });
+          if (recentMsg.status === 'failed') {
+            toast.error('Erro ao enviar mensagem. Verifique a conexão do WhatsApp.');
+          }
+          fetchConversation();
+          return;
+        }
+      } catch { /* ignore fallback check errors */ }
+
+      // Truly failed — no DB record found
       setMessages(prev => prev.map(m => m.id === optimisticId ? { ...m, status: 'failed' } : m));
       toast.error('Erro ao enviar mensagem. Verifique a conexão do WhatsApp.');
     } finally {
