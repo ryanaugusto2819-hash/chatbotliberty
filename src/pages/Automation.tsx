@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TopBar from '@/components/layout/TopBar';
 import { supabase } from '@/integrations/supabase/client';
-import { GitBranch, Plus, Play, Pause, Trash2, Loader2, BarChart3 } from 'lucide-react';
+import { GitBranch, Plus, Play, Pause, Trash2, Loader2, BarChart3, Copy } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
@@ -74,6 +74,84 @@ export default function Automation() {
     if (error) toast.error('Erro ao atualizar fluxo');
   };
 
+  const duplicateFlow = async (flowId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      // 1. Get original flow
+      const { data: original, error: flowErr } = await supabase
+        .from('automation_flows')
+        .select('*')
+        .eq('id', flowId)
+        .single();
+      if (flowErr || !original) throw flowErr;
+
+      // 2. Create copy
+      const { data: newFlow, error: insertErr } = await supabase
+        .from('automation_flows')
+        .insert({
+          name: `${original.name} (cópia)`,
+          description: original.description,
+          is_active: false,
+          manual_only: original.manual_only,
+          niche_id: original.niche_id,
+        })
+        .select('id')
+        .single();
+      if (insertErr || !newFlow) throw insertErr;
+
+      // 3. Copy nodes
+      const { data: origNodes } = await supabase
+        .from('automation_nodes')
+        .select('*')
+        .eq('flow_id', flowId)
+        .order('sort_order');
+
+      const nodeIdMap: Record<string, string> = {};
+
+      if (origNodes && origNodes.length > 0) {
+        const nodeInserts = origNodes.map((n: any) => {
+          const newId = crypto.randomUUID();
+          nodeIdMap[n.id] = newId;
+          return {
+            id: newId,
+            flow_id: newFlow.id,
+            node_type: n.node_type,
+            label: n.label,
+            config: n.config,
+            position_x: n.position_x,
+            position_y: n.position_y,
+            sort_order: n.sort_order,
+          };
+        });
+        await supabase.from('automation_nodes').insert(nodeInserts);
+      }
+
+      // 4. Copy edges with mapped node IDs
+      const { data: origEdges } = await supabase
+        .from('automation_edges')
+        .select('*')
+        .eq('flow_id', flowId);
+
+      if (origEdges && origEdges.length > 0) {
+        const edgeInserts = origEdges
+          .filter((e: any) => nodeIdMap[e.source_node_id] && nodeIdMap[e.target_node_id])
+          .map((e: any) => ({
+            flow_id: newFlow.id,
+            source_node_id: nodeIdMap[e.source_node_id],
+            target_node_id: nodeIdMap[e.target_node_id],
+          }));
+        if (edgeInserts.length > 0) {
+          await supabase.from('automation_edges').insert(edgeInserts);
+        }
+      }
+
+      toast.success('Fluxo duplicado com sucesso');
+    } catch (err) {
+      console.error('Duplicate error:', err);
+      toast.error('Erro ao duplicar fluxo');
+    }
+  };
+
   const deleteFlow = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const { error } = await supabase
@@ -137,6 +215,13 @@ export default function Automation() {
                       title="Métricas do Funil"
                     >
                       <BarChart3 className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={(e) => duplicateFlow(flow.id, e)}
+                      className="text-muted-foreground hover:text-primary transition-colors"
+                      title="Duplicar Fluxo"
+                    >
+                      <Copy className="h-4 w-4" />
                     </button>
                     <button
                       onClick={(e) => deleteFlow(flow.id, e)}
