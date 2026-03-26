@@ -34,40 +34,62 @@ export default function AutoReplyLogs({ nicheId }: Props) {
   const fetchLogs = async () => {
     setLoading(true);
 
-    // Get conversation IDs for this niche
-    const { data: convos } = await supabase
-      .from('conversations')
-      .select('id, contact_name, contact_phone')
-      .eq('niche_id', nicheId);
+    try {
+      // First, get ALL auto-reply logs (without filtering by conversation)
+      const { data: usageLogs, error: logsError } = await supabase
+        .from('ai_usage_logs')
+        .select('*')
+        .eq('function_name', 'ai-auto-reply')
+        .order('created_at', { ascending: false })
+        .limit(100);
 
-    if (!convos || convos.length === 0) {
+      if (logsError) {
+        console.error('Error fetching ai_usage_logs:', logsError);
+        setLogs([]);
+        setLoading(false);
+        return;
+      }
+
+      if (!usageLogs || usageLogs.length === 0) {
+        setLogs([]);
+        setLoading(false);
+        return;
+      }
+
+      // Get conversation IDs from logs to enrich with contact info
+      const convoIds = [...new Set(usageLogs.map(l => l.conversation_id).filter(Boolean))] as string[];
+
+      // Get conversations for this niche (for filtering) and contact info
+      const { data: convos } = await supabase
+        .from('conversations')
+        .select('id, contact_name, contact_phone, niche_id')
+        .in('id', convoIds);
+
+      const convoMap = new Map((convos || []).map(c => [c.id, c]));
+
+      // Filter logs by niche (match conversation's niche_id)
+      const enriched = usageLogs
+        .filter(log => {
+          if (!log.conversation_id) return false;
+          const convo = convoMap.get(log.conversation_id);
+          return convo?.niche_id === nicheId;
+        })
+        .map(log => {
+          const convo = log.conversation_id ? convoMap.get(log.conversation_id) : null;
+          return {
+            ...log,
+            contact_name: convo?.contact_name,
+            contact_phone: convo?.contact_phone,
+          };
+        });
+
+      setLogs(enriched);
+    } catch (err) {
+      console.error('Error in fetchLogs:', err);
       setLogs([]);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    const convoMap = new Map(convos.map(c => [c.id, c]));
-    const convoIds = convos.map(c => c.id);
-
-    const { data: usageLogs } = await supabase
-      .from('ai_usage_logs')
-      .select('*')
-      .eq('function_name', 'ai-auto-reply')
-      .in('conversation_id', convoIds)
-      .order('created_at', { ascending: false })
-      .limit(100);
-
-    const enriched = (usageLogs || []).map(log => {
-      const convo = log.conversation_id ? convoMap.get(log.conversation_id) : null;
-      return {
-        ...log,
-        contact_name: convo?.contact_name,
-        contact_phone: convo?.contact_phone,
-      };
-    });
-
-    setLogs(enriched);
-    setLoading(false);
   };
 
   if (loading) {
