@@ -518,7 +518,7 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
         <div className="p-4 space-y-5 flex-1">
           {/* Register Sale */}
           <div>
-            {saleRegistered ? (
+            {conversationId && saleRegistered[conversationId] ? (
               <div className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-green-800 text-white py-1.5 px-3 text-xs font-medium">
                 <CheckCheck className="h-3.5 w-3.5" />
                 Venda Registrada
