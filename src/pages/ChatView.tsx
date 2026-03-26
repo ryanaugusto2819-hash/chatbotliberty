@@ -140,33 +140,24 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
       .single();
     if (data) {
       setConversation(data);
-      // Fetch assigned agent
-      if (data.assigned_agent_id) {
-        const { data: agent } = await supabase
-          .from('profiles')
-          .select('id, full_name, avatar_url')
-          .eq('id', data.assigned_agent_id)
-          .single();
-        if (agent) setAssignedAgent(agent);
-      } else {
-        setAssignedAgent(null);
+
+      // Run sub-queries in parallel
+      const [agentResult, tagsResult, historyResult] = await Promise.all([
+        data.assigned_agent_id
+          ? supabase.from('profiles').select('id, full_name, avatar_url').eq('id', data.assigned_agent_id).single()
+          : Promise.resolve({ data: null }),
+        supabase.from('contact_tags').select('id, tag_id, tags(id, name, color)').eq('contact_phone', data.contact_phone),
+        supabase.from('agent_assignment_history').select('id, assigned_at, unassigned_at, agent_id, profiles(full_name)').eq('conversation_id', id).order('assigned_at', { ascending: false }),
+      ]);
+
+      setAssignedAgent(agentResult.data || null);
+
+      if (tagsResult.data) {
+        setContactTags(tagsResult.data.map((t: any) => ({ id: t.id, tag: t.tags })));
       }
-      // Fetch contact tags
-      const { data: tags } = await supabase
-        .from('contact_tags')
-        .select('id, tag_id, tags(id, name, color)')
-        .eq('contact_phone', data.contact_phone);
-      if (tags) {
-        setContactTags(tags.map((t: any) => ({ id: t.id, tag: t.tags })));
-      }
-      // Fetch assignment history
-      const { data: history } = await supabase
-        .from('agent_assignment_history')
-        .select('id, assigned_at, unassigned_at, agent_id, profiles(full_name)')
-        .eq('conversation_id', id)
-        .order('assigned_at', { ascending: false });
-      if (history) {
-        setAssignmentHistory(history.map((h: any) => ({
+
+      if (historyResult.data) {
+        setAssignmentHistory(historyResult.data.map((h: any) => ({
           id: h.id,
           agent_name: h.profiles?.full_name || 'Agente removido',
           assigned_at: h.assigned_at,
