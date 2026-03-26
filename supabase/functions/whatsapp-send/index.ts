@@ -12,7 +12,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { conversationId, message, type = "text", senderAgentId = null, senderLabel = null } = await req.json();
+    const { conversationId, message, type = "text", senderAgentId = null, senderLabel = null, mediaUrl = null } = await req.json();
 
     if (!conversationId || !message) {
       return new Response(
@@ -183,7 +183,28 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`[whatsapp-send] phoneNumberId=${phoneNumberId}, to=${phone}, original=${conversation.contact_phone}`);
+    console.log(`[whatsapp-send] phoneNumberId=${phoneNumberId}, to=${phone}, original=${conversation.contact_phone}, type=${type}`);
+
+    // Build WhatsApp API payload based on message type
+    let waPayload: Record<string, unknown> = {
+      messaging_product: "whatsapp",
+      to: phone,
+      type: "text",
+      text: { body: message },
+    };
+
+    if (mediaUrl && (type === "image" || type === "video" || type === "document")) {
+      waPayload = {
+        messaging_product: "whatsapp",
+        to: phone,
+        type,
+        [type]: {
+          link: mediaUrl,
+          ...(message ? { caption: message } : {}),
+        },
+      };
+    }
+
     const waResponse = await fetch(
       `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`,
       {
@@ -192,12 +213,7 @@ Deno.serve(async (req) => {
           Authorization: `Bearer ${accessToken}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          messaging_product: "whatsapp",
-          to: phone,
-          type: "text",
-          text: { body: message },
-        }),
+        body: JSON.stringify(waPayload),
       }
     );
 
@@ -216,7 +232,7 @@ Deno.serve(async (req) => {
         .from("messages")
         .insert({
           conversation_id: conversationId,
-          content: message,
+          content: message || "",
           sender_type: "agent",
           sender_agent_id: senderAgentId,
           message_type: type,
@@ -224,6 +240,7 @@ Deno.serve(async (req) => {
           provider_status: "failed",
           provider_error: providerError,
           sender_label: senderLabel || (senderAgentId ? "humano" : null),
+          media_url: mediaUrl,
         })
         .select()
         .single();
@@ -241,7 +258,7 @@ Deno.serve(async (req) => {
       .from("messages")
       .insert({
         conversation_id: conversationId,
-        content: message,
+        content: message || "",
         sender_type: "agent",
         sender_agent_id: senderAgentId,
         message_type: type,
@@ -249,6 +266,7 @@ Deno.serve(async (req) => {
         provider_message_id: providerMessageId,
         provider_status: "accepted",
         sender_label: senderLabel || (senderAgentId ? "humano" : null),
+        media_url: mediaUrl,
       })
       .select()
       .single();
