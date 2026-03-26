@@ -313,26 +313,83 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
     return () => { supabase.removeChannel(channel); };
   }, [id]);
 
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const maxSize = 16 * 1024 * 1024; // 16MB
+    if (file.size > maxSize) {
+      toast.error('Arquivo muito grande. Máximo 16MB.');
+      return;
+    }
+
+    setSelectedFile(file);
+    if (file.type.startsWith('image/')) {
+      const url = URL.createObjectURL(file);
+      setFilePreview(url);
+    } else {
+      setFilePreview(null);
+    }
+    // Reset input so same file can be re-selected
+    e.target.value = '';
+  }, []);
+
+  const clearSelectedFile = useCallback(() => {
+    if (filePreview) URL.revokeObjectURL(filePreview);
+    setSelectedFile(null);
+    setFilePreview(null);
+  }, [filePreview]);
+
+  const getMessageType = (file: File): string => {
+    if (file.type.startsWith('image/')) return 'image';
+    if (file.type.startsWith('video/')) return 'video';
+    return 'document';
+  };
+
   const handleSend = async () => {
-    if (!input.trim() || !id || sending) return;
+    if ((!input.trim() && !selectedFile) || !id || sending) return;
     const msg = input.trim();
+    const file = selectedFile;
     setInput('');
+    clearSelectedFile();
     setSending(true);
 
     const optimisticId = `optimistic-${Date.now()}`;
+    const messageType = file ? getMessageType(file) : 'text';
     const optimisticMsg: ChatMessage = {
       id: optimisticId,
       content: msg,
       sender_type: 'agent',
-      message_type: 'text',
+      message_type: messageType,
       status: 'sending',
       created_at: new Date().toISOString(),
       sender_label: 'humano',
+      media_url: filePreview,
     };
     setMessages(prev => [...prev, optimisticMsg]);
 
     try {
-      const result = await sendWhatsAppMessage(id, msg);
+      let mediaUrl: string | undefined;
+
+      // Upload file if present
+      if (file) {
+        setUploading(true);
+        const ext = file.name.split('.').pop() || 'bin';
+        const path = `${id}/${Date.now()}.${ext}`;
+        const { error: uploadError } = await supabase.storage
+          .from('chat-media')
+          .upload(path, file, { contentType: file.type });
+
+        if (uploadError) {
+          throw new Error('Falha ao fazer upload do arquivo');
+        }
+
+        const { data: urlData } = supabase.storage.from('chat-media').getPublicUrl(path);
+        mediaUrl = urlData.publicUrl;
+        setUploading(false);
+      }
+
+      const result = await sendWhatsAppMessage(id, msg || '', mediaUrl ? { mediaUrl, messageType } : undefined);
 
       if (result?.savedMessage) {
         const savedMsg = result.savedMessage as ChatMessage;
@@ -349,12 +406,12 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
       }
     } catch (err: any) {
       console.error('Send error:', err);
+      setUploading(false);
       try {
         const { data: recentMsgs } = await supabase
           .from('messages')
           .select('id, content, sender_type, message_type, status, created_at, media_url, provider_error, provider_status, sender_agent_id, sender_label')
           .eq('conversation_id', id)
-          .eq('content', msg)
           .eq('sender_type', 'agent')
           .order('created_at', { ascending: false })
           .limit(1);
