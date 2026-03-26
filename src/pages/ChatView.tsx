@@ -102,6 +102,7 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
   const [showSaleDialog, setShowSaleDialog] = useState(false);
   const [saleData, setSaleData] = useState({ valor: '', campanha: '', pais: 'brasil', moeda: 'BRL' });
   const [sendingSale, setSendingSale] = useState(false);
+  const [saleRegistered, setSaleRegistered] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -516,22 +517,29 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
         <div className="p-4 space-y-5 flex-1">
           {/* Register Sale */}
           <div>
-            <button
-              onClick={() => {
-                const adParts = conversation.ad_title?.split(' › ') || [];
-                setSaleData({
-                  valor: '',
-                  campanha: adParts[0] || '',
-                  pais: 'brasil',
-                  moeda: 'BRL',
-                });
-                setShowSaleDialog(true);
-              }}
-              className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white py-1.5 px-3 text-xs font-medium transition-colors"
-            >
-              <DollarSign className="h-3.5 w-3.5" />
-              Registrar Venda
-            </button>
+            {saleRegistered ? (
+              <div className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-green-800 text-white py-1.5 px-3 text-xs font-medium">
+                <CheckCheck className="h-3.5 w-3.5" />
+                Venda Registrada
+              </div>
+            ) : (
+              <button
+                onClick={() => {
+                  const adParts = conversation.ad_title?.split(' › ') || [];
+                  setSaleData({
+                    valor: '',
+                    campanha: adParts[0] || '',
+                    pais: 'brasil',
+                    moeda: 'BRL',
+                  });
+                  setShowSaleDialog(true);
+                }}
+                className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white py-1.5 px-3 text-xs font-medium transition-colors"
+              >
+                <DollarSign className="h-3.5 w-3.5" />
+                Registrar Venda
+              </button>
+            )}
           </div>
 
           {showSaleDialog && (
