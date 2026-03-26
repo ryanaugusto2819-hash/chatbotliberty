@@ -269,9 +269,24 @@ Deno.serve(async (req) => {
 
     const accessToken = Deno.env.get("WHATSAPP_ACCESS_TOKEN");
 
+    // Save message to DB FIRST so it appears in chat/logs regardless of send result
+    await supabase.from("messages").insert({
+      conversation_id: conversationId,
+      content: replyContent,
+      sender_type: "agent",
+      message_type: "text",
+      status: phoneNumberId && accessToken ? "pending" : "failed",
+      sender_label: "ia-auto-reply",
+    });
+
+    await supabase
+      .from("conversations")
+      .update({ updated_at: new Date().toISOString() })
+      .eq("id", conversationId);
+
     if (!phoneNumberId || !accessToken) {
       console.error("WhatsApp credentials missing for auto-reply");
-      return jsonResponse({ error: "WhatsApp not configured" }, 500);
+      return jsonResponse({ error: "WhatsApp not configured, but message saved", reply: replyContent }, 500);
     }
 
     const waResponse = await fetch(
@@ -295,22 +310,27 @@ Deno.serve(async (req) => {
 
     if (!waResponse.ok) {
       console.error("WhatsApp send error:", waResult);
-      return jsonResponse({ error: "Failed to send auto-reply", details: waResult }, 502);
+      // Update message status to failed
+      await supabase
+        .from("messages")
+        .update({ status: "failed", provider_error: JSON.stringify(waResult.error || waResult) })
+        .eq("conversation_id", conversationId)
+        .eq("sender_label", "ia-auto-reply")
+        .eq("status", "pending")
+        .order("created_at", { ascending: false })
+        .limit(1);
+      return jsonResponse({ error: "Failed to send auto-reply", reply: replyContent, details: waResult }, 502);
     }
 
-    await supabase.from("messages").insert({
-      conversation_id: conversationId,
-      content: replyContent,
-      sender_type: "agent",
-      message_type: "text",
-      status: "sent",
-      sender_label: "ia-auto-reply",
-    });
-
+    // Update message status to sent
     await supabase
-      .from("conversations")
-      .update({ updated_at: new Date().toISOString() })
-      .eq("id", conversationId);
+      .from("messages")
+      .update({ status: "sent", provider_message_id: waResult.messages?.[0]?.id })
+      .eq("conversation_id", conversationId)
+      .eq("sender_label", "ia-auto-reply")
+      .eq("status", "pending")
+      .order("created_at", { ascending: false })
+      .limit(1);
 
     return jsonResponse({ success: true, reply: replyContent });
   } catch (error) {
