@@ -30,10 +30,10 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Fetch conversation to get niche_id
+    // Fetch conversation to get niche_id and connection_config_id
     const { data: conversation } = await supabase
       .from("conversations")
-      .select("contact_phone, niche_id")
+      .select("contact_phone, niche_id, connection_config_id")
       .eq("id", conversationId)
       .single();
 
@@ -251,35 +251,39 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Empty AI response" }, 500);
     }
 
-    // Get WhatsApp credentials - prefer niche-specific phone number
-    const { data: niche } = nicheId ? await supabase
-      .from("niches")
-      .select("whatsapp_phone_number_id")
-      .eq("id", nicheId)
-      .single() : { data: null };
+    // Get WhatsApp credentials - priority: conversation connection > niche > fallback
+    let phoneNumberId: string | null = null;
 
-    let phoneNumberId = niche?.whatsapp_phone_number_id || null;
-
-    if (!phoneNumberId) {
-      // Fallback to connection_configs
-      const { data: waConfig } = await supabase
+    // 1st: Use the connection tied to this conversation
+    if (conversation.connection_config_id) {
+      const { data: connConfig } = await supabase
         .from("connection_configs")
         .select("config")
-        .eq("connection_id", "whatsapp")
-        .eq("is_connected", true)
-        .order("updated_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .eq("id", conversation.connection_config_id)
+        .single();
+      const cfg = connConfig?.config as Record<string, unknown> | null;
+      if (typeof cfg?.phone_number_id === "string" && cfg.phone_number_id.trim()) {
+        phoneNumberId = cfg.phone_number_id;
+      }
+    }
 
-      const waConfigData = waConfig?.config as Record<string, unknown> | null;
-      phoneNumberId =
-        (typeof waConfigData?.phone_number_id === "string" && waConfigData.phone_number_id.trim())
-          ? waConfigData.phone_number_id
-          : Deno.env.get("WHATSAPP_PHONE_NUMBER_ID") || null;
+    // 2nd: Niche-specific phone number
+    if (!phoneNumberId && nicheId) {
+      const { data: nicheData } = await supabase
+        .from("niches")
+        .select("whatsapp_phone_number_id")
+        .eq("id", nicheId)
+        .single();
+      phoneNumberId = nicheData?.whatsapp_phone_number_id || null;
+    }
+
+    // 3rd: Global fallback
+    if (!phoneNumberId) {
+      phoneNumberId = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID") || null;
     }
 
     const accessToken = Deno.env.get("WHATSAPP_ACCESS_TOKEN");
-    console.log(`[ai-auto-reply] Using phoneNumberId: ${phoneNumberId}, hasAccessToken: ${!!accessToken}`);
+    console.log(`[ai-auto-reply] Using phoneNumberId: ${phoneNumberId}, connConfigId: ${conversation.connection_config_id}, hasAccessToken: ${!!accessToken}`);
 
     // Save message to DB FIRST so it appears in chat/logs regardless of send result
     await supabase.from("messages").insert({
