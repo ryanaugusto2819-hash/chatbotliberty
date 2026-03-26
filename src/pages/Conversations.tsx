@@ -218,12 +218,13 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
     const debouncedFetch = () => {
       if (document.hidden) return;
       if (debounceTimer) clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => fetchConversations(), 500);
+      debounceTimer = setTimeout(() => fetchConversations(), 2000);
     };
 
     const channel = supabase
       .channel('conversations-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, debouncedFetch)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'conversations' }, debouncedFetch)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations' }, debouncedFetch)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, debouncedFetch)
       .subscribe();
 
