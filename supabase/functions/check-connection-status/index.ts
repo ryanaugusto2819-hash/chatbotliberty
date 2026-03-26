@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
       } else {
         try {
           const phoneData = await graphRequest(
-            `/${phoneId}?fields=id,display_phone_number,verified_name,quality_rating,status`,
+            `/${phoneId}?fields=id,display_phone_number,verified_name,quality_rating,status,messaging_limit_tier`,
             token
           );
 
@@ -95,21 +95,32 @@ Deno.serve(async (req) => {
           const webhookUrlMatches = configuredWebhookUrl ? configuredWebhookUrl === expectedWebhookUrl : null;
           let appSubscribed: boolean | null = null;
           let subscribedAppsCount = 0;
+          let wabaStatus: string | null = null;
 
           if (wabaId) {
             const subscribedApps = await getSubscribedApps(wabaId, token, metaAppId);
             appSubscribed = subscribedApps.appSubscribed;
             subscribedAppsCount = subscribedApps.subscribedApps.length;
+
+            // Check WABA-level restrictions
+            try {
+              const wabaData = await graphRequest(
+                `/${wabaId}?fields=id,account_review_status,message_template_namespace`,
+                token
+              );
+              wabaStatus = wabaData?.account_review_status || null;
+            } catch { /* ignore WABA check errors */ }
           }
 
           // Detect blocked/flagged phone statuses from Meta
           const phoneStatus = (phoneData?.status || "").toUpperCase();
-          const blockedStatuses = ["FLAGGED", "RESTRICTED", "RATE_LIMITED", "BANNED", "BLOCKED", "DISABLED"];
+          const blockedStatuses = ["FLAGGED", "RESTRICTED", "RATE_LIMITED", "BANNED", "BLOCKED", "DISABLED", "OFFLINE"];
           const isPhoneBlocked = blockedStatuses.includes(phoneStatus);
           const qualityRating = (phoneData?.quality_rating || "").toUpperCase();
           const isLowQuality = qualityRating === "RED";
+          const isWabaRestricted = wabaStatus && ["REJECTED", "DISABLED", "FLAGGED", "RESTRICTED"].includes(wabaStatus.toUpperCase());
 
-          if (isPhoneBlocked) {
+          if (isPhoneBlocked || isWabaRestricted) {
             status = "blocked";
           } else if (appSubscribed === false) {
             status = "pending_setup";
@@ -118,12 +129,17 @@ Deno.serve(async (req) => {
           } else {
             status = "active";
           }
+
+          console.log(`[check-connection-status] ${config.phone_display || phoneId}: phone_status=${phoneData?.status}, quality=${phoneData?.quality_rating}, waba_status=${wabaStatus}, final_status=${status}`);
+
           details = {
             verified_name: phoneData?.verified_name,
             quality_rating: phoneData?.quality_rating,
             phone: phoneData?.display_phone_number,
             phone_status: phoneData?.status,
+            messaging_limit: phoneData?.messaging_limit_tier || null,
             waba_id: wabaId || null,
+            waba_status: wabaStatus,
             expected_webhook_url: expectedWebhookUrl,
             configured_webhook_url: configuredWebhookUrl || null,
             webhook_url_matches: webhookUrlMatches,
