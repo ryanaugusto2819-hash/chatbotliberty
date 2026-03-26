@@ -102,7 +102,7 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
   const [showSaleDialog, setShowSaleDialog] = useState(false);
   const [saleData, setSaleData] = useState({ valor: '', campanha: '', pais: 'brasil', moeda: 'BRL' });
   const [sendingSale, setSendingSale] = useState(false);
-  const [saleRegistered, setSaleRegistered] = useState(false);
+  const [saleRegistered, setSaleRegistered] = useState<Record<string, boolean>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
