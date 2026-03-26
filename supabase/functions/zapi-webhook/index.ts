@@ -179,6 +179,21 @@ async function processZapiWebhook(body: any) {
   const allowedTypes = ["text", "image", "document", "audio", "video"];
   const normalizedType = allowedTypes.includes(messageType) ? messageType : "text";
 
+  // Deduplication: skip if this provider message was already stored
+  const providerMsgId = body.messageId || body.id?.id || null;
+  if (providerMsgId) {
+    const { data: duplicate } = await supabase
+      .from("messages")
+      .select("id")
+      .eq("provider_message_id", providerMsgId)
+      .limit(1)
+      .maybeSingle();
+    if (duplicate) {
+      console.log(`[zapi-webhook] Duplicate message ${providerMsgId}, skipping`);
+      return;
+    }
+  }
+
   const { error: msgError } = await supabase.from("messages").insert({
     conversation_id: conversationId,
     content,
@@ -186,6 +201,7 @@ async function processZapiWebhook(body: any) {
     message_type: normalizedType,
     media_url: mediaUrl,
     status: "delivered",
+    provider_message_id: providerMsgId,
   });
 
   if (msgError) {
