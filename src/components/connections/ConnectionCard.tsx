@@ -330,6 +330,7 @@ export default function ConnectionCard({ connection, onDeleted, onUpdated }: Con
                     ['REJECTED', 'DISABLED', 'FLAGGED', 'RESTRICTED'].includes(String(diagnostics?.waba_status || '').toUpperCase())
                       ? 'text-destructive' : ''
                   }`}>{formatDiagnosticValue(diagnostics?.waba_status)}</span>
+                </div>
                 <div className="flex items-start justify-between gap-3">
                   <span className="text-muted-foreground">Erro</span>
                   <span className="text-right font-medium text-destructive">{formatDiagnosticValue(diagnostics?.error)}</span>
