@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Clock, Plus, Trash2, Save, Loader2, Play,
   MessageSquare, CheckCircle, XCircle, AlertTriangle,
-  TrendingUp, Timer, Target, Zap, ArrowUpRight, BarChart3, Filter,
+  TrendingUp, Timer, Target, Zap, ArrowUpRight, BarChart3, Filter, ExternalLink,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
@@ -73,6 +74,7 @@ interface NicheFollowUpsProps {
 }
 
 export default function NicheFollowUps({ nicheId }: NicheFollowUpsProps) {
+  const navigate = useNavigate();
   const [templates, setTemplates] = useState<FollowUpTemplate[]>([]);
   const [executions, setExecutions] = useState<FollowUpExecution[]>([]);
   const [stages, setStages] = useState<FunnelStage[]>([]);
@@ -594,10 +596,17 @@ export default function NicheFollowUps({ nicheId }: NicheFollowUpsProps) {
                           <p className="text-xs text-muted-foreground truncate max-w-md">{e.message_sent}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
                         <Badge variant="outline">{sc.label}</Badge>
                         <span>Tentativa {e.attempt_number}</span>
                         <span>{new Date(e.created_at).toLocaleString('pt-BR')}</span>
+                        <button
+                          onClick={() => navigate(`/conversations/${e.conversation_id}`)}
+                          className="p-1 rounded hover:bg-accent transition-colors"
+                          title="Abrir conversa"
+                        >
+                          <ExternalLink className="h-4 w-4 text-primary" />
+                        </button>
                       </div>
                     </div>
                   );
