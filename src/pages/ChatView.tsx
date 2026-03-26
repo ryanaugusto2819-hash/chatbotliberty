@@ -481,7 +481,28 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
     }
   };
 
-  const handleSendSale = async () => {
+  const handleDeleteMessage = useCallback(async (messageId: string) => {
+    // Optimistic removal
+    setMessages(prev => prev.filter(m => m.id !== messageId));
+    try {
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const res = await fetch(`https://${projectId}.supabase.co/functions/v1/delete-message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}` },
+        body: JSON.stringify({ messageId }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        toast.error('Erro ao excluir mensagem');
+        return;
+      }
+      toast.success(result.whatsappDeleted ? 'Mensagem excluída do CRM e WhatsApp' : 'Mensagem excluída do CRM');
+    } catch {
+      toast.error('Erro ao excluir mensagem');
+    }
+  }, []);
+
+
     if (!saleData.valor || sendingSale) return;
     setSendingSale(true);
     try {
@@ -590,7 +611,7 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
           )}
 
           {messages.map((msg) => (
-            <MessageBubble key={msg.id} msg={msg} />
+            <MessageBubble key={msg.id} msg={msg} onDelete={handleDeleteMessage} />
           ))}
           <div ref={messagesEndRef} />
         </div>
