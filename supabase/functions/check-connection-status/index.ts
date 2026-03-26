@@ -102,7 +102,22 @@ Deno.serve(async (req) => {
             subscribedAppsCount = subscribedApps.subscribedApps.length;
           }
 
-          status = appSubscribed === false ? "pending_setup" : "active";
+          // Detect blocked/flagged phone statuses from Meta
+          const phoneStatus = (phoneData?.status || "").toUpperCase();
+          const blockedStatuses = ["FLAGGED", "RESTRICTED", "RATE_LIMITED", "BANNED", "BLOCKED", "DISABLED"];
+          const isPhoneBlocked = blockedStatuses.includes(phoneStatus);
+          const qualityRating = (phoneData?.quality_rating || "").toUpperCase();
+          const isLowQuality = qualityRating === "RED";
+
+          if (isPhoneBlocked) {
+            status = "blocked";
+          } else if (appSubscribed === false) {
+            status = "pending_setup";
+          } else if (isLowQuality) {
+            status = "warning";
+          } else {
+            status = "active";
+          }
           details = {
             verified_name: phoneData?.verified_name,
             quality_rating: phoneData?.quality_rating,
