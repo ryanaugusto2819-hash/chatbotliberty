@@ -74,6 +74,7 @@ interface NicheFollowUpsProps {
 }
 
 export default function NicheFollowUps({ nicheId }: NicheFollowUpsProps) {
+  const navigate = useNavigate();
   const [templates, setTemplates] = useState<FollowUpTemplate[]>([]);
   const [executions, setExecutions] = useState<FollowUpExecution[]>([]);
   const [stages, setStages] = useState<FunnelStage[]>([]);
