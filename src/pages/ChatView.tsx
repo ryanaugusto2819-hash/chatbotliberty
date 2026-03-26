@@ -77,20 +77,22 @@ const MessageBubble = memo(function MessageBubble({ msg, onDelete }: MessageBubb
       className={`group relative flex ${msg.sender_type === 'agent' ? 'justify-end' : 'justify-start'}`}
       onMouseLeave={() => { setShowMenu(false); setConfirming(false); }}
     >
-      {/* Delete button — appears on hover */}
-      <div className={`absolute top-1 ${msg.sender_type === 'agent' ? 'left-0 -translate-x-full pr-1' : 'right-0 translate-x-full pl-1'} opacity-0 group-hover:opacity-100 transition-opacity z-10`}>
+      {/* Delete — appears on hover next to the bubble */}
+      <div className={`absolute top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity z-10 ${
+        msg.sender_type === 'agent' ? 'right-[calc(70%+8px)]' : 'left-[calc(70%+8px)]'
+      }`}>
         {confirming ? (
-          <div className="flex items-center gap-1 rounded-lg bg-destructive/90 px-2 py-1 shadow-lg">
-            <span className="text-[10px] text-white whitespace-nowrap">Excluir?</span>
+          <div className="flex items-center gap-1.5 rounded-lg bg-card border border-border px-2.5 py-1.5 shadow-lg">
+            <span className="text-[11px] text-foreground whitespace-nowrap">Excluir?</span>
             <button
               onClick={() => { onDelete?.(msg.id); setConfirming(false); setShowMenu(false); }}
-              className="text-[10px] font-bold text-white hover:underline"
+              className="text-[11px] font-semibold text-destructive hover:underline"
             >
               Sim
             </button>
             <button
               onClick={() => setConfirming(false)}
-              className="text-[10px] text-white/70 hover:underline"
+              className="text-[11px] text-muted-foreground hover:underline"
             >
               Não
             </button>
@@ -98,10 +100,10 @@ const MessageBubble = memo(function MessageBubble({ msg, onDelete }: MessageBubb
         ) : (
           <button
             onClick={() => setConfirming(true)}
-            className="flex h-7 w-7 items-center justify-center rounded-full bg-card border border-border shadow-sm hover:bg-destructive/10 hover:text-destructive transition-colors text-muted-foreground"
+            className="flex h-6 w-6 items-center justify-center rounded-full bg-card/80 border border-border shadow-sm hover:bg-destructive/10 hover:text-destructive transition-colors text-muted-foreground backdrop-blur-sm"
             title="Excluir mensagem"
           >
-            <Trash2 className="h-3.5 w-3.5" />
+            <Trash2 className="h-3 w-3" />
           </button>
         )}
       </div>
