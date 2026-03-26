@@ -271,7 +271,7 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
         .select('id, label, status, connection_id')
         .eq('is_connected', true);
       if (data) {
-        const blocked = data.filter(c => c.status === 'error' || c.status === 'blocked');
+        const blocked = data.filter(c => c.status === 'error' || c.status === 'blocked' || c.status === 'warning');
         setBlockedConnections(blocked.map(c => ({ id: c.id, label: c.label || c.connection_id, status: c.status })));
       }
     };
