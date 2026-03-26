@@ -46,6 +46,8 @@ Deno.serve(async (req) => {
     const currentHour = now.getUTCHours() - 3;
     const normalizedHour = currentHour < 0 ? currentHour + 24 : currentHour;
 
+    console.log(`[ai-follow-up] ⏰ Hora atual (BRT): ${normalizedHour}h | UTC: ${now.toISOString()}`);
+
     // Get all active templates
     const { data: templates } = await supabase
       .from("follow_up_templates")
@@ -54,19 +56,23 @@ Deno.serve(async (req) => {
       .order("escalation_level", { ascending: true });
 
     if (!templates?.length) {
-      console.log("[ai-follow-up] No active templates");
+      console.log("[ai-follow-up] ❌ Nenhum template ativo encontrado");
       return jsonResponse({ processed: 0, reason: "No active templates" });
     }
 
-    // Filter templates by active hours FIRST
+    console.log(`[ai-follow-up] 📋 Templates ativos: ${templates.length} → ${templates.map((t: any) => `${t.name} (nicho: ${t.niche_id?.slice(0,8)}, etapa: ${t.funnel_stage}, horário: ${t.active_hours_start}-${t.active_hours_end}h)`).join(" | ")}`);
+
+    // Filter templates by active hours
     const activeTemplates = templates.filter((t: any) => {
       return normalizedHour >= t.active_hours_start && normalizedHour < t.active_hours_end;
     });
 
     if (!activeTemplates.length) {
-      console.log(`[ai-follow-up] No templates active at hour ${normalizedHour}`);
+      console.log(`[ai-follow-up] ❌ Nenhum template ativo na hora ${normalizedHour}. Templates: ${templates.map((t: any) => `${t.name}(${t.active_hours_start}-${t.active_hours_end}h)`).join(", ")}`);
       return jsonResponse({ processed: 0, reason: `No templates active at hour ${normalizedHour}` });
     }
+
+    console.log(`[ai-follow-up] ✅ ${activeTemplates.length} templates ativos na hora ${normalizedHour}: ${activeTemplates.map((t: any) => t.name).join(", ")}`);
 
     // Find minimum delay to filter conversations efficiently
     const minDelay = Math.min(...activeTemplates.map((t: any) => t.delay_hours));
@@ -76,29 +82,46 @@ Deno.serve(async (req) => {
     const nicheIds = [...new Set(activeTemplates.map((t: any) => t.niche_id).filter(Boolean))];
 
     if (!nicheIds.length) {
-      console.log("[ai-follow-up] No niches configured in active templates");
+      console.log("[ai-follow-up] ❌ Nenhum nicho configurado nos templates ativos");
       return jsonResponse({ processed: 0, reason: "No niches in templates" });
     }
 
-    // Only get conversations that:
-    // 1. Are not resolved
-    // 2. Belong to a niche with active templates
-    // 3. Were updated before the minimum delay cutoff (haven't had activity recently)
-    const { data: conversations } = await supabase
+    // Collect funnel stages from templates (including 'all')
+    const templateStages = [...new Set(activeTemplates.map((t: any) => t.funnel_stage || 'all'))];
+    const hasAllStage = templateStages.includes('all');
+
+    console.log(`[ai-follow-up] 🎯 Nichos: ${nicheIds.map((id: string) => id.slice(0,8)).join(", ")} | Etapas dos templates: ${templateStages.join(", ")} | Cutoff: ${cutoffTime}`);
+
+    // Build query - filter by funnel stages that templates actually target
+    let query = supabase
       .from("conversations")
       .select("id, contact_name, contact_phone, niche_id, status, updated_at, tags, ad_title, funnel_stage")
       .neq("status", "resolved")
       .in("niche_id", nicheIds)
       .lt("updated_at", cutoffTime)
       .order("updated_at", { ascending: true })
-      .limit(30);
+      .limit(50);
+
+    // If no template targets 'all', filter conversations to only matching funnel stages
+    if (!hasAllStage) {
+      const specificStages = templateStages.filter((s: string) => s !== 'all');
+      query = query.in("funnel_stage", specificStages);
+      console.log(`[ai-follow-up] 🔍 Filtrando conversas pelas etapas: ${specificStages.join(", ")}`);
+    }
+
+    const { data: conversations, error: convError } = await query;
+
+    if (convError) {
+      console.error(`[ai-follow-up] ❌ Erro ao buscar conversas: ${convError.message}`);
+      return jsonResponse({ error: convError.message }, 500);
+    }
 
     if (!conversations?.length) {
-      console.log(`[ai-follow-up] No eligible conversations (cutoff: ${cutoffTime})`);
+      console.log(`[ai-follow-up] ❌ Nenhuma conversa elegível (cutoff: ${cutoffTime}, nichos: ${nicheIds.length}, etapas: ${templateStages.join(",")})`);
       return jsonResponse({ processed: 0, reason: "No eligible conversations" });
     }
 
-    console.log(`[ai-follow-up] Processing ${conversations.length} conversations (of ${nicheIds.length} niches)`);
+    console.log(`[ai-follow-up] 📊 ${conversations.length} conversas elegíveis encontradas. Distribuição por etapa: ${Object.entries(conversations.reduce((acc: any, c: any) => { acc[c.funnel_stage] = (acc[c.funnel_stage] || 0) + 1; return acc; }, {})).map(([k, v]) => `${k}=${v}`).join(", ")}`);
 
     // Load niche data in parallel
     const [nichesRes, kbRes, stagesRes] = await Promise.all([
@@ -116,6 +139,11 @@ Deno.serve(async (req) => {
     }
 
     let totalSent = 0;
+    const skippedReasons: Record<string, number> = {};
+
+    function trackSkip(reason: string) {
+      skippedReasons[reason] = (skippedReasons[reason] || 0) + 1;
+    }
 
     for (const conv of conversations) {
       // Get recent messages for this conversation
@@ -126,11 +154,16 @@ Deno.serve(async (req) => {
         .order("created_at", { ascending: false })
         .limit(20);
 
-      if (!lastMessages?.length) continue;
+      if (!lastMessages?.length) {
+        trackSkip("sem_mensagens");
+        continue;
+      }
 
       const lastMsg = lastMessages[0];
-      // Skip if last message is from customer (they already responded, no need for follow-up)
-      if (lastMsg.sender_type === "customer") continue;
+      if (lastMsg.sender_type === "customer") {
+        trackSkip("ultima_msg_do_cliente");
+        continue;
+      }
 
       const lastMsgTime = new Date(lastMsg.created_at);
       const hoursSinceLastMsg = (now.getTime() - lastMsgTime.getTime()) / (1000 * 60 * 60);
@@ -146,7 +179,10 @@ Deno.serve(async (req) => {
         .order("created_at", { ascending: false });
 
       const nicheTemplates = activeTemplates.filter((t: any) => t.niche_id === conv.niche_id);
-      if (!nicheTemplates.length) continue;
+      if (!nicheTemplates.length) {
+        trackSkip("sem_template_pro_nicho");
+        continue;
+      }
 
       let sentForConv = false;
 
@@ -156,18 +192,30 @@ Deno.serve(async (req) => {
         // Check funnel stage match
         const templateStage = template.funnel_stage || 'all';
         const convStage = conv.funnel_stage || 'etapa_1';
-        if (templateStage !== 'all' && templateStage !== convStage) continue;
+        if (templateStage !== 'all' && templateStage !== convStage) {
+          trackSkip(`etapa_incompativel(${convStage}!=${templateStage})`);
+          continue;
+        }
 
         // Check delay
-        if (hoursSinceLastMsg < template.delay_hours) continue;
+        if (hoursSinceLastMsg < template.delay_hours) {
+          trackSkip(`delay_insuficiente(${Math.round(hoursSinceLastMsg)}h<${template.delay_hours}h)`);
+          continue;
+        }
 
         // Check attempts
         const templateExecs = (existingExecs || []).filter((e: any) => e.template_id === template.id);
         const attemptsDone = templateExecs.length;
-        if (attemptsDone >= template.max_attempts) continue;
+        if (attemptsDone >= template.max_attempts) {
+          trackSkip(`max_tentativas(${attemptsDone}/${template.max_attempts})`);
+          continue;
+        }
 
         // Check pending
-        if (templateExecs.some((e: any) => e.status === "pending")) continue;
+        if (templateExecs.some((e: any) => e.status === "pending")) {
+          trackSkip("execucao_pendente");
+          continue;
+        }
 
         // Check if customer responded after last follow-up
         const lastExec = templateExecs[0];
@@ -180,9 +228,12 @@ Deno.serve(async (req) => {
               .eq("conversation_id", conv.id)
               .eq("template_id", template.id)
               .eq("status", "sent");
+            trackSkip("cliente_respondeu");
             continue;
           }
         }
+
+        console.log(`[ai-follow-up] 🚀 Gerando follow-up para ${conv.contact_name} (etapa: ${funnelStage.label}, template: ${template.name}, tentativa: ${attemptsDone + 1}/${template.max_attempts}, horas sem resposta: ${Math.round(hoursSinceLastMsg)}h)`);
 
         // Build context
         const allMsgsChronological = [...lastMessages].reverse();
@@ -267,13 +318,21 @@ Gere a mensagem de follow-up:`,
         });
 
         if (!aiResponse.ok) {
-          console.error(`[ai-follow-up] AI error for ${conv.contact_name}: ${aiResponse.status}`);
+          const errText = await aiResponse.text();
+          console.error(`[ai-follow-up] ❌ Erro na IA para ${conv.contact_name}: HTTP ${aiResponse.status} - ${errText}`);
+          trackSkip(`erro_ia(${aiResponse.status})`);
           continue;
         }
 
         const aiResult = await aiResponse.json();
         const followUpMessage = aiResult.choices?.[0]?.message?.content?.trim();
-        if (!followUpMessage) continue;
+        if (!followUpMessage) {
+          console.error(`[ai-follow-up] ❌ IA retornou mensagem vazia para ${conv.contact_name}`);
+          trackSkip("ia_msg_vazia");
+          continue;
+        }
+
+        console.log(`[ai-follow-up] 💬 Mensagem gerada para ${conv.contact_name}: "${followUpMessage.substring(0, 80)}..."`);
 
         // Log AI usage
         const usage = aiResult.usage;
@@ -331,6 +390,8 @@ Gere a mensagem de follow-up:`,
         const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
         const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+        console.log(`[ai-follow-up] 📤 Enviando via ${sendFunction} para ${conv.contact_name} (${conv.contact_phone})`);
+
         const sendResp = await fetch(`${supabaseUrl}/functions/v1/${sendFunction}`, {
           method: "POST",
           headers: {
@@ -350,17 +411,22 @@ Gere a mensagem de follow-up:`,
 
           totalSent++;
           sentForConv = true;
-          console.log(`[ai-follow-up] ✅ Sent to ${conv.contact_name} (template: ${template.name}, attempt: ${attemptsDone + 1}, funnel: ${funnelStage.label})`);
+          console.log(`[ai-follow-up] ✅ Enviado para ${conv.contact_name} (template: ${template.name}, tentativa: ${attemptsDone + 1}, funil: ${funnelStage.label})`);
         } else {
-          console.error(`[ai-follow-up] ❌ Failed to send to ${conv.contact_name}:`, await sendResp.text());
+          const errText = await sendResp.text();
+          console.error(`[ai-follow-up] ❌ Falha ao enviar para ${conv.contact_name}: ${errText}`);
+          trackSkip(`erro_envio(${sendResp.status})`);
         }
       }
     }
 
-    console.log(`[ai-follow-up] Finished: ${totalSent} sent`);
-    return jsonResponse({ processed: totalSent });
+    // Log summary of skipped reasons
+    const skipSummary = Object.entries(skippedReasons).map(([reason, count]) => `${reason}: ${count}`).join(" | ");
+    console.log(`[ai-follow-up] 📊 Resumo: ${totalSent} enviados, ${conversations.length} processadas. Motivos de skip: ${skipSummary || "nenhum"}`);
+
+    return jsonResponse({ processed: totalSent, skippedReasons });
   } catch (error) {
-    console.error("[ai-follow-up] Error:", error);
+    console.error("[ai-follow-up] ❌ Erro fatal:", error);
     return jsonResponse({ error: "Internal server error" }, 500);
   }
 });
