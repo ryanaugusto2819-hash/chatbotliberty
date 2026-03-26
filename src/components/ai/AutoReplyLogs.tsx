@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, MessageSquare, ExternalLink, Bot, Clock, SkipForward } from 'lucide-react';
+import { Loader2, ExternalLink, Bot, Clock, ChevronDown, ChevronUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -16,6 +16,7 @@ interface AutoReplyLog {
   created_at: string;
   contact_name?: string;
   contact_phone?: string;
+  ai_message?: string;
 }
 
 interface Props {
@@ -25,6 +26,7 @@ interface Props {
 export default function AutoReplyLogs({ nicheId }: Props) {
   const [logs, setLogs] = useState<AutoReplyLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -35,7 +37,6 @@ export default function AutoReplyLogs({ nicheId }: Props) {
     setLoading(true);
 
     try {
-      // First, get ALL auto-reply logs (without filtering by conversation)
       const { data: usageLogs, error: logsError } = await supabase
         .from('ai_usage_logs')
         .select('*')
@@ -56,18 +57,27 @@ export default function AutoReplyLogs({ nicheId }: Props) {
         return;
       }
 
-      // Get conversation IDs from logs to enrich with contact info
       const convoIds = [...new Set(usageLogs.map(l => l.conversation_id).filter(Boolean))] as string[];
 
-      // Get conversations for this niche (for filtering) and contact info
-      const { data: convos } = await supabase
-        .from('conversations')
-        .select('id, contact_name, contact_phone, niche_id')
-        .in('id', convoIds);
+      // Fetch conversations and AI messages in parallel
+      const [convosResult, messagesResult] = await Promise.all([
+        supabase
+          .from('conversations')
+          .select('id, contact_name, contact_phone, niche_id')
+          .in('id', convoIds),
+        supabase
+          .from('messages')
+          .select('conversation_id, content, created_at, sender_label')
+          .in('conversation_id', convoIds)
+          .eq('sender_label', 'ia-vendedora')
+          .order('created_at', { ascending: false }),
+      ]);
 
-      const convoMap = new Map((convos || []).map(c => [c.id, c]));
+      const convoMap = new Map((convosResult.data || []).map(c => [c.id, c]));
 
-      // Filter logs by niche (match conversation's niche_id)
+      // Group AI messages by conversation_id with timestamps
+      const aiMessages = messagesResult.data || [];
+
       const enriched = usageLogs
         .filter(log => {
           if (!log.conversation_id) return false;
@@ -76,10 +86,18 @@ export default function AutoReplyLogs({ nicheId }: Props) {
         })
         .map(log => {
           const convo = log.conversation_id ? convoMap.get(log.conversation_id) : null;
+          // Find the AI message closest to the log timestamp
+          const logTime = new Date(log.created_at).getTime();
+          const matchingMsg = aiMessages.find(m => {
+            if (m.conversation_id !== log.conversation_id) return false;
+            const msgTime = new Date(m.created_at).getTime();
+            return Math.abs(msgTime - logTime) < 30_000; // within 30s
+          });
           return {
             ...log,
             contact_name: convo?.contact_name,
             contact_phone: convo?.contact_phone,
+            ai_message: matchingMsg?.content,
           };
         });
 
@@ -125,41 +143,68 @@ export default function AutoReplyLogs({ nicheId }: Props) {
       </div>
 
       <div className="space-y-2 max-h-[500px] overflow-y-auto">
-        {logs.map((log) => (
-          <div
-            key={log.id}
-            className="flex items-center justify-between rounded-lg border border-border bg-background p-3 text-sm"
-          >
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 shrink-0">
-                <Bot className="h-4 w-4 text-primary" />
-              </div>
-              <div className="min-w-0">
-                <p className="font-medium text-foreground truncate">
-                  {log.contact_name || log.contact_phone || 'Conversa desconhecida'}
-                </p>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Clock className="h-3 w-3" />
-                  {format(new Date(log.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                  <span className="text-muted-foreground/60">•</span>
-                  <span>{log.total_tokens} tokens</span>
-                  <span className="text-muted-foreground/60">•</span>
-                  <span className="text-xs opacity-60">{log.model.split('/').pop()}</span>
+        {logs.map((log) => {
+          const isExpanded = expandedId === log.id;
+          return (
+            <div
+              key={log.id}
+              className="rounded-lg border border-border bg-background text-sm overflow-hidden"
+            >
+              <div
+                className="flex items-center justify-between p-3 cursor-pointer hover:bg-accent/30 transition-colors"
+                onClick={() => setExpandedId(isExpanded ? null : log.id)}
+              >
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 shrink-0">
+                    <Bot className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-medium text-foreground truncate">
+                      {log.contact_name || log.contact_phone || 'Conversa desconhecida'}
+                    </p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Clock className="h-3 w-3" />
+                      {format(new Date(log.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                      <span className="text-muted-foreground/60">•</span>
+                      <span>{log.total_tokens} tokens</span>
+                      <span className="text-muted-foreground/60">•</span>
+                      <span className="text-xs opacity-60">{log.model.split('/').pop()}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1 shrink-0">
+                  {log.conversation_id && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/conversations/${log.conversation_id}`);
+                      }}
+                      className="p-1.5 rounded-lg hover:bg-accent transition-colors"
+                      title="Abrir conversa"
+                    >
+                      <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  )}
+                  {isExpanded
+                    ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                    : <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                  }
                 </div>
               </div>
-            </div>
 
-            {log.conversation_id && (
-              <button
-                onClick={() => navigate(`/conversations/${log.conversation_id}`)}
-                className="p-1.5 rounded-lg hover:bg-accent transition-colors shrink-0"
-                title="Abrir conversa"
-              >
-                <ExternalLink className="h-4 w-4 text-muted-foreground" />
-              </button>
-            )}
-          </div>
-        ))}
+              {isExpanded && (
+                <div className="px-3 pb-3 pt-0">
+                  <div className="rounded-lg bg-muted/50 p-3 text-sm text-foreground whitespace-pre-wrap border-l-2 border-primary/40">
+                    {log.ai_message || (
+                      <span className="text-muted-foreground italic">Mensagem não encontrada</span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
