@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { executeFlow } from '@/lib/automation';
-import { GitBranch, Loader2, X } from 'lucide-react';
+import { GitBranch, Loader2, X, Search } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface FlowOption {
@@ -18,6 +18,13 @@ export default function FlowTrigger({ conversationId }: FlowTriggerProps) {
   const [open, setOpen] = useState(false);
   const [flows, setFlows] = useState<FlowOption[]>([]);
   const [executing, setExecuting] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return flows;
+    const q = search.toLowerCase();
+    return flows.filter(f => f.name.toLowerCase().includes(q));
+  }, [flows, search]);
 
   useEffect(() => {
     if (open) {
