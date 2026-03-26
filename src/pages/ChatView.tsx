@@ -103,7 +103,29 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
   const [saleData, setSaleData] = useState({ valor: '', campanha: '', pais: 'brasil', moeda: 'BRL' });
   const [sendingSale, setSendingSale] = useState(false);
   const [saleRegistered, setSaleRegistered] = useState<Record<string, boolean>>({});
+  const [blockedConnections, setBlockedConnections] = useState<{ id: string; label: string; status: string }[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Check for blocked/error connections
+  useEffect(() => {
+    const checkConnections = async () => {
+      const { data } = await supabase
+        .from('connection_configs')
+        .select('id, label, status, connection_id')
+        .eq('is_connected', true);
+      if (data) {
+        const blocked = data.filter(c => c.status === 'error' || c.status === 'blocked');
+        setBlockedConnections(blocked.map(c => ({
+          id: c.id,
+          label: c.label || c.connection_id,
+          status: c.status,
+        })));
+      }
+    };
+    checkConnections();
+    const interval = setInterval(checkConnections, 60_000);
+    return () => clearInterval(interval);
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -311,6 +333,18 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
             </button>
           </div>
         </div>
+
+        {/* Blocked connection warning */}
+        {blockedConnections.length > 0 && (
+          <div className="mx-4 mt-2 flex items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-2.5 text-sm text-destructive">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <span className="font-medium">
+              ⚠️ {blockedConnections.length === 1 ? 'Conexão com problema' : `${blockedConnections.length} conexões com problemas`}:
+              {' '}{blockedConnections.map(c => c.label).join(', ')}
+              {' '}— Verifique na página de Conexões.
+            </span>
+          </div>
+        )}
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-6 space-y-3 scrollbar-thin bg-background">
