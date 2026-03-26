@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { sendWhatsAppMessage } from '@/lib/whatsapp';
 import StatusBadge from '@/components/shared/StatusBadge';
-import { ArrowLeft, Send, Paperclip, MoreVertical, User, Clock, CheckCheck, Check, Loader2, Phone, MessageSquare, Tag, Calendar, Hash, History, AlertTriangle, RefreshCw, Bot, UserRound, DollarSign } from 'lucide-react';
+import { ArrowLeft, Send, Paperclip, MoreVertical, User, Clock, CheckCheck, Check, Loader2, Phone, MessageSquare, Tag, Calendar, Hash, History, AlertTriangle, RefreshCw, Bot, UserRound, DollarSign, Image, X } from 'lucide-react';
 import FlowTrigger from '@/components/automation/FlowTrigger';
 import QuickMessages from '@/components/chat/QuickMessages';
 import TagManager from '@/components/tags/TagManager';
@@ -206,7 +206,11 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
   const [blockedConnections, setBlockedConnections] = useState<{ id: string; label: string; status: string }[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const isLoadingOlderRef = useRef(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [filePreview, setFilePreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   const { messages, setMessages, loading: msgsLoading, hasMore, loadMore, loadingMore, markAsRead } = useChatMessages(id);
 
@@ -309,26 +313,83 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
     return () => { supabase.removeChannel(channel); };
   }, [id]);
 
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const maxSize = 16 * 1024 * 1024; // 16MB
+    if (file.size > maxSize) {
+      toast.error('Arquivo muito grande. Máximo 16MB.');
+      return;
+    }
+
+    setSelectedFile(file);
+    if (file.type.startsWith('image/')) {
+      const url = URL.createObjectURL(file);
+      setFilePreview(url);
+    } else {
+      setFilePreview(null);
+    }
+    // Reset input so same file can be re-selected
+    e.target.value = '';
+  }, []);
+
+  const clearSelectedFile = useCallback(() => {
+    if (filePreview) URL.revokeObjectURL(filePreview);
+    setSelectedFile(null);
+    setFilePreview(null);
+  }, [filePreview]);
+
+  const getMessageType = (file: File): string => {
+    if (file.type.startsWith('image/')) return 'image';
+    if (file.type.startsWith('video/')) return 'video';
+    return 'document';
+  };
+
   const handleSend = async () => {
-    if (!input.trim() || !id || sending) return;
+    if ((!input.trim() && !selectedFile) || !id || sending) return;
     const msg = input.trim();
+    const file = selectedFile;
     setInput('');
+    clearSelectedFile();
     setSending(true);
 
     const optimisticId = `optimistic-${Date.now()}`;
+    const messageType = file ? getMessageType(file) : 'text';
     const optimisticMsg: ChatMessage = {
       id: optimisticId,
       content: msg,
       sender_type: 'agent',
-      message_type: 'text',
+      message_type: messageType,
       status: 'sending',
       created_at: new Date().toISOString(),
       sender_label: 'humano',
+      media_url: filePreview,
     };
     setMessages(prev => [...prev, optimisticMsg]);
 
     try {
-      const result = await sendWhatsAppMessage(id, msg);
+      let mediaUrl: string | undefined;
+
+      // Upload file if present
+      if (file) {
+        setUploading(true);
+        const ext = file.name.split('.').pop() || 'bin';
+        const path = `${id}/${Date.now()}.${ext}`;
+        const { error: uploadError } = await supabase.storage
+          .from('chat-media')
+          .upload(path, file, { contentType: file.type });
+
+        if (uploadError) {
+          throw new Error('Falha ao fazer upload do arquivo');
+        }
+
+        const { data: urlData } = supabase.storage.from('chat-media').getPublicUrl(path);
+        mediaUrl = urlData.publicUrl;
+        setUploading(false);
+      }
+
+      const result = await sendWhatsAppMessage(id, msg || '', mediaUrl ? { mediaUrl, messageType } : undefined);
 
       if (result?.savedMessage) {
         const savedMsg = result.savedMessage as ChatMessage;
@@ -345,12 +406,12 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
       }
     } catch (err: any) {
       console.error('Send error:', err);
+      setUploading(false);
       try {
         const { data: recentMsgs } = await supabase
           .from('messages')
           .select('id, content, sender_type, message_type, status, created_at, media_url, provider_error, provider_status, sender_agent_id, sender_label')
           .eq('conversation_id', id)
-          .eq('content', msg)
           .eq('sender_type', 'agent')
           .order('created_at', { ascending: false })
           .limit(1);
@@ -484,8 +545,40 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
 
         {/* Input */}
         <div className="border-t border-border bg-card p-4 relative">
+          {/* File preview */}
+          {selectedFile && (
+            <div className="mb-2 flex items-center gap-2 rounded-lg border border-border bg-secondary/50 p-2">
+              {filePreview ? (
+                <img src={filePreview} alt="Preview" className="h-16 w-16 rounded-lg object-cover" />
+              ) : (
+                <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                  <Paperclip className="h-6 w-6" />
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-foreground truncate">{selectedFile.name}</p>
+                <p className="text-[10px] text-muted-foreground">{(selectedFile.size / 1024).toFixed(0)} KB</p>
+              </div>
+              <button onClick={clearSelectedFile} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,video/*,.pdf,.doc,.docx"
+            className="hidden"
+            onChange={handleFileSelect}
+          />
+
           <div className="flex items-end gap-2">
-            <button className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary transition-colors">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary transition-colors"
+              title="Anexar arquivo"
+            >
               <Paperclip className="h-4 w-4" />
             </button>
             <QuickMessages onSelect={(content) => setInput(content)} />
@@ -495,17 +588,17 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }}}
-                placeholder="Digite uma mensagem..."
+                placeholder={selectedFile ? "Legenda (opcional)..." : "Digite uma mensagem..."}
                 rows={1}
                 className="w-full resize-none rounded-xl border border-input bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
             <button
               onClick={handleSend}
-              disabled={sending || !input.trim()}
+              disabled={sending || uploading || (!input.trim() && !selectedFile)}
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
             >
-              {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              {sending || uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             </button>
           </div>
         </div>

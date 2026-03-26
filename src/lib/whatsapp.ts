@@ -5,7 +5,8 @@ let cachedProfileId: string | null | undefined = undefined;
 
 export async function sendWhatsAppMessage(
   conversationId: string,
-  message: string
+  message: string,
+  options?: { mediaUrl?: string; messageType?: string }
 ) {
   // Run profile lookup and connection check in parallel
   const [profileResult, connectionsResult] = await Promise.all([
@@ -40,7 +41,13 @@ export async function sendWhatsAppMessage(
   const functionName = zapiConnected ? "zapi-send" : "whatsapp-send";
 
   const { data, error } = await supabase.functions.invoke(functionName, {
-    body: { conversationId, message, senderAgentId, senderLabel: 'humano' },
+    body: {
+      conversationId,
+      message,
+      senderAgentId,
+      senderLabel: 'humano',
+      ...(options?.mediaUrl ? { mediaUrl: options.mediaUrl, type: options.messageType || 'image' } : {}),
+    },
   });
 
   // supabase.functions.invoke returns error for non-2xx, but the edge function

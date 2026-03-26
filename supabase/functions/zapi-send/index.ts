@@ -12,7 +12,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { conversationId, message, type = "text", senderAgentId = null, senderLabel = null } = await req.json();
+    const { conversationId, message, type = "text", senderAgentId = null, senderLabel = null, mediaUrl = null } = await req.json();
 
     if (!conversationId || !message) {
       return new Response(
@@ -73,20 +73,29 @@ Deno.serve(async (req) => {
     const configData = zapiConfig?.config as Record<string, unknown> | null;
     const clientToken = (configData?.client_token as string) || Deno.env.get("ZAPI_CLIENT_TOKEN") || "";
 
-    const zapiResponse = await fetch(
-      `https://api.z-api.io/instances/${instanceId}/token/${token}/send-text`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Client-Token": clientToken,
-        },
-        body: JSON.stringify({
-          phone,
-          message,
-        }),
-      }
-    );
+    // Choose Z-API endpoint based on type
+    let zapiEndpoint = `https://api.z-api.io/instances/${instanceId}/token/${token}/send-text`;
+    let zapiBody: Record<string, unknown> = { phone, message };
+
+    if (mediaUrl && type === "image") {
+      zapiEndpoint = `https://api.z-api.io/instances/${instanceId}/token/${token}/send-image`;
+      zapiBody = { phone, image: mediaUrl, caption: message || "" };
+    } else if (mediaUrl && type === "video") {
+      zapiEndpoint = `https://api.z-api.io/instances/${instanceId}/token/${token}/send-video`;
+      zapiBody = { phone, video: mediaUrl, caption: message || "" };
+    } else if (mediaUrl && type === "document") {
+      zapiEndpoint = `https://api.z-api.io/instances/${instanceId}/token/${token}/send-document/${encodeURIComponent("documento")}`;
+      zapiBody = { phone, document: mediaUrl };
+    }
+
+    const zapiResponse = await fetch(zapiEndpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Client-Token": clientToken,
+      },
+      body: JSON.stringify(zapiBody),
+    });
 
     const zapiResult = await zapiResponse.json();
     const providerMessageId = zapiResult?.messageId || zapiResult?.zaapId || null;
@@ -103,7 +112,7 @@ Deno.serve(async (req) => {
         .from("messages")
         .insert({
           conversation_id: conversationId,
-          content: message,
+          content: message || "",
           sender_type: "agent",
           sender_agent_id: senderAgentId,
           message_type: type,
@@ -111,6 +120,7 @@ Deno.serve(async (req) => {
           provider_status: "failed",
           provider_error: providerError,
           sender_label: senderLabel || (senderAgentId ? "humano" : null),
+          media_url: mediaUrl,
         })
         .select()
         .single();
@@ -128,7 +138,7 @@ Deno.serve(async (req) => {
       .from("messages")
       .insert({
         conversation_id: conversationId,
-        content: message,
+        content: message || "",
         sender_type: "agent",
         sender_agent_id: senderAgentId,
         message_type: type,
@@ -136,6 +146,7 @@ Deno.serve(async (req) => {
         provider_message_id: providerMessageId,
         provider_status: providerMessageId ? "accepted" : null,
         sender_label: senderLabel || (senderAgentId ? "humano" : null),
+        media_url: mediaUrl,
       })
       .select()
       .single();
