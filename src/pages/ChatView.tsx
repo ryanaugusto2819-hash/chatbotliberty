@@ -248,14 +248,18 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
       const result = await sendWhatsAppMessage(id, msg);
 
       if (result?.savedMessage) {
+        const savedMsg = result.savedMessage as MessageData;
         setMessages(prev => {
-          // Replace optimistic message with real one
           const withoutOptimistic = prev.filter(m => m.id !== optimisticId);
-          if (withoutOptimistic.some(m => m.id === result.savedMessage.id)) {
+          if (withoutOptimistic.some(m => m.id === savedMsg.id)) {
             return withoutOptimistic;
           }
-          return [...withoutOptimistic, result.savedMessage as MessageData];
+          return [...withoutOptimistic, savedMsg];
         });
+        // If the saved message is failed, show error toast
+        if (savedMsg.status === 'failed') {
+          toast.error('Erro ao enviar mensagem. Verifique a conexão do WhatsApp.');
+        }
       } else {
         // Remove optimistic if no saved message returned
         setMessages(prev => prev.filter(m => m.id !== optimisticId));
