@@ -623,6 +623,17 @@ export default function AiSettings() {
               </motion.div>
             </TabsContent>
 
+            {/* Auto-Reply Logs Tab */}
+            <TabsContent value="autoreply-logs">
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="rounded-xl border border-border bg-card p-6 shadow-elevated"
+              >
+                <AutoReplyLogs nicheId={selectedNicheId!} />
+              </motion.div>
+            </TabsContent>
+
             {/* Follow-ups Tab */}
             <TabsContent value="followups">
               <NicheFollowUps nicheId={selectedNicheId!} />
