@@ -417,7 +417,7 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
       )}
       {!embedded && showTabs && (
         <div className="px-6 pt-2">
-          <div className="flex gap-0 border-b border-border">
+          <div className="flex items-center gap-0 border-b border-border">
             {(['all', 'whatsapp', 'zapi'] as ConnectionTab[]).map(tab => (
               <button
                 key={tab}
@@ -434,6 +434,17 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
                 )}
               </button>
             ))}
+            {activeTab === 'zapi' && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs gap-1.5 ml-auto mb-1"
+                onClick={() => setShowCreateContact(true)}
+              >
+                <UserPlus className="h-3.5 w-3.5" />
+                Criar Contato
+              </Button>
+            )}
           </div>
         </div>
       )}
