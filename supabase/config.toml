@@ -41,3 +41,6 @@ verify_jwt = false
 
 [functions.ai-follow-up]
 verify_jwt = false
+
+[functions.zapi-qrcode]
+verify_jwt = false

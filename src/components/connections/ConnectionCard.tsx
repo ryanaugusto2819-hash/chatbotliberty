@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import ZApiQrCodePanel from './ZApiQrCodePanel';
 import {
   AlertCircle,
   ChevronDown,
@@ -13,6 +14,7 @@ import {
   Trash2,
   Wifi,
   WifiOff,
+  QrCode,
 } from 'lucide-react';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -89,6 +91,7 @@ const STATUS_MAP: Record<string, { icon: React.ReactNode; label: string; classes
 
 export default function ConnectionCard({ connection, onDeleted, onUpdated }: ConnectionCardProps) {
   const [expanded, setExpanded] = useState(false);
+  const [showQrPanel, setShowQrPanel] = useState(false);
   const [values, setValues] = useState<Record<string, string>>(connection.config || {});
   const [label, setLabel] = useState(connection.label || '');
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
@@ -209,6 +212,15 @@ export default function ConnectionCard({ connection, onDeleted, onUpdated }: Con
             )}
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
+            {connection.connection_id === 'zapi' && (
+              <button
+                onClick={() => setShowQrPanel(!showQrPanel)}
+                className={`flex h-8 w-8 items-center justify-center rounded-lg border border-input bg-background text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors ${showQrPanel ? 'bg-primary/10 text-primary border-primary/30' : ''}`}
+                title="Conectar via QR Code"
+              >
+                <QrCode className="h-3.5 w-3.5" />
+              </button>
+            )}
             <button
               onClick={handleCheckStatus}
               disabled={checking}
@@ -226,6 +238,18 @@ export default function ConnectionCard({ connection, onDeleted, onUpdated }: Con
           </div>
         </div>
       </div>
+
+      {/* QR Code Panel for Z-API */}
+      {showQrPanel && connection.connection_id === 'zapi' && (
+        <div className="border-t border-border px-5 py-4">
+          <ZApiQrCodePanel
+            configId={connection.id}
+            onConnected={() => {
+              onUpdated();
+            }}
+          />
+        </div>
+      )}
 
       {expanded && (
         <div className="border-t border-border px-5 pb-5 pt-4 space-y-4">
