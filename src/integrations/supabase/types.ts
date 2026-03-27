@@ -877,6 +877,7 @@ export type Database = {
           flow_selector_enabled: boolean
           flow_selector_instructions: string
           id: string
+          language: string
           name: string
           system_prompt: string
           updated_at: string
@@ -889,6 +890,7 @@ export type Database = {
           flow_selector_enabled?: boolean
           flow_selector_instructions?: string
           id?: string
+          language?: string
           name: string
           system_prompt?: string
           updated_at?: string
@@ -901,6 +903,7 @@ export type Database = {
           flow_selector_enabled?: boolean
           flow_selector_instructions?: string
           id?: string
+          language?: string
           name?: string
           system_prompt?: string
           updated_at?: string

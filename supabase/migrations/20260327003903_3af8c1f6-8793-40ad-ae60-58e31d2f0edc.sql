@@ -1,0 +1,1 @@
+ALTER TABLE public.niches ADD COLUMN language TEXT NOT NULL DEFAULT 'pt-BR';
