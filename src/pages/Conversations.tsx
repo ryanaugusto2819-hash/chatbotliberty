@@ -159,6 +159,7 @@ interface ConversationsProps {
 
 export default function Conversations({ embedded, selectedId, onSelectConversation }: ConversationsProps = {}) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const storedFilters = getStoredConversationFilters();
   const [searchInput, setSearchInput] = useState(storedFilters.search);
   const [debouncedSearch, setDebouncedSearch] = useState(storedFilters.search);
@@ -289,6 +290,76 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
       navigate(`/conversations/${conversationId}`);
     }
   }, [onSelectConversation, navigate]);
+
+  // ─── Create contact dialog (Cobrança tab) ───
+  const [showCreateContact, setShowCreateContact] = useState(false);
+  const [newContactName, setNewContactName] = useState('');
+  const [newContactPhone, setNewContactPhone] = useState('');
+  const [creatingContact, setCreatingContact] = useState(false);
+
+  const handleCreateContact = async () => {
+    const phone = newContactPhone.replace(/\D/g, '');
+    if (!phone || phone.length < 10) {
+      toast.error('Informe um número de telefone válido');
+      return;
+    }
+    if (!newContactName.trim()) {
+      toast.error('Informe o nome do contato');
+      return;
+    }
+
+    setCreatingContact(true);
+    try {
+      // Find zapi connection to link
+      const zapiConnection = allConnections.find(c => c.connection_id === 'zapi');
+
+      // Check if conversation already exists for this phone
+      const { data: existing } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('contact_phone', phone)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (existing) {
+        toast.info('Conversa já existe para este número');
+        setShowCreateContact(false);
+        setNewContactName('');
+        setNewContactPhone('');
+        handleConversationClick(existing.id);
+        return;
+      }
+
+      const { data: newConv, error } = await supabase
+        .from('conversations')
+        .insert({
+          contact_name: newContactName.trim(),
+          contact_phone: phone,
+          status: 'new',
+          tags: [],
+          connection_config_id: zapiConnection?.id || null,
+        })
+        .select('id')
+        .single();
+
+      if (error) throw error;
+
+      toast.success('Contato criado com sucesso');
+      setShowCreateContact(false);
+      setNewContactName('');
+      setNewContactPhone('');
+      queryClient.invalidateQueries({ queryKey: ['inbox'] });
+      if (newConv) {
+        handleConversationClick(newConv.id);
+      }
+    } catch (err) {
+      console.error('Error creating contact:', err);
+      toast.error('Erro ao criar contato');
+    } finally {
+      setCreatingContact(false);
+    }
+  };
 
   const tabLabels: Record<ConnectionTab, string> = {
     all: 'Todos',
