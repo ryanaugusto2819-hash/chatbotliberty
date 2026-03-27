@@ -99,6 +99,8 @@ Deno.serve(async (req) => {
       );
     }
 
+    const phone = conversation.contact_phone.replace(/\D/g, "");
+
     // Choose Z-API endpoint based on type
     let zapiEndpoint = `https://api.z-api.io/instances/${instanceId}/token/${token}/send-text`;
     let zapiBody: Record<string, unknown> = { phone, message };
