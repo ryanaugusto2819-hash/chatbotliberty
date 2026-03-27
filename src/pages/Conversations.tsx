@@ -12,6 +12,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useInboxQuery, type InboxFilters, type InboxConversation, type ContactTagInfo } from '@/hooks/useInboxQuery';
 
 const CONVERSATIONS_FILTERS_STORAGE_KEY = 'conversations-filters';
+const CONVERSATIONS_TAB_STORAGE_KEY = 'conversations-active-tab';
+
+type ConnectionTab = 'all' | 'whatsapp' | 'zapi';
 
 interface PersistedConversationFilters {
   search: string;
