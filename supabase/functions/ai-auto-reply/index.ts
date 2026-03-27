@@ -46,17 +46,19 @@ Deno.serve(async (req) => {
     // Load niche-specific config OR global config
     let aiEnabled = false;
     let systemPrompt = "Você é um assistente virtual amigável. Responda de forma concisa e útil em português brasileiro.";
+    let nicheLanguage = "pt-BR";
 
     if (nicheId) {
       const { data: niche } = await supabase
         .from("niches")
-        .select("auto_reply_enabled, system_prompt")
+        .select("auto_reply_enabled, system_prompt, language")
         .eq("id", nicheId)
         .single();
 
       if (niche) {
         aiEnabled = niche.auto_reply_enabled;
         systemPrompt = niche.system_prompt || systemPrompt;
+        nicheLanguage = niche.language || "pt-BR";
       }
     } else {
       // Fallback to global config
@@ -150,7 +152,11 @@ Deno.serve(async (req) => {
       knowledgeContext = "\n\n--- BASE DE CONHECIMENTO ---\nUse as informações abaixo para responder com precisão:\n\n" + sections.join("\n\n");
     }
 
-    const fullSystemPrompt = systemPrompt + knowledgeContext;
+    const langInstruction = nicheLanguage === "es"
+      ? "\n\nIMPORTANTE: Responda SEMPRE em espanhol (español). Toda a comunicação deve ser em espanhol."
+      : "\n\nIMPORTANTE: Responda SEMPRE em português brasileiro.";
+
+    const fullSystemPrompt = systemPrompt + knowledgeContext + langInstruction;
 
     // Fetch last 20 messages (include media info for vision)
     const { data: messages } = await supabase
