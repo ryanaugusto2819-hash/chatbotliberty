@@ -59,15 +59,48 @@ async function processZapiWebhook(body: any) {
 
   console.log("Z-API webhook received:", JSON.stringify(body));
 
-  const { data: connectionConfig } = await supabase
-    .from("connection_configs")
-    .select("is_connected")
-    .eq("connection_id", "zapi")
-    .maybeSingle();
+  // Resolve the connection config by instance_id from the webhook payload
+  const webhookInstanceId = body.instanceId;
+  let connectionConfigId: string | null = null;
 
-  if (!connectionConfig?.is_connected) {
-    console.log("Z-API connection is not active, ignoring webhook");
-    return;
+  if (webhookInstanceId) {
+    // Find connection config matching this instance
+    const { data: configs } = await supabase
+      .from("connection_configs")
+      .select("id, is_connected, config")
+      .eq("connection_id", "zapi");
+
+    const matchedConfig = (configs || []).find((c: any) => {
+      const cfg = c.config as any;
+      return cfg?.instance_id === webhookInstanceId;
+    });
+
+    if (!matchedConfig) {
+      console.log(`Z-API webhook: no connection config found for instanceId ${webhookInstanceId}`);
+      return;
+    }
+
+    if (!matchedConfig.is_connected) {
+      console.log("Z-API connection is not active, ignoring webhook");
+      return;
+    }
+
+    connectionConfigId = matchedConfig.id;
+  } else {
+    // Fallback: pick the first active Z-API connection
+    const { data: connectionConfig } = await supabase
+      .from("connection_configs")
+      .select("id, is_connected")
+      .eq("connection_id", "zapi")
+      .eq("is_connected", true)
+      .limit(1)
+      .maybeSingle();
+
+    if (!connectionConfig?.is_connected) {
+      console.log("Z-API connection is not active, ignoring webhook");
+      return;
+    }
+    connectionConfigId = connectionConfig.id;
   }
 
   if (!body.phone && !body.chatId) {
