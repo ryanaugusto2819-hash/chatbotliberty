@@ -381,6 +381,17 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
               <h2 className="text-sm font-semibold text-foreground">Conversas</h2>
               <p className="text-[11px] text-muted-foreground">{totalCount} conversas</p>
             </div>
+            {activeTab === 'zapi' && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs gap-1.5"
+                onClick={() => setShowCreateContact(true)}
+              >
+                <UserPlus className="h-3.5 w-3.5" />
+                Criar Contato
+              </Button>
+            )}
           </div>
           {showTabs && (
             <div className="flex gap-0">
