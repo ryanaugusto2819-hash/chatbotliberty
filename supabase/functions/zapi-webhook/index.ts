@@ -137,7 +137,7 @@ async function processZapiWebhook(body: any) {
   }
 
   // Resolve niche
-  const nicheId = await resolveNicheByZapi(supabase);
+  const nicheId = await resolveNicheByZapi(supabase, connectionConfigId);
 
   let conversationId: string;
 
@@ -153,6 +153,7 @@ async function processZapiWebhook(body: any) {
     conversationId = existing.id;
     const updateData: any = { updated_at: new Date().toISOString(), status: "active" };
     if (nicheId) updateData.niche_id = nicheId;
+    if (connectionConfigId) updateData.connection_config_id = connectionConfigId;
     await supabase
       .from("conversations")
       .update(updateData)
@@ -166,6 +167,7 @@ async function processZapiWebhook(body: any) {
         status: "new",
         tags: [],
         niche_id: nicheId,
+        connection_config_id: connectionConfigId,
       })
       .select("id")
       .single();
