@@ -29,10 +29,10 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Get conversation phone
+    // Get conversation phone + connection_config_id
     const { data: conversation, error: convError } = await serviceClient
       .from("conversations")
-      .select("contact_phone")
+      .select("contact_phone, connection_config_id")
       .eq("id", conversationId)
       .single();
 
@@ -46,8 +46,48 @@ Deno.serve(async (req) => {
       );
     }
 
-    const instanceId = Deno.env.get("ZAPI_INSTANCE_ID");
-    const token = Deno.env.get("ZAPI_TOKEN");
+    // Resolve Z-API credentials from connection_configs
+    let instanceId: string | null = null;
+    let token: string | null = null;
+    let clientToken = "";
+
+    if (conversation.connection_config_id) {
+      const { data: connConfig } = await serviceClient
+        .from("connection_configs")
+        .select("config, connection_id")
+        .eq("id", conversation.connection_config_id)
+        .single();
+
+      if (connConfig?.connection_id === "zapi") {
+        const cfg = connConfig.config as Record<string, unknown>;
+        instanceId = (cfg?.instance_id as string) || null;
+        token = (cfg?.token as string) || null;
+        clientToken = (cfg?.client_token as string) || "";
+      }
+    }
+
+    // Fallback: try any active Z-API connection
+    if (!instanceId || !token) {
+      const { data: zapiConfig } = await serviceClient
+        .from("connection_configs")
+        .select("config")
+        .eq("connection_id", "zapi")
+        .eq("is_connected", true)
+        .limit(1)
+        .maybeSingle();
+
+      if (zapiConfig) {
+        const cfg = zapiConfig.config as Record<string, unknown>;
+        instanceId = instanceId || (cfg?.instance_id as string) || null;
+        token = token || (cfg?.token as string) || null;
+        clientToken = clientToken || (cfg?.client_token as string) || "";
+      }
+    }
+
+    // Final fallback: env vars
+    instanceId = instanceId || Deno.env.get("ZAPI_INSTANCE_ID") || null;
+    token = token || Deno.env.get("ZAPI_TOKEN") || null;
+    clientToken = clientToken || Deno.env.get("ZAPI_CLIENT_TOKEN") || "";
 
     if (!instanceId || !token) {
       return new Response(
@@ -58,20 +98,6 @@ Deno.serve(async (req) => {
         }
       );
     }
-
-    // Z-API send text message endpoint
-    const phone = conversation.contact_phone.replace(/\D/g, "");
-
-    // Get client-token from connection_configs or env
-    const { data: zapiConfig } = await serviceClient
-      .from("connection_configs")
-      .select("config")
-      .eq("connection_id", "zapi")
-      .eq("is_connected", true)
-      .maybeSingle();
-
-    const configData = zapiConfig?.config as Record<string, unknown> | null;
-    const clientToken = (configData?.client_token as string) || Deno.env.get("ZAPI_CLIENT_TOKEN") || "";
 
     // Choose Z-API endpoint based on type
     let zapiEndpoint = `https://api.z-api.io/instances/${instanceId}/token/${token}/send-text`;
