@@ -286,8 +286,9 @@ REGRAS:
 9. Use emojis com moderação (máx 2).
 10. NUNCA mencione que é um robô, IA ou sistema automatizado.
 11. Se o lead mencionou um produto/serviço específico, FOQUE nele.
-12. ${conv.ad_title ? `O lead veio do anúncio: "${conv.ad_title}". Use isso como contexto se relevante.` : ""}
-13. ${(conv.tags || []).length > 0 ? `Tags do contato: ${conv.tags!.join(", ")}. Podem indicar interesses ou estágio.` : ""}`;
+12. ${template.image_url ? `IMPORTANTE: Uma IMAGEM será enviada junto com sua mensagem. Sua mensagem será a LEGENDA da imagem. Adapte o texto sabendo que o cliente verá a imagem junto. Não descreva a imagem no texto, apenas complemente.` : ""}
+13. ${conv.ad_title ? `O lead veio do anúncio: "${conv.ad_title}". Use isso como contexto se relevante.` : ""}
+14. ${(conv.tags || []).length > 0 ? `Tags do contato: ${conv.tags!.join(", ")}. Podem indicar interesses ou estágio.` : ""}`;
 
         // Generate AI follow-up
         const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
