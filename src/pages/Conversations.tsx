@@ -629,6 +629,44 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
           )}
         </div>
       </div>
+
+      {/* Create Contact Dialog */}
+      <Dialog open={showCreateContact} onOpenChange={setShowCreateContact}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Criar Contato (Cobrança)</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="contact-name">Nome</Label>
+              <Input
+                id="contact-name"
+                placeholder="Nome do contato"
+                value={newContactName}
+                onChange={(e) => setNewContactName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="contact-phone">Telefone (com DDD)</Label>
+              <Input
+                id="contact-phone"
+                placeholder="5511999999999"
+                value={newContactPhone}
+                onChange={(e) => setNewContactPhone(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreateContact(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleCreateContact} disabled={creatingContact}>
+              {creatingContact ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Criar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
