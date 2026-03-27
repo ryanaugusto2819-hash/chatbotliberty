@@ -239,6 +239,18 @@ export default function ConnectionCard({ connection, onDeleted, onUpdated }: Con
         </div>
       </div>
 
+      {/* QR Code Panel for Z-API */}
+      {showQrPanel && connection.connection_id === 'zapi' && (
+        <div className="border-t border-border px-5 py-4">
+          <ZApiQrCodePanel
+            configId={connection.id}
+            onConnected={() => {
+              onUpdated();
+            }}
+          />
+        </div>
+      )}
+
       {expanded && (
         <div className="border-t border-border px-5 pb-5 pt-4 space-y-4">
           <div className="space-y-1.5">
