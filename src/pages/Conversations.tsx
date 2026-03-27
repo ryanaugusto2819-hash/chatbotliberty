@@ -1,14 +1,19 @@
 import { useState, useEffect, useMemo, useRef, useCallback, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import TopBar from '@/components/layout/TopBar';
 import StatusBadge from '@/components/shared/StatusBadge';
 import { supabase } from '@/integrations/supabase/client';
-import { Search, Loader2, X, Smartphone, Globe, MessageCircle, SlidersHorizontal } from 'lucide-react';
+import { Search, Loader2, X, Smartphone, Globe, MessageCircle, SlidersHorizontal, UserPlus } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
 import { useInboxQuery, type InboxFilters, type InboxConversation, type ContactTagInfo } from '@/hooks/useInboxQuery';
 
 const CONVERSATIONS_FILTERS_STORAGE_KEY = 'conversations-filters';
