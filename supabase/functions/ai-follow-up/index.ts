@@ -125,7 +125,7 @@ Deno.serve(async (req) => {
 
     // Load niche data in parallel
     const [nichesRes, kbRes, stagesRes] = await Promise.all([
-      supabase.from("niches").select("id, name, system_prompt").in("id", nicheIds),
+      supabase.from("niches").select("id, name, system_prompt, language").in("id", nicheIds),
       supabase.from("knowledge_base_items").select("title, content, niche_id").in("niche_id", nicheIds).limit(50),
       supabase.from("niche_funnel_stages").select("*").in("niche_id", nicheIds).order("sort_order"),
     ]);
@@ -259,6 +259,12 @@ Deno.serve(async (req) => {
 
         const nicheInfo = conv.niche_id ? nichesMap.get(conv.niche_id) : null;
 
+        const nicheLanguage = nicheInfo?.language || "pt-BR";
+        const langLabel = nicheLanguage === "es" ? "español" : "português brasileiro";
+        const langInstruction = nicheLanguage === "es"
+          ? "IDIOMA: Escreva TODA a mensagem em ESPANHOL (español). O cliente fala espanhol."
+          : "IDIOMA: Escreva TODA a mensagem em PORTUGUÊS BRASILEIRO.";
+
         const systemPrompt = `Você é um especialista em follow-up de vendas via WhatsApp. Gere uma mensagem de follow-up altamente personalizada com base no CONTEXTO COMPLETO da conversa e na ETAPA DO FUNIL em que o lead se encontra.
 
 ${nicheInfo ? `NICHO: ${nicheInfo.name}\nCONTEXTO DO NEGÓCIO: ${nicheInfo.system_prompt}` : ""}
@@ -288,7 +294,8 @@ REGRAS:
 11. Se o lead mencionou um produto/serviço específico, FOQUE nele.
 12. ${template.image_url ? `IMPORTANTE: Uma IMAGEM será enviada junto com sua mensagem. Sua mensagem será a LEGENDA da imagem. Adapte o texto sabendo que o cliente verá a imagem junto. Não descreva a imagem no texto, apenas complemente.` : ""}
 13. ${conv.ad_title ? `O lead veio do anúncio: "${conv.ad_title}". Use isso como contexto se relevante.` : ""}
-14. ${(conv.tags || []).length > 0 ? `Tags do contato: ${conv.tags!.join(", ")}. Podem indicar interesses ou estágio.` : ""}`;
+14. ${(conv.tags || []).length > 0 ? `Tags do contato: ${conv.tags!.join(", ")}. Podem indicar interesses ou estágio.` : ""}
+15. ${langInstruction}`;
 
         // Generate AI follow-up
         const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
