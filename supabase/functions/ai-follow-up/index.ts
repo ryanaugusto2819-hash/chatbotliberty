@@ -357,7 +357,7 @@ Gere a mensagem de follow-up:`,
           message_sent: followUpMessage,
         });
 
-        // Determine send function
+        // Determine send function and build payload
         let sendFunction = "whatsapp-send";
         const sendBody: Record<string, unknown> = {
           to: conv.contact_phone,
@@ -365,6 +365,13 @@ Gere a mensagem de follow-up:`,
           conversationId: conv.id,
           senderLabel: "ia-follow-up",
         };
+
+        // If template has an image, send as image type with caption
+        if (template.image_url) {
+          sendBody.type = "image";
+          sendBody.mediaUrl = template.image_url;
+          console.log(`[ai-follow-up] 🖼️ Template tem imagem: ${template.image_url.substring(0, 80)}...`);
+        }
 
         if (conv.niche_id) {
           const { data: nicheConn } = await supabase
@@ -390,7 +397,7 @@ Gere a mensagem de follow-up:`,
         const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
         const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-        console.log(`[ai-follow-up] 📤 Enviando via ${sendFunction} para ${conv.contact_name} (${conv.contact_phone})`);
+        console.log(`[ai-follow-up] 📤 Enviando via ${sendFunction} para ${conv.contact_name} (${conv.contact_phone})${template.image_url ? ' [COM IMAGEM]' : ''}`);
 
         const sendResp = await fetch(`${supabaseUrl}/functions/v1/${sendFunction}`, {
           method: "POST",
