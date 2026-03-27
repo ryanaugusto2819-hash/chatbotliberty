@@ -40,13 +40,21 @@ export default function FlowTrigger({ conversationId }: FlowTriggerProps) {
   const trigger = async (flowId: string) => {
     setExecuting(flowId);
     try {
-      // Fire-and-forget: don't await the full flow execution
-      supabase.functions.invoke("execute-flow", {
+      const { data, error } = await supabase.functions.invoke("execute-flow", {
         body: { flowId, conversationId, senderLabel: "humano" },
-      }).then(({ error }) => {
-        if (error) console.error('Flow execution error:', error);
       });
-      
+
+      if (error) {
+        console.error('Flow execution error:', error);
+        toast.error('Erro ao disparar fluxo: ' + (error.message || 'Erro desconhecido'));
+        return;
+      }
+
+      if (data?.success === false) {
+        toast.error('Falha ao executar fluxo: ' + (data?.error || 'Erro desconhecido'));
+        return;
+      }
+
       toast.success('Fluxo disparado com sucesso');
       setOpen(false);
     } catch (err) {

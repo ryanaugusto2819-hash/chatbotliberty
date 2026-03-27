@@ -192,13 +192,22 @@ Deno.serve(async (req) => {
 
     const { data: conversation } = await supabase
       .from("conversations")
-      .select("contact_phone, niche_id, connection_config_id")
+      .select("contact_phone, niche_id, connection_config_id, sale_registered_at")
       .eq("id", conversationId)
       .single();
 
     if (!conversation) {
       return createJsonResponse({ error: "Conversation not found" }, 404);
     }
+
+    // Only block AI-triggered flows for leads with sale registered
+    const isAiTrigger = requestedLabel === "ia-seletora" || requestedLabel === "ia-auto-reply" || requestedLabel === "ia-follow-up";
+    if (isAiTrigger && conversation.sale_registered_at) {
+      console.log(`[execute-flow] Skipping AI trigger: sale already registered for conversation ${conversationId}`);
+      return createJsonResponse({ success: false, skipped: true, reason: "Sale already registered" }, 200);
+    }
+
+    console.log(`[execute-flow] Trigger by "${requestedLabel}" for conversation ${conversationId}`);
 
     // Resolve connection for this conversation's niche
     let resolvedConnection: Record<string, unknown> | null = null;
