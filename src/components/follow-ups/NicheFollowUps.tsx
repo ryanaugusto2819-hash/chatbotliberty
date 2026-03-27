@@ -466,11 +466,11 @@ export default function NicheFollowUps({ nicheId }: NicheFollowUpsProps) {
                     <p className="text-[11px] text-muted-foreground mb-1.5">
                       Anexe uma imagem que será enviada junto com a mensagem de follow-up. A mensagem da IA será usada como legenda.
                     </p>
-                    {(t as any).image_url ? (
+                    {t.image_url ? (
                       <div className="relative inline-block">
-                        <img src={(t as any).image_url} alt="Follow-up" className="max-h-32 rounded-lg border border-border" />
+                        <img src={t.image_url} alt="Follow-up" className="max-h-32 rounded-lg border border-border" />
                         <button
-                          onClick={() => updateTemplate(t.id, 'image_url' as any, null)}
+                          onClick={() => updateTemplate(t.id, 'image_url', null)}
                           className="absolute -top-2 -right-2 p-1 bg-destructive text-destructive-foreground rounded-full hover:opacity-90"
                         >
                           <X className="h-3 w-3" />
@@ -500,7 +500,8 @@ export default function NicheFollowUps({ nicheId }: NicheFollowUpsProps) {
                             const { data: urlData } = supabase.storage
                               .from('follow-up-images')
                               .getPublicUrl(uploadData.path);
-                            updateTemplate(t.id, 'image_url' as any, urlData.publicUrl);
+                            updateTemplate(t.id, 'image_url', urlData.publicUrl);
+                            toast.success('Imagem anexada!');
                             toast.success('Imagem anexada!');
                           }}
                         />
