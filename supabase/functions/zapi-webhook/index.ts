@@ -30,16 +30,27 @@ Deno.serve(async (req) => {
   return new Response("Method not allowed", { status: 405, headers: corsHeaders });
 });
 
-async function resolveNicheByZapi(supabase: any): Promise<string | null> {
-  // For Z-API, resolve niche by the configured zapi_instance_id
-  const { data: zapiConfig } = await supabase
-    .from("connection_configs")
-    .select("config")
-    .eq("connection_id", "zapi")
-    .eq("is_connected", true)
+async function resolveNicheByZapi(supabase: any, connectionConfigId: string | null): Promise<string | null> {
+  if (!connectionConfigId) return null;
+
+  // First try via niche_connections junction table
+  const { data: nicheConn } = await supabase
+    .from("niche_connections")
+    .select("niche_id")
+    .eq("connection_config_id", connectionConfigId)
+    .limit(1)
     .maybeSingle();
 
-  const instanceId = (zapiConfig?.config as any)?.instance_id;
+  if (nicheConn?.niche_id) return nicheConn.niche_id;
+
+  // Fallback: legacy zapi_instance_id on niches table
+  const { data: config } = await supabase
+    .from("connection_configs")
+    .select("config")
+    .eq("id", connectionConfigId)
+    .single();
+
+  const instanceId = (config?.config as any)?.instance_id;
   if (!instanceId) return null;
 
   const { data } = await supabase
