@@ -14,7 +14,7 @@ Deno.serve(async (req) => {
   try {
     const { conversationId, message, type = "text", senderAgentId = null, senderLabel = null, mediaUrl = null } = await req.json();
 
-    if (!conversationId || !message) {
+    if (!conversationId || (message === undefined && !mediaUrl)) {
       return new Response(
         JSON.stringify({ error: "conversationId and message are required" }),
         {
