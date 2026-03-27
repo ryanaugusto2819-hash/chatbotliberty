@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import {
   Clock, Plus, Trash2, Save, Loader2, Play,
   MessageSquare, CheckCircle, XCircle, AlertTriangle,
-  TrendingUp, Timer, Target, Zap, ArrowUpRight, BarChart3, Filter, ExternalLink,
+  TrendingUp, Timer, Target, Zap, ArrowUpRight, BarChart3, Filter, ExternalLink, ImagePlus, X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
@@ -456,6 +456,54 @@ export default function NicheFollowUps({ nicheId }: NicheFollowUpsProps) {
                       placeholder="Ex: Quando o cliente não responder após receber o valor do produto. Ou: Quando o cliente disse que iria pagar mas ainda não enviou o comprovante."
                       rows={2}
                     />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium flex items-center gap-2 mb-1">
+                      <ImagePlus className="h-4 w-4 text-primary" /> Imagem do Follow-up (opcional)
+                    </label>
+                    <p className="text-[11px] text-muted-foreground mb-1.5">
+                      Anexe uma imagem que será enviada junto com a mensagem de follow-up. A mensagem da IA será usada como legenda.
+                    </p>
+                    {(t as any).image_url ? (
+                      <div className="relative inline-block">
+                        <img src={(t as any).image_url} alt="Follow-up" className="max-h-32 rounded-lg border border-border" />
+                        <button
+                          onClick={() => updateTemplate(t.id, 'image_url' as any, null)}
+                          className="absolute -top-2 -right-2 p-1 bg-destructive text-destructive-foreground rounded-full hover:opacity-90"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="flex items-center gap-2 px-4 py-3 border-2 border-dashed border-border rounded-lg cursor-pointer hover:border-primary/50 transition-colors">
+                        <ImagePlus className="h-5 w-5 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">Clique para anexar uma imagem</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            const ext = file.name.split('.').pop() || 'jpg';
+                            const path = `${nicheId}/${t.id}_${Date.now()}.${ext}`;
+                            const { data: uploadData, error: uploadError } = await supabase.storage
+                              .from('follow-up-images')
+                              .upload(path, file, { upsert: true });
+                            if (uploadError) {
+                              toast.error('Erro ao enviar imagem');
+                              console.error(uploadError);
+                              return;
+                            }
+                            const { data: urlData } = supabase.storage
+                              .from('follow-up-images')
+                              .getPublicUrl(uploadData.path);
+                            updateTemplate(t.id, 'image_url' as any, urlData.publicUrl);
+                            toast.success('Imagem anexada!');
+                          }}
+                        />
+                      </label>
+                    )}
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
