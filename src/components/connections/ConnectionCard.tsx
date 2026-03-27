@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import ZApiQrCodePanel from './ZApiQrCodePanel';
 import {
   AlertCircle,
   ChevronDown,
@@ -13,6 +14,7 @@ import {
   Trash2,
   Wifi,
   WifiOff,
+  QrCode,
 } from 'lucide-react';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -89,6 +91,7 @@ const STATUS_MAP: Record<string, { icon: React.ReactNode; label: string; classes
 
 export default function ConnectionCard({ connection, onDeleted, onUpdated }: ConnectionCardProps) {
   const [expanded, setExpanded] = useState(false);
+  const [showQrPanel, setShowQrPanel] = useState(false);
   const [values, setValues] = useState<Record<string, string>>(connection.config || {});
   const [label, setLabel] = useState(connection.label || '');
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
