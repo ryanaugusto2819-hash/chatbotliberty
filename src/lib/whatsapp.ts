@@ -8,8 +8,8 @@ export async function sendWhatsAppMessage(
   message: string,
   options?: { mediaUrl?: string; messageType?: string }
 ) {
-  // Run profile lookup and connection check in parallel
-  const [profileResult, connectionsResult] = await Promise.all([
+  // Run profile lookup and conversation connection check in parallel
+  const [profileResult, conversationResult] = await Promise.all([
     // Only fetch profile once per session
     cachedProfileId !== undefined
       ? Promise.resolve(cachedProfileId)
@@ -27,18 +27,42 @@ export async function sendWhatsAppMessage(
           }
           return cachedProfileId;
         })(),
+    // Get the conversation's connection_config_id
     supabase
-      .from("connection_configs")
-      .select("connection_id, is_connected")
-      .in("connection_id", ["zapi", "whatsapp"])
-      .eq("is_connected", true),
+      .from("conversations")
+      .select("connection_config_id")
+      .eq("id", conversationId)
+      .single(),
   ]);
 
   const senderAgentId = profileResult;
-  const zapiConnected = connectionsResult.data?.some((c) => c.connection_id === "zapi");
 
-  // Prefer Z-API if connected, fallback to WhatsApp Cloud API
-  const functionName = zapiConnected ? "zapi-send" : "whatsapp-send";
+  // Determine which send function based on the conversation's actual connection
+  let functionName = "whatsapp-send"; // default
+
+  if (conversationResult.data?.connection_config_id) {
+    const { data: connConfig } = await supabase
+      .from("connection_configs")
+      .select("connection_id")
+      .eq("id", conversationResult.data.connection_config_id)
+      .single();
+
+    if (connConfig?.connection_id === "zapi") {
+      functionName = "zapi-send";
+    }
+  } else {
+    // No connection on conversation — fallback: check if any Z-API is active
+    const { data: connections } = await supabase
+      .from("connection_configs")
+      .select("connection_id")
+      .eq("connection_id", "zapi")
+      .eq("is_connected", true)
+      .limit(1);
+
+    if (connections && connections.length > 0) {
+      functionName = "zapi-send";
+    }
+  }
 
   const { data, error } = await supabase.functions.invoke(functionName, {
     body: {
