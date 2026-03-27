@@ -14,7 +14,7 @@ import {
   Settings,
   LogOut,
   ShieldCheck,
-  
+  Webhook,
 } from 'lucide-react';
 
 const allNavItems = [
@@ -22,6 +22,7 @@ const allNavItems = [
   { to: '/conversations', icon: MessageSquare, label: 'Conversas', adminOnly: false },
   { to: '/agents', icon: Users, label: 'Atendentes', adminOnly: true },
   { to: '/automation', icon: GitBranch, label: 'Automação', adminOnly: true },
+  { to: '/webhook-mappings', icon: Webhook, label: 'Webhooks', adminOnly: true },
   { to: '/ai', icon: Bot, label: 'Nichos & IA', adminOnly: true },
   { to: '/reports', icon: BarChart3, label: 'Relatórios', adminOnly: true },
   { to: '/manager-ai', icon: ShieldCheck, label: 'IA Gerente', adminOnly: true },

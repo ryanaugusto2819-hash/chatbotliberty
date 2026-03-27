@@ -1023,6 +1023,44 @@ export type Database = {
         }
         Relationships: []
       }
+      webhook_flow_mappings: {
+        Row: {
+          created_at: string
+          flow_id: string | null
+          id: string
+          is_active: boolean
+          label: string
+          status_key: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          flow_id?: string | null
+          id?: string
+          is_active?: boolean
+          label?: string
+          status_key: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          flow_id?: string | null
+          id?: string
+          is_active?: boolean
+          label?: string
+          status_key?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_flow_mappings_flow_id_fkey"
+            columns: ["flow_id"]
+            isOneToOne: false
+            referencedRelation: "automation_flows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
