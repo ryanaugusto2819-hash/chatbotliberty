@@ -556,6 +556,7 @@ export type Database = {
           escalation_level: number
           funnel_stage: string
           id: string
+          image_url: string | null
           is_active: boolean
           max_attempts: number
           message_template: string
@@ -574,6 +575,7 @@ export type Database = {
           escalation_level?: number
           funnel_stage?: string
           id?: string
+          image_url?: string | null
           is_active?: boolean
           max_attempts?: number
           message_template?: string
@@ -592,6 +594,7 @@ export type Database = {
           escalation_level?: number
           funnel_stage?: string
           id?: string
+          image_url?: string | null
           is_active?: boolean
           max_attempts?: number
           message_template?: string

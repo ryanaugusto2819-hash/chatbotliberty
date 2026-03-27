@@ -286,8 +286,9 @@ REGRAS:
 9. Use emojis com moderação (máx 2).
 10. NUNCA mencione que é um robô, IA ou sistema automatizado.
 11. Se o lead mencionou um produto/serviço específico, FOQUE nele.
-12. ${conv.ad_title ? `O lead veio do anúncio: "${conv.ad_title}". Use isso como contexto se relevante.` : ""}
-13. ${(conv.tags || []).length > 0 ? `Tags do contato: ${conv.tags!.join(", ")}. Podem indicar interesses ou estágio.` : ""}`;
+12. ${template.image_url ? `IMPORTANTE: Uma IMAGEM será enviada junto com sua mensagem. Sua mensagem será a LEGENDA da imagem. Adapte o texto sabendo que o cliente verá a imagem junto. Não descreva a imagem no texto, apenas complemente.` : ""}
+13. ${conv.ad_title ? `O lead veio do anúncio: "${conv.ad_title}". Use isso como contexto se relevante.` : ""}
+14. ${(conv.tags || []).length > 0 ? `Tags do contato: ${conv.tags!.join(", ")}. Podem indicar interesses ou estágio.` : ""}`;
 
         // Generate AI follow-up
         const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -357,7 +358,7 @@ Gere a mensagem de follow-up:`,
           message_sent: followUpMessage,
         });
 
-        // Determine send function
+        // Determine send function and build payload
         let sendFunction = "whatsapp-send";
         const sendBody: Record<string, unknown> = {
           to: conv.contact_phone,
@@ -365,6 +366,13 @@ Gere a mensagem de follow-up:`,
           conversationId: conv.id,
           senderLabel: "ia-follow-up",
         };
+
+        // If template has an image, send as image type with caption
+        if (template.image_url) {
+          sendBody.type = "image";
+          sendBody.mediaUrl = template.image_url;
+          console.log(`[ai-follow-up] 🖼️ Template tem imagem: ${template.image_url.substring(0, 80)}...`);
+        }
 
         if (conv.niche_id) {
           const { data: nicheConn } = await supabase
@@ -390,7 +398,7 @@ Gere a mensagem de follow-up:`,
         const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
         const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-        console.log(`[ai-follow-up] 📤 Enviando via ${sendFunction} para ${conv.contact_name} (${conv.contact_phone})`);
+        console.log(`[ai-follow-up] 📤 Enviando via ${sendFunction} para ${conv.contact_name} (${conv.contact_phone})${template.image_url ? ' [COM IMAGEM]' : ''}`);
 
         const sendResp = await fetch(`${supabaseUrl}/functions/v1/${sendFunction}`, {
           method: "POST",
