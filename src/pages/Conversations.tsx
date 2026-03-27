@@ -12,6 +12,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useInboxQuery, type InboxFilters, type InboxConversation, type ContactTagInfo } from '@/hooks/useInboxQuery';
 
 const CONVERSATIONS_FILTERS_STORAGE_KEY = 'conversations-filters';
+const CONVERSATIONS_TAB_STORAGE_KEY = 'conversations-active-tab';
+
+type ConnectionTab = 'all' | 'whatsapp' | 'zapi';
 
 interface PersistedConversationFilters {
   search: string;
@@ -159,6 +162,10 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
   const [selectedAgent, setSelectedAgent] = useState<string>(storedFilters.selectedAgent);
   const [selectedConnections, setSelectedConnections] = useState<string[]>(storedFilters.selectedConnections);
   const [onlyUnread, setOnlyUnread] = useState(storedFilters.onlyUnread);
+  const [activeTab, setActiveTab] = useState<ConnectionTab>(() => {
+    const stored = localStorage.getItem(CONVERSATIONS_TAB_STORAGE_KEY);
+    return (stored === 'whatsapp' || stored === 'zapi') ? stored : 'all';
+  });
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   // Debounce search input
@@ -167,20 +174,12 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  // Compute filters for the query
-  const inboxFilters = useMemo<InboxFilters>(() => ({
-    search: debouncedSearch,
-    status: !['all', 'last_customer'].includes(activeFilter) ? activeFilter : '',
-    agentId: selectedAgent !== 'all' ? selectedAgent : null,
-    connectionIds: selectedConnections,
-    tagId: selectedTag !== 'all' ? selectedTag : null,
-    onlyUnread,
-    lastCustomer: activeFilter === 'last_customer',
-  }), [debouncedSearch, activeFilter, selectedAgent, selectedConnections, selectedTag, onlyUnread]);
+  // Persist active tab
+  useEffect(() => {
+    localStorage.setItem(CONVERSATIONS_TAB_STORAGE_KEY, activeTab);
+  }, [activeTab]);
 
-  const { conversations, totalCount, isLoading, isFetchingNextPage, hasNextPage, fetchNextPage } = useInboxQuery(inboxFilters);
-
-  // Filter dropdown options
+  // Filter dropdown options (moved up so allConnections is available for tab filtering)
   const { data: tags = [] } = useQuery({
     queryKey: ['filter-tags'],
     queryFn: async () => {
@@ -207,6 +206,31 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
     },
     staleTime: 300_000,
   });
+
+  // Compute effective connection IDs based on tab + manual filter
+  const effectiveConnectionIds = useMemo(() => {
+    if (activeTab === 'all') return selectedConnections;
+    const tabConnectionIds = allConnections
+      .filter(c => c.connection_id === activeTab)
+      .map(c => c.id);
+    if (selectedConnections.length > 0) {
+      return selectedConnections.filter(id => tabConnectionIds.includes(id));
+    }
+    return tabConnectionIds;
+  }, [activeTab, selectedConnections, allConnections]);
+
+  // Compute filters for the query
+  const inboxFilters = useMemo<InboxFilters>(() => ({
+    search: debouncedSearch,
+    status: !['all', 'last_customer'].includes(activeFilter) ? activeFilter : '',
+    agentId: selectedAgent !== 'all' ? selectedAgent : null,
+    connectionIds: effectiveConnectionIds,
+    tagId: selectedTag !== 'all' ? selectedTag : null,
+    onlyUnread,
+    lastCustomer: activeFilter === 'last_customer',
+  }), [debouncedSearch, activeFilter, selectedAgent, effectiveConnectionIds, selectedTag, onlyUnread]);
+
+  const { conversations, totalCount, isLoading, isFetchingNextPage, hasNextPage, fetchNextPage } = useInboxQuery(inboxFilters);
 
   const connectionMap = useMemo(() => {
     const map: Record<string, ConnectionInfo> = {};
@@ -261,13 +285,69 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
     }
   }, [onSelectConversation, navigate]);
 
+  const tabLabels: Record<ConnectionTab, string> = {
+    all: 'Todos',
+    whatsapp: 'Comercial',
+    zapi: 'Cobrança',
+  };
+
+  const hasWhatsapp = allConnections.some(c => c.connection_id === 'whatsapp');
+  const hasZapi = allConnections.some(c => c.connection_id === 'zapi');
+  const showTabs = hasWhatsapp && hasZapi;
+
   return (
     <div className={embedded ? 'flex flex-col h-full overflow-hidden' : ''}>
       {!embedded && <TopBar title="Conversas" subtitle={`${totalCount} conversas totais`} />}
       {embedded && (
-        <div className="px-4 pt-4 pb-2 border-b border-border">
-          <h2 className="text-sm font-semibold text-foreground">Conversas</h2>
-          <p className="text-[11px] text-muted-foreground">{totalCount} conversas</p>
+        <div className="px-4 pt-4 pb-0 border-b border-border">
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">Conversas</h2>
+              <p className="text-[11px] text-muted-foreground">{totalCount} conversas</p>
+            </div>
+          </div>
+          {showTabs && (
+            <div className="flex gap-0">
+              {(['all', 'whatsapp', 'zapi'] as ConnectionTab[]).map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`relative px-4 py-2 text-xs font-medium transition-colors ${
+                    activeTab === tab
+                      ? 'text-primary'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {tabLabels[tab]}
+                  {activeTab === tab && (
+                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-full" />
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {!embedded && showTabs && (
+        <div className="px-6 pt-2">
+          <div className="flex gap-0 border-b border-border">
+            {(['all', 'whatsapp', 'zapi'] as ConnectionTab[]).map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`relative px-4 py-2 text-xs font-medium transition-colors ${
+                  activeTab === tab
+                    ? 'text-primary'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {tabLabels[tab]}
+                {activeTab === tab && (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-full" />
+                )}
+              </button>
+            ))}
+          </div>
         </div>
       )}
       <div className={`${embedded ? 'p-3 flex-1 overflow-hidden flex flex-col' : 'p-6'} space-y-4`}>
