@@ -30,16 +30,27 @@ Deno.serve(async (req) => {
   return new Response("Method not allowed", { status: 405, headers: corsHeaders });
 });
 
-async function resolveNicheByZapi(supabase: any): Promise<string | null> {
-  // For Z-API, resolve niche by the configured zapi_instance_id
-  const { data: zapiConfig } = await supabase
-    .from("connection_configs")
-    .select("config")
-    .eq("connection_id", "zapi")
-    .eq("is_connected", true)
+async function resolveNicheByZapi(supabase: any, connectionConfigId: string | null): Promise<string | null> {
+  if (!connectionConfigId) return null;
+
+  // First try via niche_connections junction table
+  const { data: nicheConn } = await supabase
+    .from("niche_connections")
+    .select("niche_id")
+    .eq("connection_config_id", connectionConfigId)
+    .limit(1)
     .maybeSingle();
 
-  const instanceId = (zapiConfig?.config as any)?.instance_id;
+  if (nicheConn?.niche_id) return nicheConn.niche_id;
+
+  // Fallback: legacy zapi_instance_id on niches table
+  const { data: config } = await supabase
+    .from("connection_configs")
+    .select("config")
+    .eq("id", connectionConfigId)
+    .single();
+
+  const instanceId = (config?.config as any)?.instance_id;
   if (!instanceId) return null;
 
   const { data } = await supabase
@@ -59,15 +70,48 @@ async function processZapiWebhook(body: any) {
 
   console.log("Z-API webhook received:", JSON.stringify(body));
 
-  const { data: connectionConfig } = await supabase
-    .from("connection_configs")
-    .select("is_connected")
-    .eq("connection_id", "zapi")
-    .maybeSingle();
+  // Resolve the connection config by instance_id from the webhook payload
+  const webhookInstanceId = body.instanceId;
+  let connectionConfigId: string | null = null;
 
-  if (!connectionConfig?.is_connected) {
-    console.log("Z-API connection is not active, ignoring webhook");
-    return;
+  if (webhookInstanceId) {
+    // Find connection config matching this instance
+    const { data: configs } = await supabase
+      .from("connection_configs")
+      .select("id, is_connected, config")
+      .eq("connection_id", "zapi");
+
+    const matchedConfig = (configs || []).find((c: any) => {
+      const cfg = c.config as any;
+      return cfg?.instance_id === webhookInstanceId;
+    });
+
+    if (!matchedConfig) {
+      console.log(`Z-API webhook: no connection config found for instanceId ${webhookInstanceId}`);
+      return;
+    }
+
+    if (!matchedConfig.is_connected) {
+      console.log("Z-API connection is not active, ignoring webhook");
+      return;
+    }
+
+    connectionConfigId = matchedConfig.id;
+  } else {
+    // Fallback: pick the first active Z-API connection
+    const { data: connectionConfig } = await supabase
+      .from("connection_configs")
+      .select("id, is_connected")
+      .eq("connection_id", "zapi")
+      .eq("is_connected", true)
+      .limit(1)
+      .maybeSingle();
+
+    if (!connectionConfig?.is_connected) {
+      console.log("Z-API connection is not active, ignoring webhook");
+      return;
+    }
+    connectionConfigId = connectionConfig.id;
   }
 
   if (!body.phone && !body.chatId) {
@@ -93,7 +137,7 @@ async function processZapiWebhook(body: any) {
   }
 
   // Resolve niche
-  const nicheId = await resolveNicheByZapi(supabase);
+  const nicheId = await resolveNicheByZapi(supabase, connectionConfigId);
 
   let conversationId: string;
 
@@ -109,6 +153,7 @@ async function processZapiWebhook(body: any) {
     conversationId = existing.id;
     const updateData: any = { updated_at: new Date().toISOString(), status: "active" };
     if (nicheId) updateData.niche_id = nicheId;
+    if (connectionConfigId) updateData.connection_config_id = connectionConfigId;
     await supabase
       .from("conversations")
       .update(updateData)
@@ -122,6 +167,7 @@ async function processZapiWebhook(body: any) {
         status: "new",
         tags: [],
         niche_id: nicheId,
+        connection_config_id: connectionConfigId,
       })
       .select("id")
       .single();
