@@ -54,6 +54,7 @@ interface FollowUpTemplate {
   sort_order: number;
   funnel_stage: string;
   trigger_condition: string;
+  image_url: string | null;
 }
 
 interface FollowUpExecution {
@@ -147,6 +148,7 @@ export default function NicheFollowUps({ nicheId }: NicheFollowUpsProps) {
       sort_order: newLevel,
       funnel_stage: stage,
       trigger_condition: '',
+      image_url: null,
     };
     setTemplates(prev => [...prev, newTemplate]);
     const { id, ...data } = newTemplate;
