@@ -1,14 +1,19 @@
 import { useState, useEffect, useMemo, useRef, useCallback, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import TopBar from '@/components/layout/TopBar';
 import StatusBadge from '@/components/shared/StatusBadge';
 import { supabase } from '@/integrations/supabase/client';
-import { Search, Loader2, X, Smartphone, Globe, MessageCircle, SlidersHorizontal } from 'lucide-react';
+import { Search, Loader2, X, Smartphone, Globe, MessageCircle, SlidersHorizontal, UserPlus } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
 import { useInboxQuery, type InboxFilters, type InboxConversation, type ContactTagInfo } from '@/hooks/useInboxQuery';
 
 const CONVERSATIONS_FILTERS_STORAGE_KEY = 'conversations-filters';
@@ -154,6 +159,7 @@ interface ConversationsProps {
 
 export default function Conversations({ embedded, selectedId, onSelectConversation }: ConversationsProps = {}) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const storedFilters = getStoredConversationFilters();
   const [searchInput, setSearchInput] = useState(storedFilters.search);
   const [debouncedSearch, setDebouncedSearch] = useState(storedFilters.search);
@@ -285,6 +291,76 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
     }
   }, [onSelectConversation, navigate]);
 
+  // ─── Create contact dialog (Cobrança tab) ───
+  const [showCreateContact, setShowCreateContact] = useState(false);
+  const [newContactName, setNewContactName] = useState('');
+  const [newContactPhone, setNewContactPhone] = useState('');
+  const [creatingContact, setCreatingContact] = useState(false);
+
+  const handleCreateContact = async () => {
+    const phone = newContactPhone.replace(/\D/g, '');
+    if (!phone || phone.length < 10) {
+      toast.error('Informe um número de telefone válido');
+      return;
+    }
+    if (!newContactName.trim()) {
+      toast.error('Informe o nome do contato');
+      return;
+    }
+
+    setCreatingContact(true);
+    try {
+      // Find zapi connection to link
+      const zapiConnection = allConnections.find(c => c.connection_id === 'zapi');
+
+      // Check if conversation already exists for this phone
+      const { data: existing } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('contact_phone', phone)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (existing) {
+        toast.info('Conversa já existe para este número');
+        setShowCreateContact(false);
+        setNewContactName('');
+        setNewContactPhone('');
+        handleConversationClick(existing.id);
+        return;
+      }
+
+      const { data: newConv, error } = await supabase
+        .from('conversations')
+        .insert({
+          contact_name: newContactName.trim(),
+          contact_phone: phone,
+          status: 'new',
+          tags: [],
+          connection_config_id: zapiConnection?.id || null,
+        })
+        .select('id')
+        .single();
+
+      if (error) throw error;
+
+      toast.success('Contato criado com sucesso');
+      setShowCreateContact(false);
+      setNewContactName('');
+      setNewContactPhone('');
+      queryClient.invalidateQueries({ queryKey: ['inbox'] });
+      if (newConv) {
+        handleConversationClick(newConv.id);
+      }
+    } catch (err) {
+      console.error('Error creating contact:', err);
+      toast.error('Erro ao criar contato');
+    } finally {
+      setCreatingContact(false);
+    }
+  };
+
   const tabLabels: Record<ConnectionTab, string> = {
     all: 'Todos',
     whatsapp: 'Comercial',
@@ -305,6 +381,17 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
               <h2 className="text-sm font-semibold text-foreground">Conversas</h2>
               <p className="text-[11px] text-muted-foreground">{totalCount} conversas</p>
             </div>
+            {activeTab === 'zapi' && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs gap-1.5"
+                onClick={() => setShowCreateContact(true)}
+              >
+                <UserPlus className="h-3.5 w-3.5" />
+                Criar Contato
+              </Button>
+            )}
           </div>
           {showTabs && (
             <div className="flex gap-0">
@@ -330,7 +417,7 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
       )}
       {!embedded && showTabs && (
         <div className="px-6 pt-2">
-          <div className="flex gap-0 border-b border-border">
+          <div className="flex items-center gap-0 border-b border-border">
             {(['all', 'whatsapp', 'zapi'] as ConnectionTab[]).map(tab => (
               <button
                 key={tab}
@@ -347,6 +434,17 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
                 )}
               </button>
             ))}
+            {activeTab === 'zapi' && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs gap-1.5 ml-auto mb-1"
+                onClick={() => setShowCreateContact(true)}
+              >
+                <UserPlus className="h-3.5 w-3.5" />
+                Criar Contato
+              </Button>
+            )}
           </div>
         </div>
       )}
@@ -542,6 +640,44 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
           )}
         </div>
       </div>
+
+      {/* Create Contact Dialog */}
+      <Dialog open={showCreateContact} onOpenChange={setShowCreateContact}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Criar Contato (Cobrança)</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="contact-name">Nome</Label>
+              <Input
+                id="contact-name"
+                placeholder="Nome do contato"
+                value={newContactName}
+                onChange={(e) => setNewContactName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="contact-phone">Telefone (com DDD)</Label>
+              <Input
+                id="contact-phone"
+                placeholder="5511999999999"
+                value={newContactPhone}
+                onChange={(e) => setNewContactPhone(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreateContact(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleCreateContact} disabled={creatingContact}>
+              {creatingContact ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Criar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
