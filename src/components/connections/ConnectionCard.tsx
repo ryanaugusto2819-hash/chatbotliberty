@@ -212,6 +212,15 @@ export default function ConnectionCard({ connection, onDeleted, onUpdated }: Con
             )}
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
+            {connection.connection_id === 'zapi' && (
+              <button
+                onClick={() => setShowQrPanel(!showQrPanel)}
+                className={`flex h-8 w-8 items-center justify-center rounded-lg border border-input bg-background text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors ${showQrPanel ? 'bg-primary/10 text-primary border-primary/30' : ''}`}
+                title="Conectar via QR Code"
+              >
+                <QrCode className="h-3.5 w-3.5" />
+              </button>
+            )}
             <button
               onClick={handleCheckStatus}
               disabled={checking}
