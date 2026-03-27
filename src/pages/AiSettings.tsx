@@ -25,6 +25,7 @@ interface Niche {
   flow_selector_instructions: string;
   auto_reply_enabled: boolean;
   flow_selector_enabled: boolean;
+  language: string;
   created_at: string;
 }
 
@@ -186,6 +187,7 @@ export default function AiSettings() {
         flow_selector_instructions: editForm.flow_selector_instructions,
         auto_reply_enabled: editForm.auto_reply_enabled,
         flow_selector_enabled: editForm.flow_selector_enabled,
+        language: editForm.language || 'pt-BR',
       })
       .eq('id', selectedNicheId);
 
@@ -431,6 +433,30 @@ export default function AiSettings() {
                   >
                     <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${editForm.auto_reply_enabled ? 'translate-x-5' : ''}`} />
                   </button>
+                </div>
+
+                {/* Language selector */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Idioma da IA</label>
+                  <p className="text-xs text-muted-foreground">Define o idioma das respostas automáticas e follow-ups</p>
+                  <div className="flex gap-2">
+                    {[
+                      { value: 'pt-BR', label: '🇧🇷 Português' },
+                      { value: 'es', label: '🇪🇸 Español' },
+                    ].map((lang) => (
+                      <button
+                        key={lang.value}
+                        onClick={() => setEditForm((prev) => ({ ...prev, language: lang.value }))}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                          (editForm.language || 'pt-BR') === lang.value
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-background text-foreground border-input hover:bg-accent'
+                        }`}
+                      >
+                        {lang.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {/* System Prompt */}
