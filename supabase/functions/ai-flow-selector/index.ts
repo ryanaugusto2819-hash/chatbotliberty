@@ -33,9 +33,14 @@ Deno.serve(async (req) => {
     // Get conversation with niche_id
     const { data: conversation } = await supabase
       .from("conversations")
-      .select("niche_id")
+      .select("niche_id, sale_registered_at")
       .eq("id", conversationId)
       .single();
+
+    if (conversation?.sale_registered_at) {
+      console.log(`[ai-flow-selector] Skipping: sale already registered for conversation ${conversationId}`);
+      return jsonResponse({ skipped: true, reason: "Sale already registered" });
+    }
 
     const nicheId = conversation?.niche_id;
 

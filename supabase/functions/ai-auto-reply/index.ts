@@ -33,12 +33,17 @@ Deno.serve(async (req) => {
     // Fetch conversation to get niche_id and connection_config_id
     const { data: conversation } = await supabase
       .from("conversations")
-      .select("contact_phone, niche_id, connection_config_id")
+      .select("contact_phone, niche_id, connection_config_id, sale_registered_at")
       .eq("id", conversationId)
       .single();
 
     if (!conversation) {
       return jsonResponse({ error: "Conversation not found" }, 404);
+    }
+
+    if (conversation.sale_registered_at) {
+      console.log(`[ai-auto-reply] Skipping: sale already registered for conversation ${conversationId}`);
+      return jsonResponse({ skipped: true, reason: "Sale already registered" });
     }
 
     const nicheId = conversation.niche_id;

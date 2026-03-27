@@ -95,8 +95,9 @@ Deno.serve(async (req) => {
     // Build query - filter by funnel stages that templates actually target
     let query = supabase
       .from("conversations")
-      .select("id, contact_name, contact_phone, niche_id, status, updated_at, tags, ad_title, funnel_stage")
+      .select("id, contact_name, contact_phone, niche_id, status, updated_at, tags, ad_title, funnel_stage, sale_registered_at")
       .neq("status", "resolved")
+      .is("sale_registered_at", null)
       .in("niche_id", nicheIds)
       .lt("updated_at", cutoffTime)
       .order("updated_at", { ascending: true })
