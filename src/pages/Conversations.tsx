@@ -285,13 +285,69 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
     }
   }, [onSelectConversation, navigate]);
 
+  const tabLabels: Record<ConnectionTab, string> = {
+    all: 'Todos',
+    whatsapp: 'Comercial',
+    zapi: 'Cobrança',
+  };
+
+  const hasWhatsapp = allConnections.some(c => c.connection_id === 'whatsapp');
+  const hasZapi = allConnections.some(c => c.connection_id === 'zapi');
+  const showTabs = hasWhatsapp && hasZapi;
+
   return (
     <div className={embedded ? 'flex flex-col h-full overflow-hidden' : ''}>
       {!embedded && <TopBar title="Conversas" subtitle={`${totalCount} conversas totais`} />}
       {embedded && (
-        <div className="px-4 pt-4 pb-2 border-b border-border">
-          <h2 className="text-sm font-semibold text-foreground">Conversas</h2>
-          <p className="text-[11px] text-muted-foreground">{totalCount} conversas</p>
+        <div className="px-4 pt-4 pb-0 border-b border-border">
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">Conversas</h2>
+              <p className="text-[11px] text-muted-foreground">{totalCount} conversas</p>
+            </div>
+          </div>
+          {showTabs && (
+            <div className="flex gap-0">
+              {(['all', 'whatsapp', 'zapi'] as ConnectionTab[]).map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`relative px-4 py-2 text-xs font-medium transition-colors ${
+                    activeTab === tab
+                      ? 'text-primary'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {tabLabels[tab]}
+                  {activeTab === tab && (
+                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-full" />
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {!embedded && showTabs && (
+        <div className="px-6 pt-2">
+          <div className="flex gap-0 border-b border-border">
+            {(['all', 'whatsapp', 'zapi'] as ConnectionTab[]).map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`relative px-4 py-2 text-xs font-medium transition-colors ${
+                  activeTab === tab
+                    ? 'text-primary'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {tabLabels[tab]}
+                {activeTab === tab && (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-full" />
+                )}
+              </button>
+            ))}
+          </div>
         </div>
       )}
       <div className={`${embedded ? 'p-3 flex-1 overflow-hidden flex flex-col' : 'p-6'} space-y-4`}>
