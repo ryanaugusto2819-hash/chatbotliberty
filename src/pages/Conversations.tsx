@@ -162,6 +162,10 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
   const [selectedAgent, setSelectedAgent] = useState<string>(storedFilters.selectedAgent);
   const [selectedConnections, setSelectedConnections] = useState<string[]>(storedFilters.selectedConnections);
   const [onlyUnread, setOnlyUnread] = useState(storedFilters.onlyUnread);
+  const [activeTab, setActiveTab] = useState<ConnectionTab>(() => {
+    const stored = localStorage.getItem(CONVERSATIONS_TAB_STORAGE_KEY);
+    return (stored === 'whatsapp' || stored === 'zapi') ? stored : 'all';
+  });
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   // Debounce search input
