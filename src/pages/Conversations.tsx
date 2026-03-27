@@ -179,34 +179,7 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
     localStorage.setItem(CONVERSATIONS_TAB_STORAGE_KEY, activeTab);
   }, [activeTab]);
 
-  // Compute effective connection IDs based on tab + manual filter
-  const effectiveConnectionIds = useMemo(() => {
-    if (activeTab === 'all') return selectedConnections;
-    // Filter allConnections by tab type
-    const tabConnectionIds = allConnections
-      .filter(c => c.connection_id === activeTab)
-      .map(c => c.id);
-    if (selectedConnections.length > 0) {
-      // Intersection: only show manually selected that match the tab
-      return selectedConnections.filter(id => tabConnectionIds.includes(id));
-    }
-    return tabConnectionIds;
-  }, [activeTab, selectedConnections, allConnections]);
-
-  // Compute filters for the query
-  const inboxFilters = useMemo<InboxFilters>(() => ({
-    search: debouncedSearch,
-    status: !['all', 'last_customer'].includes(activeFilter) ? activeFilter : '',
-    agentId: selectedAgent !== 'all' ? selectedAgent : null,
-    connectionIds: effectiveConnectionIds,
-    tagId: selectedTag !== 'all' ? selectedTag : null,
-    onlyUnread,
-    lastCustomer: activeFilter === 'last_customer',
-  }), [debouncedSearch, activeFilter, selectedAgent, effectiveConnectionIds, selectedTag, onlyUnread]);
-
-  const { conversations, totalCount, isLoading, isFetchingNextPage, hasNextPage, fetchNextPage } = useInboxQuery(inboxFilters);
-
-  // Filter dropdown options
+  // Filter dropdown options (moved up so allConnections is available for tab filtering)
   const { data: tags = [] } = useQuery({
     queryKey: ['filter-tags'],
     queryFn: async () => {
@@ -233,6 +206,31 @@ export default function Conversations({ embedded, selectedId, onSelectConversati
     },
     staleTime: 300_000,
   });
+
+  // Compute effective connection IDs based on tab + manual filter
+  const effectiveConnectionIds = useMemo(() => {
+    if (activeTab === 'all') return selectedConnections;
+    const tabConnectionIds = allConnections
+      .filter(c => c.connection_id === activeTab)
+      .map(c => c.id);
+    if (selectedConnections.length > 0) {
+      return selectedConnections.filter(id => tabConnectionIds.includes(id));
+    }
+    return tabConnectionIds;
+  }, [activeTab, selectedConnections, allConnections]);
+
+  // Compute filters for the query
+  const inboxFilters = useMemo<InboxFilters>(() => ({
+    search: debouncedSearch,
+    status: !['all', 'last_customer'].includes(activeFilter) ? activeFilter : '',
+    agentId: selectedAgent !== 'all' ? selectedAgent : null,
+    connectionIds: effectiveConnectionIds,
+    tagId: selectedTag !== 'all' ? selectedTag : null,
+    onlyUnread,
+    lastCustomer: activeFilter === 'last_customer',
+  }), [debouncedSearch, activeFilter, selectedAgent, effectiveConnectionIds, selectedTag, onlyUnread]);
+
+  const { conversations, totalCount, isLoading, isFetchingNextPage, hasNextPage, fetchNextPage } = useInboxQuery(inboxFilters);
 
   const connectionMap = useMemo(() => {
     const map: Record<string, ConnectionInfo> = {};
