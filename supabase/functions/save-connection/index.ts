@@ -165,6 +165,58 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: "id is required for delete" }, 400);
       }
 
+      // 1. Get all conversation IDs linked to this connection
+      const { data: convos } = await serviceClient
+        .from("conversations")
+        .select("id")
+        .eq("connection_config_id", id);
+
+      const convoIds = (convos || []).map((c: { id: string }) => c.id);
+
+      if (convoIds.length > 0) {
+        // 2. Delete messages of those conversations
+        for (const cid of convoIds) {
+          await serviceClient.from("messages").delete().eq("conversation_id", cid);
+        }
+
+        // 3. Delete flow executions & step logs
+        for (const cid of convoIds) {
+          const { data: execs } = await serviceClient
+            .from("flow_executions")
+            .select("id")
+            .eq("conversation_id", cid);
+          const execIds = (execs || []).map((e: { id: string }) => e.id);
+          if (execIds.length > 0) {
+            for (const eid of execIds) {
+              await serviceClient.from("flow_step_logs").delete().eq("execution_id", eid);
+            }
+            await serviceClient.from("flow_executions").delete().in("id", execIds);
+          }
+        }
+
+        // 4. Delete agent assignment history
+        for (const cid of convoIds) {
+          await serviceClient.from("agent_assignment_history").delete().eq("conversation_id", cid);
+        }
+
+        // 5. Delete follow-up executions
+        for (const cid of convoIds) {
+          await serviceClient.from("follow_up_executions").delete().eq("conversation_id", cid);
+        }
+
+        // 6. Delete manager analyses
+        for (const cid of convoIds) {
+          await serviceClient.from("manager_analyses").delete().eq("conversation_id", cid);
+        }
+
+        // 7. Delete the conversations themselves
+        await serviceClient.from("conversations").delete().in("id", convoIds);
+      }
+
+      // 8. Delete niche_connections referencing this config
+      await serviceClient.from("niche_connections").delete().eq("connection_config_id", id);
+
+      // 9. Delete the connection config
       const { error } = await serviceClient.from("connection_configs").delete().eq("id", id);
 
       if (error) {
@@ -172,7 +224,8 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: "Failed to delete" }, 500);
       }
 
-      return jsonResponse({ success: true });
+      console.log(`Connection ${id} deleted with ${convoIds.length} conversations and all related data.`);
+      return jsonResponse({ success: true, deletedConversations: convoIds.length });
     }
 
     if (action === "update") {
