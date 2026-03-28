@@ -66,6 +66,7 @@ const toolCategories: ToolCategory[] = [
     label: 'Interação',
     items: [
       { type: 'quick_reply', label: 'Resposta Rápida', icon: ListOrdered, desc: 'Botões de resposta rápida' },
+      { type: 'call_button', label: 'Botão de Ligação', icon: Zap, desc: 'Botão para o cliente ligar' },
       { type: 'ai_reply', label: 'Resposta IA', icon: Bot, desc: 'Resposta gerada por IA' },
     ],
   },

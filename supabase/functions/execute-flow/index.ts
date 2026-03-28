@@ -471,6 +471,44 @@ Deno.serve(async (req) => {
             text: { body: content + buttonText },
           };
         }
+      } else if (node.node_type === "call_button") {
+        const content = (config.content as string) || "";
+        const callPhone = (config.call_phone as string) || "";
+        const callButtonText = (config.call_button_text as string) || "Ligar agora";
+        
+        if (!content.trim() || !callPhone.trim()) {
+          if (executionId) {
+            await supabase.from("flow_step_logs").insert({
+              execution_id: executionId,
+              node_id: node.id,
+              node_type: node.node_type,
+              node_label: node.label || "Botão de Ligação",
+              sort_order: node.sort_order,
+              status: "skipped",
+              error_message: !content.trim() ? "Conteúdo vazio" : "Telefone não configurado",
+            });
+          }
+          results.push({ nodeId: node.id, status: "skipped_empty" });
+          continue;
+        }
+
+        // WhatsApp Cloud API CTA URL with tel: scheme
+        waPayload = {
+          messaging_product: "whatsapp",
+          to: phone,
+          type: "interactive",
+          interactive: {
+            type: "cta_url",
+            body: { text: content },
+            action: {
+              name: "cta_url",
+              parameters: {
+                display_text: callButtonText.slice(0, 20),
+                url: callPhone.startsWith("tel:") ? callPhone : `tel:${callPhone}`,
+              },
+            },
+          },
+        };
       } else if (node.node_type === "action") {
         // Handle action nodes internally (no message sending)
         const actionType = config.action_type as string;
@@ -574,6 +612,14 @@ Deno.serve(async (req) => {
           } else if (node.node_type === "video") {
             zapiEndpoint = `${zapiBase}/send-link-video`;
             zapiBody = { phone, videoUrl: config.media_url, caption: (config.caption as string) || "" };
+          } else if (node.node_type === "call_button") {
+            // Z-API doesn't support CTA buttons, send as text with phone number
+            const content = (config.content as string) || "";
+            const callPhone = (config.call_phone as string) || "";
+            const callButtonText = (config.call_button_text as string) || "Ligar agora";
+            const textContent = `${content}\n\n📞 ${callButtonText}: ${callPhone}`;
+            zapiEndpoint = `${zapiBase}/send-text`;
+            zapiBody = { phone, message: textContent };
           } else {
             const textBody = (waPayload as Record<string, unknown>).text as Record<string, unknown> | undefined;
             const interactiveBody = (waPayload as Record<string, unknown>).interactive as Record<string, unknown> | undefined;
@@ -663,6 +709,10 @@ Deno.serve(async (req) => {
           failedContent = qrButtons.length > 0
             ? qrContent + "\n\n" + qrButtons.map((b, i) => `${i + 1}. ${b}`).join("\n")
             : qrContent;
+        } else if (node.node_type === "call_button") {
+          const cbContent = (config.content as string) || "";
+          const cbPhone = (config.call_phone as string) || "";
+          failedContent = `${cbContent}\n\n📞 ${cbPhone}`;
         }
 
         // Insert message with status 'failed' so it appears in chat with error indicator

@@ -62,6 +62,11 @@ const nodeConfig: Record<string, { icon: React.ElementType; typeLabel: string; c
     typeLabel: 'AÇÃO',
     colors: 'bg-rose-50 border-rose-300 text-rose-700 dark:bg-rose-900/20 dark:border-rose-500/40 dark:text-rose-300',
   },
+  call_button: {
+    icon: MessageSquare,
+    typeLabel: 'BOTÃO LIGAÇÃO',
+    colors: 'bg-teal-50 border-teal-300 text-teal-700 dark:bg-teal-900/20 dark:border-teal-500/40 dark:text-teal-300',
+  },
 };
 
 const triggerLabels: Record<string, string> = {
@@ -179,6 +184,10 @@ function AutomationNode({ data, selected, id }: NodeProps) {
               <span key={i} className="rounded-full bg-current/10 px-2 py-0.5 text-[10px] font-medium">{b}</span>
             ))}
           </div>
+        )}
+
+        {nodeType === 'call_button' && config?.call_phone && (
+          <p className="text-[10px] mt-1 opacity-60 truncate">📞 {config.call_phone as string}</p>
         )}
 
         {/* Action node preview */}
