@@ -136,12 +136,24 @@ Deno.serve(async (req) => {
     const normalizedPhone = (phone as string).replace(/\D/g, "");
     const contactName = name || normalizedPhone;
 
+    // 2.5 Find the default Z-API connection for webhook-created conversations
+    const { data: zapiConnection } = await supabase
+      .from("connection_configs")
+      .select("id")
+      .eq("connection_id", "zapi")
+      .eq("is_connected", true)
+      .order("created_at")
+      .limit(1)
+      .maybeSingle();
+
+    const connectionConfigId = zapiConnection?.id || null;
+
     // 3. Find or create conversation
     let conversationId: string;
 
     const { data: existing } = await supabase
       .from("conversations")
-      .select("id")
+      .select("id, connection_config_id")
       .eq("contact_phone", normalizedPhone)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -149,9 +161,17 @@ Deno.serve(async (req) => {
 
     if (existing) {
       conversationId = existing.id;
+      const updateData: Record<string, unknown> = {
+        updated_at: new Date().toISOString(),
+        status: "active",
+      };
+      // If conversation has no connection, assign the Z-API one
+      if (!existing.connection_config_id && connectionConfigId) {
+        updateData.connection_config_id = connectionConfigId;
+      }
       await supabase
         .from("conversations")
-        .update({ updated_at: new Date().toISOString(), status: "active" })
+        .update(updateData)
         .eq("id", conversationId);
     } else {
       const { data: newConv, error: convErr } = await supabase
@@ -161,6 +181,7 @@ Deno.serve(async (req) => {
           contact_phone: normalizedPhone,
           status: "new",
           tags: [],
+          connection_config_id: connectionConfigId,
         })
         .select("id")
         .single();
