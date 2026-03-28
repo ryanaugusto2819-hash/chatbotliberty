@@ -567,6 +567,46 @@ export default function NodeEditor({ nodeId, nodeType, label, config, nicheId, o
           </div>
         )}
 
+        {/* === CALL BUTTON CONFIG === */}
+        {nodeType === 'call_button' && (
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <label className={labelClass}>Texto da mensagem</label>
+              <textarea
+                value={(editConfig.content as string) || ''}
+                onChange={(e) => setEditConfig((p) => ({ ...p, content: e.target.value }))}
+                rows={3}
+                placeholder="Precisa de ajuda? Ligue para nós!"
+                className={`${inputClass} resize-none`}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className={labelClass}>Número de telefone</label>
+              <input
+                value={(editConfig.call_phone as string) || ''}
+                onChange={(e) => setEditConfig((p) => ({ ...p, call_phone: e.target.value }))}
+                placeholder="+5531999999999"
+                className={inputClass}
+              />
+              <p className="text-[10px] text-muted-foreground">Inclua o código do país (ex: +55)</p>
+            </div>
+            <div className="space-y-1.5">
+              <label className={labelClass}>Texto do botão</label>
+              <input
+                value={(editConfig.call_button_text as string) || 'Ligar agora'}
+                onChange={(e) => setEditConfig((p) => ({ ...p, call_button_text: e.target.value }))}
+                placeholder="Ligar agora"
+                className={inputClass}
+              />
+            </div>
+            <div className="rounded-lg bg-teal-50 dark:bg-teal-900/10 border border-teal-200 dark:border-teal-800 p-3">
+              <p className="text-[11px] text-teal-700 dark:text-teal-300">
+                📞 O cliente receberá uma mensagem com um botão que abre o discador para ligar no número configurado
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* === AI REPLY CONFIG === */}
         {nodeType === 'ai_reply' && (
           <div className="space-y-3">
