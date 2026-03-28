@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
 import TopBar from '@/components/layout/TopBar';
 import { supabase } from '@/integrations/supabase/client';
-import { Webhook, Plus, Trash2, Loader2, Copy, Check, Link2 } from 'lucide-react';
+import { Webhook, Plus, Trash2, Loader2, Copy, Check, Link2, History, CheckCircle2, XCircle, AlertTriangle, RefreshCw } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface FlowOption {
   id: string;
@@ -19,6 +22,21 @@ interface Mapping {
   is_active: boolean;
 }
 
+interface WebhookLog {
+  id: string;
+  status_key: string;
+  phone: string;
+  contact_name: string;
+  payload: Record<string, unknown>;
+  mapping_found: boolean;
+  flow_id: string | null;
+  conversation_id: string | null;
+  result: Record<string, unknown>;
+  error: string | null;
+  success: boolean;
+  created_at: string;
+}
+
 export default function WebhookMappings() {
   const [mappings, setMappings] = useState<Mapping[]>([]);
   const [flows, setFlows] = useState<FlowOption[]>([]);
@@ -27,6 +45,9 @@ export default function WebhookMappings() {
   const [newStatusKey, setNewStatusKey] = useState('');
   const [newLabel, setNewLabel] = useState('');
   const [copiedUrl, setCopiedUrl] = useState(false);
+  const [logs, setLogs] = useState<WebhookLog[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [expandedLog, setExpandedLog] = useState<string | null>(null);
 
   const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/webhook-trigger`;
 
@@ -38,6 +59,17 @@ export default function WebhookMappings() {
     setMappings((m as Mapping[]) || []);
     setFlows(f || []);
     setLoading(false);
+  };
+
+  const fetchLogs = async () => {
+    setLogsLoading(true);
+    const { data } = await supabase
+      .from('webhook_logs')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(50);
+    setLogs((data as WebhookLog[]) || []);
+    setLogsLoading(false);
   };
 
   useEffect(() => { fetchData(); }, []);
@@ -91,6 +123,12 @@ export default function WebhookMappings() {
     setTimeout(() => setCopiedUrl(false), 2000);
   };
 
+  const getFlowName = (flowId: string | null) => {
+    if (!flowId) return '—';
+    const flow = flows.find(f => f.id === flowId);
+    return flow ? flow.name : flowId.slice(0, 8);
+  };
+
   return (
     <div>
       <TopBar title="Webhook → Fluxo" subtitle="Configure qual fluxo dispara para cada status do webhook" />
@@ -139,99 +177,224 @@ Content-Type: application/json
           </details>
         </div>
 
-        {/* Add new mapping */}
-        <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-          <p className="text-sm font-semibold text-card-foreground">Adicionar Mapeamento</p>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <input
-              type="text"
-              placeholder="Chave do status (ex: pedido_enviado)"
-              value={newStatusKey}
-              onChange={(e) => setNewStatusKey(e.target.value)}
-              className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-            />
-            <input
-              type="text"
-              placeholder="Label (ex: Pedido Enviado)"
-              value={newLabel}
-              onChange={(e) => setNewLabel(e.target.value)}
-              className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-            />
-            <button
-              onClick={addMapping}
-              className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors whitespace-nowrap"
-            >
-              <Plus className="h-4 w-4" />
-              Adicionar
-            </button>
-          </div>
-        </div>
+        <Tabs defaultValue="mappings" onValueChange={(v) => { if (v === 'logs') fetchLogs(); }}>
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="mappings" className="flex items-center gap-2">
+              <Webhook className="h-4 w-4" />
+              Mapeamentos
+            </TabsTrigger>
+            <TabsTrigger value="logs" className="flex items-center gap-2">
+              <History className="h-4 w-4" />
+              Histórico
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Mappings list */}
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
-        ) : mappings.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <Webhook className="h-12 w-12 text-muted-foreground/40 mb-3" />
-            <p className="text-sm font-medium text-muted-foreground">Nenhum mapeamento criado</p>
-            <p className="text-xs text-muted-foreground mt-1">Adicione um status e vincule a um fluxo de automação</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {mappings.map((m, i) => (
-              <motion.div
-                key={m.id}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.04 }}
-                className="rounded-xl border border-border bg-card p-4 space-y-3"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-card-foreground">{m.label || m.status_key}</p>
-                    <code className="text-[11px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                      status: "{m.status_key}"
-                    </code>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => updateMapping(m.id, { is_active: !m.is_active })}
-                      className={`rounded-full px-3 py-1 text-[11px] font-semibold transition-colors ${
-                        m.is_active ? 'bg-accent text-accent-foreground' : 'bg-secondary text-muted-foreground'
-                      }`}
-                    >
-                      {m.is_active ? 'Ativo' : 'Inativo'}
-                    </button>
-                    <button
-                      onClick={() => deleteMapping(m.id)}
-                      className="text-muted-foreground hover:text-destructive transition-colors"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">Fluxo vinculado</label>
-                  <select
-                    value={m.flow_id || ''}
-                    onChange={(e) => updateMapping(m.id, { flow_id: e.target.value || null })}
-                    disabled={saving === m.id}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+          <TabsContent value="mappings" className="space-y-4 mt-4">
+            {/* Add new mapping */}
+            <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+              <p className="text-sm font-semibold text-card-foreground">Adicionar Mapeamento</p>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                  type="text"
+                  placeholder="Chave do status (ex: pedido_enviado)"
+                  value={newStatusKey}
+                  onChange={(e) => setNewStatusKey(e.target.value)}
+                  className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+                <input
+                  type="text"
+                  placeholder="Label (ex: Pedido Enviado)"
+                  value={newLabel}
+                  onChange={(e) => setNewLabel(e.target.value)}
+                  className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+                <button
+                  onClick={addMapping}
+                  className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors whitespace-nowrap"
+                >
+                  <Plus className="h-4 w-4" />
+                  Adicionar
+                </button>
+              </div>
+            </div>
+
+            {/* Mappings list */}
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : mappings.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <Webhook className="h-12 w-12 text-muted-foreground/40 mb-3" />
+                <p className="text-sm font-medium text-muted-foreground">Nenhum mapeamento criado</p>
+                <p className="text-xs text-muted-foreground mt-1">Adicione um status e vincule a um fluxo de automação</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {mappings.map((m, i) => (
+                  <motion.div
+                    key={m.id}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.04 }}
+                    className="rounded-xl border border-border bg-card p-4 space-y-3"
                   >
-                    <option value="">— Nenhum fluxo —</option>
-                    {flows.map(f => (
-                      <option key={f.id} value={f.id}>
-                        {f.name} {f.is_active ? '' : '(inativo)'}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        )}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-card-foreground">{m.label || m.status_key}</p>
+                        <code className="text-[11px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                          status: "{m.status_key}"
+                        </code>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => updateMapping(m.id, { is_active: !m.is_active })}
+                          className={`rounded-full px-3 py-1 text-[11px] font-semibold transition-colors ${
+                            m.is_active ? 'bg-accent text-accent-foreground' : 'bg-secondary text-muted-foreground'
+                          }`}
+                        >
+                          {m.is_active ? 'Ativo' : 'Inativo'}
+                        </button>
+                        <button
+                          onClick={() => deleteMapping(m.id)}
+                          className="text-muted-foreground hover:text-destructive transition-colors"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground mb-1 block">Fluxo vinculado</label>
+                      <select
+                        value={m.flow_id || ''}
+                        onChange={(e) => updateMapping(m.id, { flow_id: e.target.value || null })}
+                        disabled={saving === m.id}
+                        className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+                      >
+                        <option value="">— Nenhum fluxo —</option>
+                        {flows.map(f => (
+                          <option key={f.id} value={f.id}>
+                            {f.name} {f.is_active ? '' : '(inativo)'}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="logs" className="space-y-4 mt-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-card-foreground">Últimas 50 chamadas</p>
+              <button
+                onClick={fetchLogs}
+                disabled={logsLoading}
+                className="flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-xs hover:bg-secondary transition-colors disabled:opacity-50"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${logsLoading ? 'animate-spin' : ''}`} />
+                Atualizar
+              </button>
+            </div>
+
+            {logsLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : logs.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <History className="h-12 w-12 text-muted-foreground/40 mb-3" />
+                <p className="text-sm font-medium text-muted-foreground">Nenhum webhook recebido ainda</p>
+                <p className="text-xs text-muted-foreground mt-1">Quando um webhook for enviado, aparecerá aqui</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {logs.map((log, i) => (
+                  <motion.div
+                    key={log.id}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.02 }}
+                    className="rounded-xl border border-border bg-card overflow-hidden"
+                  >
+                    <button
+                      onClick={() => setExpandedLog(expandedLog === log.id ? null : log.id)}
+                      className="w-full flex items-center gap-3 p-3 text-left hover:bg-secondary/50 transition-colors"
+                    >
+                      {log.success ? (
+                        <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+                      ) : log.mapping_found ? (
+                        <AlertTriangle className="h-4 w-4 text-yellow-500 shrink-0" />
+                      ) : (
+                        <XCircle className="h-4 w-4 text-destructive shrink-0" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <code className="text-[11px] bg-muted px-1.5 py-0.5 rounded text-foreground">
+                            {log.status_key || '—'}
+                          </code>
+                          <span className="text-xs text-muted-foreground truncate">
+                            {log.phone || 'sem telefone'}
+                          </span>
+                          {log.contact_name && (
+                            <span className="text-xs text-muted-foreground truncate hidden sm:inline">
+                              • {log.contact_name}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <span className="text-[11px] text-muted-foreground shrink-0">
+                        {format(new Date(log.created_at), "dd/MM HH:mm:ss", { locale: ptBR })}
+                      </span>
+                    </button>
+
+                    {expandedLog === log.id && (
+                      <div className="border-t border-border p-3 space-y-3 bg-muted/30">
+                        <div className="grid grid-cols-2 gap-3 text-xs">
+                          <div>
+                            <span className="text-muted-foreground">Status:</span>{' '}
+                            <span className={log.success ? 'text-green-500 font-medium' : 'text-destructive font-medium'}>
+                              {log.success ? 'Sucesso' : 'Falha'}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Mapeamento:</span>{' '}
+                            <span className="text-foreground">{log.mapping_found ? 'Encontrado' : 'Não encontrado'}</span>
+                          </div>
+                          {log.flow_id && (
+                            <div className="col-span-2">
+                              <span className="text-muted-foreground">Fluxo:</span>{' '}
+                              <span className="text-foreground">{getFlowName(log.flow_id)}</span>
+                            </div>
+                          )}
+                          {log.error && (
+                            <div className="col-span-2">
+                              <span className="text-muted-foreground">Erro:</span>{' '}
+                              <span className="text-destructive">{log.error}</span>
+                            </div>
+                          )}
+                        </div>
+                        <details>
+                          <summary className="text-[11px] text-muted-foreground cursor-pointer hover:text-foreground">Payload recebido</summary>
+                          <pre className="mt-1 rounded-lg bg-muted p-2 text-[10px] text-foreground overflow-x-auto max-h-40">
+                            {JSON.stringify(log.payload, null, 2)}
+                          </pre>
+                        </details>
+                        <details>
+                          <summary className="text-[11px] text-muted-foreground cursor-pointer hover:text-foreground">Resultado</summary>
+                          <pre className="mt-1 rounded-lg bg-muted p-2 text-[10px] text-foreground overflow-x-auto max-h-40">
+                            {JSON.stringify(log.result, null, 2)}
+                          </pre>
+                        </details>
+                      </div>
+                    )}
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

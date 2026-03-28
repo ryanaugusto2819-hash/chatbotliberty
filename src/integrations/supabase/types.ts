@@ -1061,6 +1061,66 @@ export type Database = {
           },
         ]
       }
+      webhook_logs: {
+        Row: {
+          contact_name: string | null
+          conversation_id: string | null
+          created_at: string
+          error: string | null
+          flow_id: string | null
+          id: string
+          mapping_found: boolean
+          payload: Json
+          phone: string
+          result: Json | null
+          status_key: string
+          success: boolean
+        }
+        Insert: {
+          contact_name?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          error?: string | null
+          flow_id?: string | null
+          id?: string
+          mapping_found?: boolean
+          payload?: Json
+          phone?: string
+          result?: Json | null
+          status_key?: string
+          success?: boolean
+        }
+        Update: {
+          contact_name?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          error?: string | null
+          flow_id?: string | null
+          id?: string
+          mapping_found?: boolean
+          payload?: Json
+          phone?: string
+          result?: Json | null
+          status_key?: string
+          success?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_logs_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "webhook_logs_flow_id_fkey"
+            columns: ["flow_id"]
+            isOneToOne: false
+            referencedRelation: "automation_flows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
