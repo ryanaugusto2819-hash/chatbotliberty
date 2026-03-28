@@ -141,7 +141,7 @@ export default function NodeEditor({ nodeId, nodeType, label, config, nicheId, o
   const iconMap: Record<string, React.ElementType> = {
     trigger: Zap, message: MessageSquare, delay: Clock, image: Image,
     audio: Music, video: Video, document: FileText, condition: GitFork,
-    quick_reply: ListOrdered, ai_reply: Bot, action: Cog,
+    quick_reply: ListOrdered, ai_reply: Bot, action: Cog, call_button: Zap,
   };
   const Icon = iconMap[nodeType] || MessageSquare;
 
@@ -149,6 +149,7 @@ export default function NodeEditor({ nodeId, nodeType, label, config, nicheId, o
     trigger: 'Gatilho', message: 'Mensagem', delay: 'Espera', image: 'Imagem',
     audio: 'Áudio', video: 'Vídeo', document: 'Documento', condition: 'Condição',
     quick_reply: 'Resposta Rápida', ai_reply: 'Resposta IA', action: 'Ação',
+    call_button: 'Botão de Ligação',
   };
 
   const inputClass = "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring";
