@@ -730,7 +730,21 @@ export default function NodeEditor({ nodeId, nodeType, label, config, nicheId, o
               </div>
             )}
 
-            {/* Webhook */}
+            {/* Set billing stage */}
+            {(editConfig.action_type as string) === 'set_billing_stage' && (
+              <div className="space-y-2">
+                <label className={labelClass}>Etapa da Cobrança</label>
+                <input
+                  value={(editConfig.billing_stage as string) || ''}
+                  onChange={(e) => setEditConfig((p) => ({ ...p, billing_stage: e.target.value }))}
+                  placeholder="Ex: pedido pre enviado, enviado, entregue..."
+                  className={inputClass}
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  Esse valor será enviado via webhook para a plataforma de atendimento para sincronizar a etapa da cobrança do lead.
+                </p>
+              </div>
+            )}
             {(editConfig.action_type as string) === 'webhook' && (
               <div className="space-y-2">
                 <div className="space-y-1.5">
@@ -785,10 +799,12 @@ export default function NodeEditor({ nodeId, nodeType, label, config, nicheId, o
                    : (editConfig.action_type as string) === 'remove_tag'
                    ? 'Remove uma etiqueta do contato da conversa'
                    : (editConfig.action_type as string) === 'set_funnel_stage'
-                   ? 'Define em qual etapa do funil o lead se encontra — isso determina qual IA de follow-up será acionada'
-                   : (editConfig.action_type as string) === 'transfer_agent'
-                   ? 'Transfere a conversa para o agente selecionado'
-                   : 'Envia uma requisição HTTP para o endpoint configurado'}
+                    ? 'Define em qual etapa do funil o lead se encontra — isso determina qual IA de follow-up será acionada'
+                    : (editConfig.action_type as string) === 'set_billing_stage'
+                    ? 'Define a etapa da cobrança do lead — sincroniza com a plataforma de atendimento via webhook'
+                    : (editConfig.action_type as string) === 'transfer_agent'
+                    ? 'Transfere a conversa para o agente selecionado'
+                    : 'Envia uma requisição HTTP para o endpoint configurado'}
               </p>
             </div>
           </div>

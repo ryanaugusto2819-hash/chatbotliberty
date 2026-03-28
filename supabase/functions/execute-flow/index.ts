@@ -483,6 +483,16 @@ Deno.serve(async (req) => {
             .eq("id", conversationId);
           
           console.log(`[execute-flow] Set funnel stage to "${stage}" for conversation ${conversationId}`);
+        } else if (actionType === "set_billing_stage") {
+          const billingStage = (config.billing_stage as string) || "";
+          if (billingStage) {
+            await supabase
+              .from("conversations")
+              .update({ billing_stage: billingStage })
+              .eq("id", conversationId);
+            
+            console.log(`[execute-flow] Set billing stage to "${billingStage}" for conversation ${conversationId}`);
+          }
         }
         // Other action types (add_tag, remove_tag, transfer_agent, webhook) can be handled here too
         
