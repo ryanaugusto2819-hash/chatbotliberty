@@ -1,12 +1,19 @@
 import { useState, useEffect } from 'react';
 import TopBar from '@/components/layout/TopBar';
 import { supabase } from '@/integrations/supabase/client';
-import { Webhook, Plus, Trash2, Loader2, Copy, Check, Link2, History, CheckCircle2, XCircle, AlertTriangle, RefreshCw } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Webhook, Plus, Trash2, Loader2, Copy, Check, Link2, History, CheckCircle2, XCircle, AlertTriangle, RefreshCw, GripVertical, Zap } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Switch } from '@/components/ui/switch';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 
 interface FlowOption {
   id: string;
@@ -42,12 +49,14 @@ export default function WebhookMappings() {
   const [flows, setFlows] = useState<FlowOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
-  const [newStatusKey, setNewStatusKey] = useState('');
-  const [newLabel, setNewLabel] = useState('');
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [logs, setLogs] = useState<WebhookLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
   const [expandedLog, setExpandedLog] = useState<string | null>(null);
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [newStatusKey, setNewStatusKey] = useState('');
+  const [newLabel, setNewLabel] = useState('');
+  const [newFlowId, setNewFlowId] = useState('');
 
   const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/webhook-trigger`;
 
@@ -82,6 +91,7 @@ export default function WebhookMappings() {
     const { error } = await supabase.from('webhook_flow_mappings').insert({
       status_key: newStatusKey.trim(),
       label: newLabel.trim() || newStatusKey.trim(),
+      flow_id: newFlowId || null,
     });
     if (error) {
       if (error.code === '23505') toast.error('Essa chave de status já existe');
@@ -90,6 +100,8 @@ export default function WebhookMappings() {
     }
     setNewStatusKey('');
     setNewLabel('');
+    setNewFlowId('');
+    setShowAddDialog(false);
     fetchData();
     toast.success('Mapeamento adicionado');
   };
@@ -103,6 +115,7 @@ export default function WebhookMappings() {
     if (error) toast.error('Erro ao salvar');
     else {
       setMappings(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
+      toast.success('Salvo');
     }
     setSaving(null);
   };
@@ -132,7 +145,7 @@ export default function WebhookMappings() {
   return (
     <div>
       <TopBar title="Webhook → Fluxo" subtitle="Configure qual fluxo dispara para cada status do webhook" />
-      <div className="p-6 space-y-6 max-w-3xl">
+      <div className="p-6 space-y-6 max-w-4xl">
         {/* Webhook URL */}
         <div className="rounded-xl border border-border bg-card p-4 space-y-2">
           <div className="flex items-center gap-2 text-sm font-semibold text-card-foreground">
@@ -190,97 +203,115 @@ Content-Type: application/json
           </TabsList>
 
           <TabsContent value="mappings" className="space-y-4 mt-4">
-            {/* Add new mapping */}
-            <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-              <p className="text-sm font-semibold text-card-foreground">Adicionar Mapeamento</p>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <input
-                  type="text"
-                  placeholder="Chave do status (ex: pedido_enviado)"
-                  value={newStatusKey}
-                  onChange={(e) => setNewStatusKey(e.target.value)}
-                  className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                />
-                <input
-                  type="text"
-                  placeholder="Label (ex: Pedido Enviado)"
-                  value={newLabel}
-                  onChange={(e) => setNewLabel(e.target.value)}
-                  className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                />
-                <button
-                  onClick={addMapping}
-                  className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors whitespace-nowrap"
-                >
-                  <Plus className="h-4 w-4" />
-                  Adicionar
-                </button>
+            {/* Header with add button */}
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-card-foreground">Status → Fluxo</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Cada status de pedido dispara um fluxo diferente</p>
               </div>
+              <Button onClick={() => setShowAddDialog(true)} size="sm" className="gap-1.5">
+                <Plus className="h-4 w-4" />
+                Novo Mapeamento
+              </Button>
             </div>
 
-            {/* Mappings list */}
+            {/* Mappings Table */}
             {loading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
             ) : mappings.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <Webhook className="h-12 w-12 text-muted-foreground/40 mb-3" />
-                <p className="text-sm font-medium text-muted-foreground">Nenhum mapeamento criado</p>
-                <p className="text-xs text-muted-foreground mt-1">Adicione um status e vincule a um fluxo de automação</p>
+              <div className="flex flex-col items-center justify-center py-16 text-center rounded-xl border border-dashed border-border bg-card/50">
+                <div className="rounded-full bg-muted p-4 mb-4">
+                  <Zap className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <p className="text-sm font-medium text-card-foreground">Nenhum mapeamento criado</p>
+                <p className="text-xs text-muted-foreground mt-1 max-w-xs">
+                  Adicione um status do pedido e vincule a um fluxo de automação para disparar automaticamente
+                </p>
+                <Button onClick={() => setShowAddDialog(true)} size="sm" className="mt-4 gap-1.5">
+                  <Plus className="h-4 w-4" />
+                  Criar Primeiro Mapeamento
+                </Button>
               </div>
             ) : (
-              <div className="space-y-3">
-                {mappings.map((m, i) => (
-                  <motion.div
-                    key={m.id}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.04 }}
-                    className="rounded-xl border border-border bg-card p-4 space-y-3"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-semibold text-card-foreground">{m.label || m.status_key}</p>
-                        <code className="text-[11px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                          status: "{m.status_key}"
+              <div className="rounded-xl border border-border bg-card overflow-hidden">
+                {/* Table header */}
+                <div className="grid grid-cols-[1fr_1fr_auto_auto] gap-4 items-center px-4 py-2.5 bg-muted/50 border-b border-border text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  <span>Status do Pedido</span>
+                  <span>Fluxo Vinculado</span>
+                  <span className="text-center">Ativo</span>
+                  <span className="text-center w-8"></span>
+                </div>
+
+                {/* Table rows */}
+                <AnimatePresence>
+                  {mappings.map((m, i) => (
+                    <motion.div
+                      key={m.id}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ delay: i * 0.03 }}
+                      className="grid grid-cols-[1fr_1fr_auto_auto] gap-4 items-center px-4 py-3 border-b border-border last:border-b-0 hover:bg-muted/30 transition-colors group"
+                    >
+                      {/* Status key + label */}
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-card-foreground truncate">{m.label || m.status_key}</p>
+                        <code className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded mt-0.5 inline-block">
+                          {m.status_key}
                         </code>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => updateMapping(m.id, { is_active: !m.is_active })}
-                          className={`rounded-full px-3 py-1 text-[11px] font-semibold transition-colors ${
-                            m.is_active ? 'bg-accent text-accent-foreground' : 'bg-secondary text-muted-foreground'
-                          }`}
+
+                      {/* Flow selector */}
+                      <div className="min-w-0">
+                        <Select
+                          value={m.flow_id || 'none'}
+                          onValueChange={(val) => updateMapping(m.id, { flow_id: val === 'none' ? null : val })}
+                          disabled={saving === m.id}
                         >
-                          {m.is_active ? 'Ativo' : 'Inativo'}
-                        </button>
+                          <SelectTrigger className="h-9 text-sm">
+                            <SelectValue placeholder="Selecione um fluxo" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">
+                              <span className="text-muted-foreground">— Nenhum fluxo —</span>
+                            </SelectItem>
+                            {flows.map(f => (
+                              <SelectItem key={f.id} value={f.id}>
+                                <div className="flex items-center gap-2">
+                                  <span>{f.name}</span>
+                                  {!f.is_active && (
+                                    <Badge variant="secondary" className="text-[9px] px-1 py-0">inativo</Badge>
+                                  )}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Active toggle */}
+                      <div className="flex justify-center">
+                        <Switch
+                          checked={m.is_active}
+                          onCheckedChange={(checked) => updateMapping(m.id, { is_active: checked })}
+                          disabled={saving === m.id}
+                        />
+                      </div>
+
+                      {/* Delete */}
+                      <div className="flex justify-center">
                         <button
                           onClick={() => deleteMapping(m.id)}
-                          className="text-muted-foreground hover:text-destructive transition-colors"
+                          className="text-muted-foreground hover:text-destructive transition-colors opacity-0 group-hover:opacity-100 p-1 rounded-md hover:bg-destructive/10"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground mb-1 block">Fluxo vinculado</label>
-                      <select
-                        value={m.flow_id || ''}
-                        onChange={(e) => updateMapping(m.id, { flow_id: e.target.value || null })}
-                        disabled={saving === m.id}
-                        className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
-                      >
-                        <option value="">— Nenhum fluxo —</option>
-                        {flows.map(f => (
-                          <option key={f.id} value={f.id}>
-                            {f.name} {f.is_active ? '' : '(inativo)'}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </motion.div>
-                ))}
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
               </div>
             )}
           </TabsContent>
@@ -396,6 +427,69 @@ Content-Type: application/json
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Add Mapping Dialog */}
+      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Zap className="h-5 w-5 text-primary" />
+              Novo Mapeamento
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Chave do status <span className="text-destructive">*</span></Label>
+              <Input
+                placeholder="ex: pedido_enviado"
+                value={newStatusKey}
+                onChange={(e) => setNewStatusKey(e.target.value)}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Valor que será enviado no campo <code className="bg-muted px-1 py-0.5 rounded">status_envio</code> do webhook
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>Nome amigável</Label>
+              <Input
+                placeholder="ex: Pedido Enviado"
+                value={newLabel}
+                onChange={(e) => setNewLabel(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Fluxo a disparar</Label>
+              <Select value={newFlowId} onValueChange={setNewFlowId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um fluxo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">
+                    <span className="text-muted-foreground">— Definir depois —</span>
+                  </SelectItem>
+                  {flows.map(f => (
+                    <SelectItem key={f.id} value={f.id}>
+                      <div className="flex items-center gap-2">
+                        <span>{f.name}</span>
+                        {!f.is_active && (
+                          <Badge variant="secondary" className="text-[9px] px-1 py-0">inativo</Badge>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddDialog(false)}>Cancelar</Button>
+            <Button onClick={addMapping} disabled={!newStatusKey.trim()}>
+              <Plus className="h-4 w-4 mr-1" />
+              Adicionar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
