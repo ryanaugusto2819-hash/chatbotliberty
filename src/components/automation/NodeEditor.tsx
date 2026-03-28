@@ -600,6 +600,7 @@ export default function NodeEditor({ nodeId, nodeType, label, config, nicheId, o
                 <option value="add_tag">Adicionar Etiqueta</option>
                 <option value="remove_tag">Remover Etiqueta</option>
                 <option value="set_funnel_stage">Definir Etapa do Funil</option>
+                <option value="set_billing_stage">Definir Etapa da Cobrança</option>
                 <option value="transfer_agent">Transferir para Agente</option>
                 <option value="webhook">Enviar Webhook</option>
               </select>
