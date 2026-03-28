@@ -303,6 +303,8 @@ export type Database = {
         Row: {
           ad_title: string | null
           assigned_agent_id: string | null
+          billing_connection_name: string | null
+          billing_stage: string | null
           connection_config_id: string | null
           contact_avatar: string | null
           contact_name: string
@@ -322,6 +324,8 @@ export type Database = {
         Insert: {
           ad_title?: string | null
           assigned_agent_id?: string | null
+          billing_connection_name?: string | null
+          billing_stage?: string | null
           connection_config_id?: string | null
           contact_avatar?: string | null
           contact_name: string
@@ -341,6 +345,8 @@ export type Database = {
         Update: {
           ad_title?: string | null
           assigned_agent_id?: string | null
+          billing_connection_name?: string | null
+          billing_stage?: string | null
           connection_config_id?: string | null
           contact_avatar?: string | null
           contact_name?: string
