@@ -612,6 +612,14 @@ Deno.serve(async (req) => {
           } else if (node.node_type === "video") {
             zapiEndpoint = `${zapiBase}/send-link-video`;
             zapiBody = { phone, videoUrl: config.media_url, caption: (config.caption as string) || "" };
+          } else if (node.node_type === "call_button") {
+            // Z-API doesn't support CTA buttons, send as text with phone number
+            const content = (config.content as string) || "";
+            const callPhone = (config.call_phone as string) || "";
+            const callButtonText = (config.call_button_text as string) || "Ligar agora";
+            const textContent = `${content}\n\n📞 ${callButtonText}: ${callPhone}`;
+            zapiEndpoint = `${zapiBase}/send-text`;
+            zapiBody = { phone, message: textContent };
           } else {
             const textBody = (waPayload as Record<string, unknown>).text as Record<string, unknown> | undefined;
             const interactiveBody = (waPayload as Record<string, unknown>).interactive as Record<string, unknown> | undefined;
