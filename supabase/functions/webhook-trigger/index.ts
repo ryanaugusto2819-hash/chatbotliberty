@@ -24,14 +24,30 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { phone, name, status } = body;
+    // Support both formats: legacy (phone/name/status) and rich payload (telefone/nome/status_envio)
+    const phone = body.telefone || body.phone;
+    const name = body.nome || body.name;
+    const status = body.status_envio || body.status;
 
     if (!phone || !status) {
       return new Response(
-        JSON.stringify({ error: "phone and status are required" }),
+        JSON.stringify({ error: "telefone and status_envio are required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    // Extract extra metadata from payload
+    const metadata = {
+      produto: body.produto || null,
+      codigo_rastreamento: body.codigo_rastreamento || null,
+      valor: body.valor || null,
+      cidade: body.cidade || null,
+      departamento: body.departamento || null,
+      pais: body.pais || null,
+      cedula: body.cedula || null,
+      email: body.email || null,
+      pedido_id: body.id || null,
+    };
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -124,6 +140,7 @@ Deno.serve(async (req) => {
         flowId: mapping.flow_id,
         conversationId,
         senderLabel: "webhook",
+        metadata,
       }),
     });
 
