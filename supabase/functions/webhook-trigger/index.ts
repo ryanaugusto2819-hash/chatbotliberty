@@ -136,39 +136,50 @@ Deno.serve(async (req) => {
     const normalizedPhone = (phone as string).replace(/\D/g, "");
     const contactName = name || normalizedPhone;
 
-    // 2.5 Find the default Z-API connection for webhook-created conversations
-    const { data: zapiConnection } = await supabase
+    // 2.5 Get ALL active Z-API connections
+    const { data: allZapiConnections } = await supabase
       .from("connection_configs")
       .select("id")
       .eq("connection_id", "zapi")
       .eq("is_connected", true)
-      .order("created_at")
-      .limit(1)
-      .maybeSingle();
+      .order("created_at");
 
-    const connectionConfigId = zapiConnection?.id || null;
+    const zapiIds = (allZapiConnections || []).map((c: { id: string }) => c.id);
 
-    // 3. Find or create conversation — only match conversations that belong to Z-API (cobrança)
+    if (zapiIds.length === 0) {
+      return await logAndRespond(500, { error: "No active Z-API connections found" }, {
+        status_key: status,
+        mapping_found: true,
+        flow_id: mapping.flow_id,
+        error: "No active Z-API connections found",
+      });
+    }
+
+    // 3. Find or create conversation with Z-API load balancing
     let conversationId: string;
+    let connectionConfigId: string;
 
-    // Look for an existing Z-API conversation for this phone
-    const { data: existing } = await supabase
+    // 3a. Check if this phone already has a conversation in ANY Z-API connection
+    const { data: existingZapi } = await supabase
       .from("conversations")
       .select("id, connection_config_id")
       .eq("contact_phone", normalizedPhone)
-      .eq("connection_config_id", connectionConfigId)
+      .in("connection_config_id", zapiIds)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    if (existing) {
-      conversationId = existing.id;
+    if (existingZapi) {
+      // Lead already exists in a Z-API connection — reuse it
+      conversationId = existingZapi.id;
+      connectionConfigId = existingZapi.connection_config_id!;
       await supabase
         .from("conversations")
         .update({ updated_at: new Date().toISOString(), status: "active" })
         .eq("id", conversationId);
+      console.log(`Reusing existing conversation ${conversationId} on connection ${connectionConfigId}`);
     } else {
-      // Also check if there's a conversation with NO connection assigned
+      // 3b. Check for orphan conversation (no connection assigned)
       const { data: unassigned } = await supabase
         .from("conversations")
         .select("id")
@@ -178,8 +189,21 @@ Deno.serve(async (req) => {
         .limit(1)
         .maybeSingle();
 
-      if (unassigned && connectionConfigId) {
-        // Assign Z-API connection to orphan conversation
+      // 3c. Pick Z-API connection via round-robin: count conversations per connection, pick least used
+      const counts: { id: string; count: number }[] = [];
+      for (const zId of zapiIds) {
+        const { count } = await supabase
+          .from("conversations")
+          .select("id", { count: "exact", head: true })
+          .eq("connection_config_id", zId);
+        counts.push({ id: zId, count: count || 0 });
+      }
+      // Sort by count ascending — pick the one with fewest conversations
+      counts.sort((a, b) => a.count - b.count);
+      connectionConfigId = counts[0].id;
+      console.log(`Round-robin selected connection ${connectionConfigId} (${counts[0].count} convos). All: ${JSON.stringify(counts)}`);
+
+      if (unassigned) {
         conversationId = unassigned.id;
         await supabase
           .from("conversations")
@@ -190,7 +214,7 @@ Deno.serve(async (req) => {
           })
           .eq("id", conversationId);
       } else {
-        // Create a new conversation for Z-API (cobrança)
+        // Create new conversation assigned to the selected Z-API connection
         const { data: newConv, error: convErr } = await supabase
           .from("conversations")
           .insert({
