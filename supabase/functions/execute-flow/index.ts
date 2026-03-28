@@ -709,6 +709,10 @@ Deno.serve(async (req) => {
           failedContent = qrButtons.length > 0
             ? qrContent + "\n\n" + qrButtons.map((b, i) => `${i + 1}. ${b}`).join("\n")
             : qrContent;
+        } else if (node.node_type === "call_button") {
+          const cbContent = (config.content as string) || "";
+          const cbPhone = (config.call_phone as string) || "";
+          failedContent = `${cbContent}\n\n📞 ${cbPhone}`;
         }
 
         // Insert message with status 'failed' so it appears in chat with error indicator
