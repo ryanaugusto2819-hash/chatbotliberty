@@ -102,7 +102,7 @@ export default function WebhookMappings() {
             URL do Webhook
           </div>
           <p className="text-xs text-muted-foreground">
-            Envie um POST para esta URL com <code className="bg-muted px-1 py-0.5 rounded text-[11px]">phone</code>, <code className="bg-muted px-1 py-0.5 rounded text-[11px]">name</code> (opcional) e <code className="bg-muted px-1 py-0.5 rounded text-[11px]">status</code>.
+            Envie um POST para esta URL com os campos do pedido. Campos obrigatórios: <code className="bg-muted px-1 py-0.5 rounded text-[11px]">telefone</code> e <code className="bg-muted px-1 py-0.5 rounded text-[11px]">status_envio</code>.
           </p>
           <div className="flex items-center gap-2">
             <code className="flex-1 rounded-lg border border-border bg-muted px-3 py-2 text-xs text-foreground break-all select-all">
@@ -122,9 +122,18 @@ export default function WebhookMappings() {
 Content-Type: application/json
 
 {
-  "phone": "5511999999999",
-  "name": "João Silva",
-  "status": "pedido_enviado"
+  "id": "uuid-do-pedido",
+  "nome": "João Silva",
+  "telefone": "5511999999999",
+  "produto": "Nome do produto",
+  "status_envio": "enviado",
+  "codigo_rastreamento": "AB123456789BR",
+  "valor": 100,
+  "cidade": "São Paulo",
+  "departamento": "SP",
+  "pais": "BR",
+  "cedula": "12345678900",
+  "email": "joao@exemplo.com"
 }`}
             </pre>
           </details>
