@@ -486,11 +486,42 @@ Deno.serve(async (req) => {
         } else if (actionType === "set_billing_stage") {
           const billingStage = (config.billing_stage as string) || "";
           if (billingStage) {
+            // Save locally
             await supabase
               .from("conversations")
               .update({ billing_stage: billingStage })
               .eq("id", conversationId);
-            
+
+            // Get connection label to send as wpp_cobranca
+            let connectionLabel = "";
+            if (conversation.connection_config_id) {
+              const { data: connConfig } = await supabase
+                .from("connection_configs")
+                .select("label")
+                .eq("id", conversation.connection_config_id)
+                .maybeSingle();
+              connectionLabel = connConfig?.label || "";
+            }
+
+            // Send webhook to attendance platform
+            const ATTENDANCE_WEBHOOK_URL = "https://gwvhvvmghkpgtiofnivo.supabase.co/functions/v1/receive-attendance-webhook";
+            try {
+              const webhookPayload = {
+                telefone: phone,
+                status_cobranca: billingStage,
+                wpp_cobranca: connectionLabel,
+              };
+              const whRes = await fetch(ATTENDANCE_WEBHOOK_URL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(webhookPayload),
+              });
+              const whResult = await whRes.json();
+              console.log(`[execute-flow] Billing webhook sent: status=${whRes.status}`, whResult);
+            } catch (whErr) {
+              console.error(`[execute-flow] Failed to send billing webhook:`, whErr);
+            }
+
             console.log(`[execute-flow] Set billing stage to "${billingStage}" for conversation ${conversationId}`);
           }
         }
