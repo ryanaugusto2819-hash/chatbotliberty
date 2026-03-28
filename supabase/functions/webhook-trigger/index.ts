@@ -148,54 +148,72 @@ Deno.serve(async (req) => {
 
     const connectionConfigId = zapiConnection?.id || null;
 
-    // 3. Find or create conversation
+    // 3. Find or create conversation — only match conversations that belong to Z-API (cobrança)
     let conversationId: string;
 
+    // Look for an existing Z-API conversation for this phone
     const { data: existing } = await supabase
       .from("conversations")
       .select("id, connection_config_id")
       .eq("contact_phone", normalizedPhone)
+      .eq("connection_config_id", connectionConfigId)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
     if (existing) {
       conversationId = existing.id;
-      const updateData: Record<string, unknown> = {
-        updated_at: new Date().toISOString(),
-        status: "active",
-      };
-      // If conversation has no connection, assign the Z-API one
-      if (!existing.connection_config_id && connectionConfigId) {
-        updateData.connection_config_id = connectionConfigId;
-      }
       await supabase
         .from("conversations")
-        .update(updateData)
+        .update({ updated_at: new Date().toISOString(), status: "active" })
         .eq("id", conversationId);
     } else {
-      const { data: newConv, error: convErr } = await supabase
+      // Also check if there's a conversation with NO connection assigned
+      const { data: unassigned } = await supabase
         .from("conversations")
-        .insert({
-          contact_name: contactName,
-          contact_phone: normalizedPhone,
-          status: "new",
-          tags: [],
-          connection_config_id: connectionConfigId,
-        })
         .select("id")
-        .single();
+        .eq("contact_phone", normalizedPhone)
+        .is("connection_config_id", null)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-      if (convErr) {
-        console.error("Error creating conversation:", convErr);
-        return await logAndRespond(500, { error: "Failed to create conversation" }, {
-          status_key: status,
-          mapping_found: true,
-          flow_id: mapping.flow_id,
-          error: `Failed to create conversation: ${convErr.message}`,
-        });
+      if (unassigned && connectionConfigId) {
+        // Assign Z-API connection to orphan conversation
+        conversationId = unassigned.id;
+        await supabase
+          .from("conversations")
+          .update({
+            updated_at: new Date().toISOString(),
+            status: "active",
+            connection_config_id: connectionConfigId,
+          })
+          .eq("id", conversationId);
+      } else {
+        // Create a new conversation for Z-API (cobrança)
+        const { data: newConv, error: convErr } = await supabase
+          .from("conversations")
+          .insert({
+            contact_name: contactName,
+            contact_phone: normalizedPhone,
+            status: "new",
+            tags: [],
+            connection_config_id: connectionConfigId,
+          })
+          .select("id")
+          .single();
+
+        if (convErr) {
+          console.error("Error creating conversation:", convErr);
+          return await logAndRespond(500, { error: "Failed to create conversation" }, {
+            status_key: status,
+            mapping_found: true,
+            flow_id: mapping.flow_id,
+            error: `Failed to create conversation: ${convErr.message}`,
+          });
+        }
+        conversationId = newConv.id;
       }
-      conversationId = newConv.id;
     }
 
     // 4. Execute the mapped flow
