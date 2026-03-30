@@ -241,6 +241,7 @@ Deno.serve(async (req) => {
     const responseBody = {
       success: true,
       conversationId,
+      conversationConnectionConfigId: connectionConfigId,
       flowId: mapping.flow_id,
       statusKey: status,
       flowResult,

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import TopBar from '@/components/layout/TopBar';
 import { supabase } from '@/integrations/supabase/client';
-import { Webhook, Plus, Trash2, Loader2, Copy, Check, Link2, History, CheckCircle2, XCircle, AlertTriangle, RefreshCw, GripVertical, Zap } from 'lucide-react';
+import { Webhook, Plus, Trash2, Loader2, Copy, Check, Link2, History, CheckCircle2, XCircle, AlertTriangle, RefreshCw, GripVertical, Zap, MessageSquare } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -45,6 +46,7 @@ interface WebhookLog {
 }
 
 export default function WebhookMappings() {
+  const navigate = useNavigate();
   const [mappings, setMappings] = useState<Mapping[]>([]);
   const [flows, setFlows] = useState<FlowOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,6 +59,7 @@ export default function WebhookMappings() {
   const [newStatusKey, setNewStatusKey] = useState('');
   const [newLabel, setNewLabel] = useState('');
   const [newFlowId, setNewFlowId] = useState('');
+  const [connectionLabels, setConnectionLabels] = useState<Record<string, string>>({});
 
   const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/webhook-trigger`;
 
@@ -72,13 +75,28 @@ export default function WebhookMappings() {
 
   const fetchLogs = async () => {
     setLogsLoading(true);
-    const { data } = await supabase
-      .from('webhook_logs')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(50);
+    const [{ data }, { data: connData }] = await Promise.all([
+      supabase
+        .from('webhook_logs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50),
+      supabase.from('connection_configs').select('id, label'),
+    ]);
     setLogs((data as WebhookLog[]) || []);
+    const labels: Record<string, string> = {};
+    (connData || []).forEach((c: any) => { labels[c.id] = c.label; });
+    setConnectionLabels(labels);
     setLogsLoading(false);
+  };
+
+  const getConnectionLabel = (conversationId: string | null) => {
+    const log = logs.find(l => l.conversation_id === conversationId);
+    if (!log?.result) return null;
+    const result = log.result as any;
+    const connId = result?.conversationConnectionConfigId;
+    if (connId && connectionLabels[connId]) return connectionLabels[connId];
+    return null;
   };
 
   useEffect(() => { fetchData(); }, []);
@@ -361,7 +379,7 @@ Content-Type: application/json
                         <XCircle className="h-4 w-4 text-destructive shrink-0" />
                       )}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <code className="text-[11px] bg-muted px-1.5 py-0.5 rounded text-foreground">
                             {log.status_key || '—'}
                           </code>
@@ -373,8 +391,33 @@ Content-Type: application/json
                               • {log.contact_name}
                             </span>
                           )}
+                          {/* Connection label */}
+                          {log.conversation_id && (() => {
+                            const r = log.result as any;
+                            const connId = r?.conversationConnectionConfigId;
+                            const label = connId ? connectionLabels[connId] : null;
+                            return label ? (
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-normal">
+                                📱 {label}
+                              </Badge>
+                            ) : null;
+                          })()}
                         </div>
                       </div>
+                      {/* Open conversation button */}
+                      {log.conversation_id && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/conversations?id=${log.conversation_id}`);
+                          }}
+                          className="flex items-center gap-1 rounded-lg border border-border bg-background px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors shrink-0"
+                          title="Abrir conversa"
+                        >
+                          <MessageSquare className="h-3 w-3" />
+                          <span className="hidden sm:inline">Abrir</span>
+                        </button>
+                      )}
                       <span className="text-[11px] text-muted-foreground shrink-0">
                         {format(new Date(log.created_at), "dd/MM HH:mm:ss", { locale: ptBR })}
                       </span>
