@@ -392,7 +392,7 @@ Deno.serve(async (req) => {
       let waPayload: Record<string, unknown>;
 
       if (node.node_type === "message") {
-        const content = (config.content as string) || "";
+        const content = replaceVariables((config.content as string) || "");
         if (!content.trim()) {
           if (executionId) {
             await supabase.from("flow_step_logs").insert({
