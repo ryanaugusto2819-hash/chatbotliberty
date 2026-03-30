@@ -179,7 +179,16 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { flowId, conversationId, senderLabel: requestedLabel } = await req.json();
+    const { flowId, conversationId, senderLabel: requestedLabel, metadata } = await req.json();
+
+    // Helper: replace {{variable}} placeholders with metadata values
+    const replaceVariables = (text: string): string => {
+      if (!text || !metadata || typeof metadata !== "object") return text;
+      return text.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+        const value = (metadata as Record<string, unknown>)[key];
+        return value !== null && value !== undefined ? String(value) : match;
+      });
+    };
 
     if (!flowId || !conversationId) {
       return createJsonResponse({ error: "flowId and conversationId are required" }, 400);
@@ -383,7 +392,7 @@ Deno.serve(async (req) => {
       let waPayload: Record<string, unknown>;
 
       if (node.node_type === "message") {
-        const content = (config.content as string) || "";
+        const content = replaceVariables((config.content as string) || "");
         if (!content.trim()) {
           if (executionId) {
             await supabase.from("flow_step_logs").insert({
@@ -410,7 +419,7 @@ Deno.serve(async (req) => {
           messaging_product: "whatsapp",
           to: phone,
           type: "image",
-          image: { link: config.media_url, caption: config.caption || undefined },
+          image: { link: config.media_url, caption: replaceVariables((config.caption as string) || "") || undefined },
         };
       } else if (node.node_type === "audio") {
         waPayload = {
@@ -424,10 +433,10 @@ Deno.serve(async (req) => {
           messaging_product: "whatsapp",
           to: phone,
           type: "video",
-          video: { link: config.media_url, caption: config.caption || undefined },
+          video: { link: config.media_url, caption: replaceVariables((config.caption as string) || "") || undefined },
         };
       } else if (node.node_type === "quick_reply") {
-        const content = (config.content as string) || "";
+        const content = replaceVariables((config.content as string) || "");
         const buttons = (config.buttons as string[]) || [];
         if (!content.trim()) {
           if (executionId) {
@@ -472,7 +481,7 @@ Deno.serve(async (req) => {
           };
         }
       } else if (node.node_type === "call_button") {
-        const content = (config.content as string) || "";
+        const content = replaceVariables((config.content as string) || "");
         const callPhone = (config.call_phone as string) || "";
         const callButtonText = (config.call_button_text as string) || "Ligar agora";
         
@@ -608,13 +617,13 @@ Deno.serve(async (req) => {
             zapiBody = { phone, audio: config.media_url };
           } else if (node.node_type === "image") {
             zapiEndpoint = `${zapiBase}/send-link-image`;
-            zapiBody = { phone, imageUrl: config.media_url, caption: (config.caption as string) || "" };
+            zapiBody = { phone, imageUrl: config.media_url, caption: replaceVariables((config.caption as string) || "") };
           } else if (node.node_type === "video") {
             zapiEndpoint = `${zapiBase}/send-link-video`;
-            zapiBody = { phone, videoUrl: config.media_url, caption: (config.caption as string) || "" };
+            zapiBody = { phone, videoUrl: config.media_url, caption: replaceVariables((config.caption as string) || "") };
           } else if (node.node_type === "call_button") {
             // Z-API doesn't support CTA buttons, send as text with phone number
-            const content = (config.content as string) || "";
+            const content = replaceVariables((config.content as string) || "");
             const callPhone = (config.call_phone as string) || "";
             const callButtonText = (config.call_button_text as string) || "Ligar agora";
             const textContent = `${content}\n\n📞 ${callButtonText}: ${callPhone}`;
