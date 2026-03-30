@@ -181,18 +181,31 @@ Deno.serve(async (req) => {
         .eq("id", conversationId);
       console.log(`Reusing existing conversation ${conversationId} on connection ${connectionConfigId}`);
     } else {
-      // 3b. Pick Z-API connection via round-robin: count conversations per connection, pick least used
-      const counts: { id: string; count: number }[] = [];
-      for (const zId of zapiIds) {
-        const { count } = await supabase
+      // 3b. True round-robin: find which connection was used last, pick the next one
+      const { data: lastLog } = await supabase
+        .from("webhook_logs")
+        .select("conversation_id")
+        .eq("success", true)
+        .not("conversation_id", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      let lastUsedConnectionId: string | null = null;
+      if (lastLog?.conversation_id) {
+        const { data: lastConv } = await supabase
           .from("conversations")
-          .select("id", { count: "exact", head: true })
-          .eq("connection_config_id", zId);
-        counts.push({ id: zId, count: count || 0 });
+          .select("connection_config_id")
+          .eq("id", lastLog.conversation_id)
+          .maybeSingle();
+        lastUsedConnectionId = lastConv?.connection_config_id || null;
       }
-      counts.sort((a, b) => a.count - b.count);
-      connectionConfigId = counts[0].id;
-      console.log(`Round-robin selected connection ${connectionConfigId} (${counts[0].count} convos). All: ${JSON.stringify(counts)}`);
+
+      // Find the index of the last used connection and pick the next one
+      const lastIdx = lastUsedConnectionId ? zapiIds.indexOf(lastUsedConnectionId) : -1;
+      const nextIdx = (lastIdx + 1) % zapiIds.length;
+      connectionConfigId = zapiIds[nextIdx];
+      console.log(`Round-robin: last used=${lastUsedConnectionId}, picking index ${nextIdx} -> ${connectionConfigId}. All: ${JSON.stringify(zapiIds)}`);
 
       // Always create a NEW conversation for Z-API — never touch orphan/official API conversations
       const { data: newConv, error: convErr } = await supabase
