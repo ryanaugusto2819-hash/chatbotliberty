@@ -46,6 +46,7 @@ interface WebhookLog {
 }
 
 export default function WebhookMappings() {
+  const navigate = useNavigate();
   const [mappings, setMappings] = useState<Mapping[]>([]);
   const [flows, setFlows] = useState<FlowOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,6 +59,7 @@ export default function WebhookMappings() {
   const [newStatusKey, setNewStatusKey] = useState('');
   const [newLabel, setNewLabel] = useState('');
   const [newFlowId, setNewFlowId] = useState('');
+  const [connectionLabels, setConnectionLabels] = useState<Record<string, string>>({});
 
   const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/webhook-trigger`;
 
