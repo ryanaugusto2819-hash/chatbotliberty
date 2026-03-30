@@ -216,7 +216,7 @@ Deno.serve(async (req) => {
       return createJsonResponse({ success: false, skipped: true, reason: "Sale already registered" }, 200);
     }
 
-    console.log(`[execute-flow] Trigger by "${requestedLabel}" for conversation ${conversationId}`);
+    console.log(`[execute-flow] Trigger by "${requestedLabel}" for conversation ${conversationId}, metadata:`, metadata ? JSON.stringify(metadata) : "none");
 
     // Resolve connection for this conversation's niche
     let resolvedConnection: Record<string, unknown> | null = null;
