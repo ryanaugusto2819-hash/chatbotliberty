@@ -617,7 +617,7 @@ Deno.serve(async (req) => {
             zapiBody = { phone, audio: config.media_url };
           } else if (node.node_type === "image") {
             zapiEndpoint = `${zapiBase}/send-link-image`;
-            zapiBody = { phone, imageUrl: config.media_url, caption: (config.caption as string) || "" };
+            zapiBody = { phone, imageUrl: config.media_url, caption: replaceVariables((config.caption as string) || "") };
           } else if (node.node_type === "video") {
             zapiEndpoint = `${zapiBase}/send-link-video`;
             zapiBody = { phone, videoUrl: config.media_url, caption: (config.caption as string) || "" };
