@@ -87,6 +87,8 @@ Deno.serve(async (req) => {
     }
 
     const metadata = {
+      nome: name || null,
+      telefone: phone || null,
       produto: body.produto || null,
       codigo_rastreamento: body.codigo_rastreamento || null,
       valor: body.valor || null,
