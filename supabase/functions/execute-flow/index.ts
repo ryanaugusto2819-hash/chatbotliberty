@@ -481,7 +481,7 @@ Deno.serve(async (req) => {
           };
         }
       } else if (node.node_type === "call_button") {
-        const content = (config.content as string) || "";
+        const content = replaceVariables((config.content as string) || "");
         const callPhone = (config.call_phone as string) || "";
         const callButtonText = (config.call_button_text as string) || "Ligar agora";
         
