@@ -613,7 +613,7 @@ Deno.serve(async (req) => {
           const zapiBase = `https://api.z-api.io/instances/${zapiInstanceId}/token/${zapiToken}`;
 
           if (node.node_type === "audio") {
-            zapiEndpoint = `${zapiBase}/send-ptts`;
+            zapiEndpoint = `${zapiBase}/send-audio`;
             zapiBody = { phone, audio: config.media_url };
           } else if (node.node_type === "image") {
             zapiEndpoint = `${zapiBase}/send-link-image`;
