@@ -436,7 +436,7 @@ Deno.serve(async (req) => {
           video: { link: config.media_url, caption: replaceVariables((config.caption as string) || "") || undefined },
         };
       } else if (node.node_type === "quick_reply") {
-        const content = (config.content as string) || "";
+        const content = replaceVariables((config.content as string) || "");
         const buttons = (config.buttons as string[]) || [];
         if (!content.trim()) {
           if (executionId) {
