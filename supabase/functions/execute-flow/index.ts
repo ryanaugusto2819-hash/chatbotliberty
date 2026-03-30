@@ -419,7 +419,7 @@ Deno.serve(async (req) => {
           messaging_product: "whatsapp",
           to: phone,
           type: "image",
-          image: { link: config.media_url, caption: config.caption || undefined },
+          image: { link: config.media_url, caption: replaceVariables((config.caption as string) || "") || undefined },
         };
       } else if (node.node_type === "audio") {
         waPayload = {
