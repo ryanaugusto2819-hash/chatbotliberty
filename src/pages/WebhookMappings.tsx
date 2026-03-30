@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import TopBar from '@/components/layout/TopBar';
 import { supabase } from '@/integrations/supabase/client';
-import { Webhook, Plus, Trash2, Loader2, Copy, Check, Link2, History, CheckCircle2, XCircle, AlertTriangle, RefreshCw, GripVertical, Zap } from 'lucide-react';
+import { Webhook, Plus, Trash2, Loader2, Copy, Check, Link2, History, CheckCircle2, XCircle, AlertTriangle, RefreshCw, GripVertical, Zap, MessageSquare } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
