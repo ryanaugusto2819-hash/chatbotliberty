@@ -75,13 +75,28 @@ export default function WebhookMappings() {
 
   const fetchLogs = async () => {
     setLogsLoading(true);
-    const { data } = await supabase
-      .from('webhook_logs')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(50);
+    const [{ data }, { data: connData }] = await Promise.all([
+      supabase
+        .from('webhook_logs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50),
+      supabase.from('connection_configs').select('id, label'),
+    ]);
     setLogs((data as WebhookLog[]) || []);
+    const labels: Record<string, string> = {};
+    (connData || []).forEach((c: any) => { labels[c.id] = c.label; });
+    setConnectionLabels(labels);
     setLogsLoading(false);
+  };
+
+  const getConnectionLabel = (conversationId: string | null) => {
+    const log = logs.find(l => l.conversation_id === conversationId);
+    if (!log?.result) return null;
+    const result = log.result as any;
+    const connId = result?.conversationConnectionConfigId;
+    if (connId && connectionLabels[connId]) return connectionLabels[connId];
+    return null;
   };
 
   useEffect(() => { fetchData(); }, []);
