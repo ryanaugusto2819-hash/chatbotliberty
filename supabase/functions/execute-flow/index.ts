@@ -533,13 +533,7 @@ Deno.serve(async (req) => {
         } else if (actionType === "set_billing_stage") {
           const billingStage = (config.billing_stage as string) || "";
           if (billingStage) {
-            // Save locally
-            await supabase
-              .from("conversations")
-              .update({ billing_stage: billingStage })
-              .eq("id", conversationId);
-
-            // Get connection label to send as wpp_cobranca
+            // Get connection label to save and send
             let connectionLabel = "";
             if (conversation.connection_config_id) {
               const { data: connConfig } = await supabase
@@ -549,6 +543,15 @@ Deno.serve(async (req) => {
                 .maybeSingle();
               connectionLabel = connConfig?.label || "";
             }
+
+            // Save locally with connection name
+            await supabase
+              .from("conversations")
+              .update({ billing_stage: billingStage, billing_connection_name: connectionLabel || null })
+              .eq("id", conversationId);
+
+
+
 
             // Send webhook to attendance platform
             const ATTENDANCE_WEBHOOK_URL = "https://gwvhvvmghkpgtiofnivo.supabase.co/functions/v1/receive-attendance-webhook";
