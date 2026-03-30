@@ -433,7 +433,7 @@ Deno.serve(async (req) => {
           messaging_product: "whatsapp",
           to: phone,
           type: "video",
-          video: { link: config.media_url, caption: config.caption || undefined },
+          video: { link: config.media_url, caption: replaceVariables((config.caption as string) || "") || undefined },
         };
       } else if (node.node_type === "quick_reply") {
         const content = (config.content as string) || "";
