@@ -379,7 +379,7 @@ Content-Type: application/json
                         <XCircle className="h-4 w-4 text-destructive shrink-0" />
                       )}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <code className="text-[11px] bg-muted px-1.5 py-0.5 rounded text-foreground">
                             {log.status_key || '—'}
                           </code>
@@ -391,8 +391,33 @@ Content-Type: application/json
                               • {log.contact_name}
                             </span>
                           )}
+                          {/* Connection label */}
+                          {log.conversation_id && (() => {
+                            const r = log.result as any;
+                            const connId = r?.conversationConnectionConfigId;
+                            const label = connId ? connectionLabels[connId] : null;
+                            return label ? (
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-normal">
+                                📱 {label}
+                              </Badge>
+                            ) : null;
+                          })()}
                         </div>
                       </div>
+                      {/* Open conversation button */}
+                      {log.conversation_id && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/conversations?id=${log.conversation_id}`);
+                          }}
+                          className="flex items-center gap-1 rounded-lg border border-border bg-background px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors shrink-0"
+                          title="Abrir conversa"
+                        >
+                          <MessageSquare className="h-3 w-3" />
+                          <span className="hidden sm:inline">Abrir</span>
+                        </button>
+                      )}
                       <span className="text-[11px] text-muted-foreground shrink-0">
                         {format(new Date(log.created_at), "dd/MM HH:mm:ss", { locale: ptBR })}
                       </span>
