@@ -13,353 +13,377 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+function getSupabase() {
+  return createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+  );
+}
 
-  try {
-    const { conversationId } = await req.json();
+// ─── MODE: SCHEDULE ────────────────────────────────────────────
+// Called by webhook on new customer message. Upserts a pending row
+// with scheduled_for = now() + 60s and returns immediately (~50ms).
+async function handleSchedule(conversationId: string) {
+  const supabase = getSupabase();
+  const scheduledFor = new Date(Date.now() + 60_000).toISOString();
 
-    if (!conversationId) {
-      return jsonResponse({ error: "conversationId is required" }, 400);
-    }
-
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+  const { error } = await supabase
+    .from("pending_ai_replies")
+    .upsert(
+      { conversation_id: conversationId, scheduled_for: scheduledFor, processed_at: null },
+      { onConflict: "conversation_id" }
     );
 
-    // Fetch conversation to get niche_id and connection_config_id
-    const { data: conversation } = await supabase
-      .from("conversations")
-      .select("contact_phone, niche_id, connection_config_id, sale_registered_at")
-      .eq("id", conversationId)
+  if (error) {
+    console.error("[ai-auto-reply][schedule] upsert error:", error);
+    return jsonResponse({ error: "Failed to schedule" }, 500);
+  }
+
+  return jsonResponse({ scheduled: true, scheduled_for: scheduledFor });
+}
+
+// ─── MODE: PROCESS ─────────────────────────────────────────────
+// Called by the cron function for conversations whose delay has elapsed.
+async function handleProcess(conversationId: string) {
+  const supabase = getSupabase();
+
+  // 1. Fetch conversation + niche config in parallel
+  const convPromise = supabase
+    .from("conversations")
+    .select("contact_phone, niche_id, connection_config_id, sale_registered_at")
+    .eq("id", conversationId)
+    .single();
+
+  const { data: conversation } = await convPromise;
+
+  if (!conversation) {
+    return jsonResponse({ error: "Conversation not found" }, 404);
+  }
+
+  if (conversation.sale_registered_at) {
+    console.log(`[ai-auto-reply] Skipping: sale already registered for ${conversationId}`);
+    return jsonResponse({ skipped: true, reason: "Sale already registered" });
+  }
+
+  const nicheId = conversation.niche_id;
+
+  // 2. Load AI config (niche or global)
+  let aiEnabled = false;
+  let systemPrompt = "Você é um assistente virtual amigável. Responda de forma concisa e útil em português brasileiro.";
+  let nicheLanguage = "pt-BR";
+
+  if (nicheId) {
+    const { data: niche } = await supabase
+      .from("niches")
+      .select("auto_reply_enabled, system_prompt, language")
+      .eq("id", nicheId)
       .single();
 
-    if (!conversation) {
-      return jsonResponse({ error: "Conversation not found" }, 404);
+    if (niche) {
+      aiEnabled = niche.auto_reply_enabled;
+      systemPrompt = niche.system_prompt || systemPrompt;
+      nicheLanguage = niche.language || "pt-BR";
     }
+  } else {
+    const { data: config } = await supabase
+      .from("connection_configs")
+      .select("config")
+      .eq("connection_id", "ai-auto-reply")
+      .maybeSingle();
 
-    if (conversation.sale_registered_at) {
-      console.log(`[ai-auto-reply] Skipping: sale already registered for conversation ${conversationId}`);
-      return jsonResponse({ skipped: true, reason: "Sale already registered" });
-    }
+    const aiConfig = config?.config as Record<string, unknown> | null;
+    aiEnabled = !!aiConfig?.enabled;
+    if (aiConfig?.system_prompt) systemPrompt = aiConfig.system_prompt as string;
+  }
 
-    const nicheId = conversation.niche_id;
+  if (!aiEnabled) {
+    return jsonResponse({ skipped: true, reason: "Auto-reply disabled" });
+  }
 
-    // Load niche-specific config OR global config
-    let aiEnabled = false;
-    let systemPrompt = "Você é um assistente virtual amigável. Responda de forma concisa e útil em português brasileiro.";
-    let nicheLanguage = "pt-BR";
+  // 3. Check if someone already replied (no more sleep!)
+  const { data: lastCustomerMsg } = await supabase
+    .from("messages")
+    .select("created_at")
+    .eq("conversation_id", conversationId)
+    .eq("sender_type", "customer")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .single();
 
-    if (nicheId) {
-      const { data: niche } = await supabase
-        .from("niches")
-        .select("auto_reply_enabled, system_prompt, language")
-        .eq("id", nicheId)
-        .single();
+  if (!lastCustomerMsg) {
+    return jsonResponse({ skipped: true, reason: "No customer message found" });
+  }
 
-      if (niche) {
-        aiEnabled = niche.auto_reply_enabled;
-        systemPrompt = niche.system_prompt || systemPrompt;
-        nicheLanguage = niche.language || "pt-BR";
-      }
-    } else {
-      // Fallback to global config
-      const { data: config } = await supabase
-        .from("connection_configs")
-        .select("config")
-        .eq("connection_id", "ai-auto-reply")
-        .maybeSingle();
+  const { data: recentReplies } = await supabase
+    .from("messages")
+    .select("id, sender_type, sender_label")
+    .eq("conversation_id", conversationId)
+    .neq("sender_type", "customer")
+    .gt("created_at", lastCustomerMsg.created_at)
+    .limit(1);
 
-      const aiConfig = config?.config as Record<string, unknown> | null;
-      aiEnabled = !!aiConfig?.enabled;
-      if (aiConfig?.system_prompt) systemPrompt = aiConfig.system_prompt as string;
-    }
+  if (recentReplies && recentReplies.length > 0) {
+    const reply = recentReplies[0];
+    console.log(`[ai-auto-reply] Skipping: already replied by ${reply.sender_type} (${reply.sender_label})`);
+    return jsonResponse({
+      skipped: true,
+      reason: `Already replied by ${reply.sender_label || reply.sender_type}`,
+    });
+  }
 
-    if (!aiEnabled) {
-      return jsonResponse({ skipped: true, reason: "Auto-reply disabled" });
-    }
+  console.log("[ai-auto-reply] No reply found, generating AI response...");
 
-    // --- DELAY 60s: wait and check if a human or flow-selector already replied ---
-    const { data: lastCustomerMsg } = await supabase
-      .from("messages")
-      .select("created_at")
-      .eq("conversation_id", conversationId)
-      .eq("sender_type", "customer")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .single();
+  // 4. Fetch knowledge base + messages in parallel
+  let kbQuery = supabase
+    .from("knowledge_base_items")
+    .select("type, title, content")
+    .order("created_at", { ascending: true })
+    .limit(50);
 
-    if (!lastCustomerMsg) {
-      return jsonResponse({ skipped: true, reason: "No customer message found" });
-    }
+  if (nicheId) {
+    kbQuery = kbQuery.eq("niche_id", nicheId);
+  } else {
+    kbQuery = kbQuery.is("niche_id", null);
+  }
 
-    const customerMsgTime = new Date(lastCustomerMsg.created_at).getTime();
-    const now = Date.now();
-    const elapsed = now - customerMsgTime;
-    const DELAY_MS = 60_000; // 1 minute
-
-    if (elapsed < DELAY_MS) {
-      const waitTime = DELAY_MS - elapsed;
-      console.log(`[ai-auto-reply] Waiting ${Math.round(waitTime / 1000)}s before checking...`);
-      await new Promise((resolve) => setTimeout(resolve, waitTime));
-    }
-
-    // After waiting, check if someone already responded
-    const { data: recentReplies } = await supabase
-      .from("messages")
-      .select("id, sender_type, sender_label")
-      .eq("conversation_id", conversationId)
-      .neq("sender_type", "customer")
-      .gt("created_at", lastCustomerMsg.created_at)
-      .limit(1);
-
-    if (recentReplies && recentReplies.length > 0) {
-      const reply = recentReplies[0];
-      console.log(`[ai-auto-reply] Skipping: already replied by ${reply.sender_type} (${reply.sender_label})`);
-      return jsonResponse({
-        skipped: true,
-        reason: `Already replied by ${reply.sender_label || reply.sender_type}`,
-      });
-    }
-
-    console.log("[ai-auto-reply] No reply after 60s, generating AI response...");
-
-    // Fetch knowledge base items filtered by niche
-    let kbQuery = supabase
-      .from("knowledge_base_items")
-      .select("type, title, content")
-      .order("created_at", { ascending: true })
-      .limit(50);
-
-    if (nicheId) {
-      kbQuery = kbQuery.eq("niche_id", nicheId);
-    } else {
-      kbQuery = kbQuery.is("niche_id", null);
-    }
-
-    const { data: kbItems } = await kbQuery;
-
-    let knowledgeContext = "";
-    if (kbItems && kbItems.length > 0) {
-      const sections: string[] = [];
-      for (const item of kbItems) {
-        if (item.type === "qa") {
-          sections.push(`Pergunta: ${item.title}\nResposta: ${item.content}`);
-        } else if (item.type === "text") {
-          sections.push(`[${item.title}]\n${item.content}`);
-        } else if (item.type === "file") {
-          sections.push(`[Arquivo: ${item.title}]\n${item.content}`);
-        }
-      }
-      knowledgeContext = "\n\n--- BASE DE CONHECIMENTO ---\nUse as informações abaixo para responder com precisão:\n\n" + sections.join("\n\n");
-    }
-
-    const langInstruction = nicheLanguage === "es"
-      ? "\n\nIMPORTANTE: Responda SEMPRE em espanhol (español). Toda a comunicação deve ser em espanhol."
-      : "\n\nIMPORTANTE: Responda SEMPRE em português brasileiro.";
-
-    const fullSystemPrompt = systemPrompt + knowledgeContext + langInstruction;
-
-    // Fetch last 20 messages (include media info for vision)
-    const { data: messages } = await supabase
+  const [kbResult, msgsResult] = await Promise.all([
+    kbQuery,
+    supabase
       .from("messages")
       .select("content, sender_type, created_at, message_type, media_url")
       .eq("conversation_id", conversationId)
       .order("created_at", { ascending: true })
-      .limit(20);
+      .limit(20),
+  ]);
 
-    if (!messages?.length) {
-      return jsonResponse({ skipped: true, reason: "No messages" });
+  const kbItems = kbResult.data;
+  const messages = msgsResult.data;
+
+  if (!messages?.length) {
+    return jsonResponse({ skipped: true, reason: "No messages" });
+  }
+
+  // 5. Build system prompt with knowledge context
+  let knowledgeContext = "";
+  if (kbItems && kbItems.length > 0) {
+    const sections: string[] = [];
+    for (const item of kbItems) {
+      if (item.type === "qa") {
+        sections.push(`Pergunta: ${item.title}\nResposta: ${item.content}`);
+      } else if (item.type === "text") {
+        sections.push(`[${item.title}]\n${item.content}`);
+      } else if (item.type === "file") {
+        sections.push(`[Arquivo: ${item.title}]\n${item.content}`);
+      }
     }
+    knowledgeContext = "\n\n--- BASE DE CONHECIMENTO ---\nUse as informações abaixo para responder com precisão:\n\n" + sections.join("\n\n");
+  }
 
-    // Build chat messages with multimodal support for images
-    const chatMessages: Array<{ role: string; content: unknown }> = [
-      { role: "system", content: fullSystemPrompt },
-    ];
+  const langInstruction = nicheLanguage === "es"
+    ? "\n\nIMPORTANTE: Responda SEMPRE em espanhol (español). Toda a comunicação deve ser em espanhol."
+    : "\n\nIMPORTANTE: Responda SEMPRE em português brasileiro.";
 
-    for (const m of messages) {
-      const role = m.sender_type === "customer" ? "user" : "assistant";
-      const hasImage = m.message_type === "image" && m.media_url;
+  const fullSystemPrompt = systemPrompt + knowledgeContext + langInstruction;
 
-      if (hasImage && role === "user") {
-        // Send image as multimodal content (vision) for customer messages
-        const parts: Array<{ type: string; text?: string; image_url?: { url: string } }> = [];
+  // 6. Build chat messages with multimodal support
+  const chatMessages: Array<{ role: string; content: unknown }> = [
+    { role: "system", content: fullSystemPrompt },
+  ];
 
-        if (m.content?.trim()) {
-          parts.push({ type: "text", text: m.content });
-        } else {
-          parts.push({ type: "text", text: "O cliente enviou esta imagem:" });
-        }
+  for (const m of messages) {
+    const role = m.sender_type === "customer" ? "user" : "assistant";
+    const hasImage = m.message_type === "image" && m.media_url;
 
-        parts.push({
-          type: "image_url",
-          image_url: { url: m.media_url },
-        });
-
-        chatMessages.push({ role, content: parts });
+    if (hasImage && role === "user") {
+      const parts: Array<{ type: string; text?: string; image_url?: { url: string } }> = [];
+      if (m.content?.trim()) {
+        parts.push({ type: "text", text: m.content });
       } else {
-        // Text-only message (or non-image media as text description)
-        let text = m.content || "";
-        if (!text.trim() && m.message_type !== "text") {
-          const labels: Record<string, string> = {
-            audio: "[Áudio enviado]",
-            video: "[Vídeo enviado]",
-            document: "[Documento enviado]",
-            sticker: "[Sticker enviado]",
-          };
-          text = labels[m.message_type] || "[Mídia enviada]";
-        }
-        chatMessages.push({ role, content: text });
+        parts.push({ type: "text", text: "O cliente enviou esta imagem:" });
       }
+      parts.push({ type: "image_url", image_url: { url: m.media_url } });
+      chatMessages.push({ role, content: parts });
+    } else {
+      let text = m.content || "";
+      if (!text.trim() && m.message_type !== "text") {
+        const labels: Record<string, string> = {
+          audio: "[Áudio enviado]",
+          video: "[Vídeo enviado]",
+          document: "[Documento enviado]",
+          sticker: "[Sticker enviado]",
+        };
+        text = labels[m.message_type] || "[Mídia enviada]";
+      }
+      chatMessages.push({ role, content: text });
     }
+  }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      console.error("LOVABLE_API_KEY not configured");
-      return jsonResponse({ error: "AI not configured" }, 500);
-    }
+  // 7. Call AI
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) {
+    console.error("LOVABLE_API_KEY not configured");
+    return jsonResponse({ error: "AI not configured" }, 500);
+  }
 
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: chatMessages,
-        stream: false,
-      }),
+  const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${LOVABLE_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "google/gemini-3-flash-preview",
+      messages: chatMessages,
+      stream: false,
+    }),
+  });
+
+  if (!aiResponse.ok) {
+    const errorText = await aiResponse.text();
+    console.error("AI gateway error:", aiResponse.status, errorText);
+    if (aiResponse.status === 429) return jsonResponse({ error: "Rate limit exceeded" }, 429);
+    if (aiResponse.status === 402) return jsonResponse({ error: "AI credits exhausted" }, 402);
+    return jsonResponse({ error: "AI generation failed" }, 502);
+  }
+
+  const aiResult = await aiResponse.json();
+  const replyContent = aiResult.choices?.[0]?.message?.content;
+
+  // 8. Log usage
+  const usage = aiResult.usage;
+  if (usage) {
+    await supabase.from("ai_usage_logs").insert({
+      function_name: "ai-auto-reply",
+      model: "google/gemini-3-flash-preview",
+      input_tokens: usage.prompt_tokens || 0,
+      output_tokens: usage.completion_tokens || 0,
+      total_tokens: usage.total_tokens || 0,
+      conversation_id: conversationId,
     });
+  }
 
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error("AI gateway error:", aiResponse.status, errorText);
-      if (aiResponse.status === 429) return jsonResponse({ error: "Rate limit exceeded" }, 429);
-      if (aiResponse.status === 402) return jsonResponse({ error: "AI credits exhausted" }, 402);
-      return jsonResponse({ error: "AI generation failed" }, 502);
+  if (!replyContent) {
+    return jsonResponse({ error: "Empty AI response" }, 500);
+  }
+
+  // 9. Get WhatsApp credentials
+  let phoneNumberId: string | null = null;
+
+  if (conversation.connection_config_id) {
+    const { data: connConfig } = await supabase
+      .from("connection_configs")
+      .select("config")
+      .eq("id", conversation.connection_config_id)
+      .single();
+    const cfg = connConfig?.config as Record<string, unknown> | null;
+    if (typeof cfg?.phone_number_id === "string" && cfg.phone_number_id.trim()) {
+      phoneNumberId = cfg.phone_number_id;
     }
+  }
 
-    const aiResult = await aiResponse.json();
-    const replyContent = aiResult.choices?.[0]?.message?.content;
+  if (!phoneNumberId && nicheId) {
+    const { data: nicheData } = await supabase
+      .from("niches")
+      .select("whatsapp_phone_number_id")
+      .eq("id", nicheId)
+      .single();
+    phoneNumberId = nicheData?.whatsapp_phone_number_id || null;
+  }
 
-    const usage = aiResult.usage;
-    if (usage) {
-      await supabase.from("ai_usage_logs").insert({
-        function_name: "ai-auto-reply",
-        model: "google/gemini-3-flash-preview",
-        input_tokens: usage.prompt_tokens || 0,
-        output_tokens: usage.completion_tokens || 0,
-        total_tokens: usage.total_tokens || 0,
-        conversation_id: conversationId,
-      });
-    }
+  if (!phoneNumberId) {
+    phoneNumberId = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID") || null;
+  }
 
-    if (!replyContent) {
-      return jsonResponse({ error: "Empty AI response" }, 500);
-    }
+  const accessToken = Deno.env.get("WHATSAPP_ACCESS_TOKEN");
+  console.log(`[ai-auto-reply] Using phoneNumberId: ${phoneNumberId}, connConfigId: ${conversation.connection_config_id}, hasAccessToken: ${!!accessToken}`);
 
-    // Get WhatsApp credentials - priority: conversation connection > niche > fallback
-    let phoneNumberId: string | null = null;
-
-    // 1st: Use the connection tied to this conversation
-    if (conversation.connection_config_id) {
-      const { data: connConfig } = await supabase
-        .from("connection_configs")
-        .select("config")
-        .eq("id", conversation.connection_config_id)
-        .single();
-      const cfg = connConfig?.config as Record<string, unknown> | null;
-      if (typeof cfg?.phone_number_id === "string" && cfg.phone_number_id.trim()) {
-        phoneNumberId = cfg.phone_number_id;
-      }
-    }
-
-    // 2nd: Niche-specific phone number
-    if (!phoneNumberId && nicheId) {
-      const { data: nicheData } = await supabase
-        .from("niches")
-        .select("whatsapp_phone_number_id")
-        .eq("id", nicheId)
-        .single();
-      phoneNumberId = nicheData?.whatsapp_phone_number_id || null;
-    }
-
-    // 3rd: Global fallback
-    if (!phoneNumberId) {
-      phoneNumberId = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID") || null;
-    }
-
-    const accessToken = Deno.env.get("WHATSAPP_ACCESS_TOKEN");
-    console.log(`[ai-auto-reply] Using phoneNumberId: ${phoneNumberId}, connConfigId: ${conversation.connection_config_id}, hasAccessToken: ${!!accessToken}`);
-
-    // Save message to DB FIRST so it appears in chat/logs regardless of send result
-    await supabase.from("messages").insert({
+  // 10. Save message + update conversation in parallel
+  await Promise.all([
+    supabase.from("messages").insert({
       conversation_id: conversationId,
       content: replyContent,
       sender_type: "agent",
       message_type: "text",
       status: phoneNumberId && accessToken ? "pending" : "failed",
       sender_label: "ia-auto-reply",
-    });
-
-    await supabase
+    }),
+    supabase
       .from("conversations")
       .update({ updated_at: new Date().toISOString() })
-      .eq("id", conversationId);
+      .eq("id", conversationId),
+  ]);
 
-    if (!phoneNumberId || !accessToken) {
-      console.error("WhatsApp credentials missing for auto-reply");
-      return jsonResponse({ error: "WhatsApp not configured, but message saved", reply: replyContent }, 500);
+  if (!phoneNumberId || !accessToken) {
+    console.error("WhatsApp credentials missing for auto-reply");
+    return jsonResponse({ error: "WhatsApp not configured, but message saved", reply: replyContent }, 500);
+  }
+
+  // 11. Send via WhatsApp
+  const waResponse = await fetch(
+    `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to: conversation.contact_phone,
+        type: "text",
+        text: { body: replyContent },
+      }),
     }
+  );
 
-    const waResponse = await fetch(
-      `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          messaging_product: "whatsapp",
-          to: conversation.contact_phone,
-          type: "text",
-          text: { body: replyContent },
-        }),
-      }
-    );
+  const waResult = await waResponse.json();
 
-    const waResult = await waResponse.json();
-
-    if (!waResponse.ok) {
-      console.error("WhatsApp send error:", waResult);
-      // Update message status to failed
-      await supabase
-        .from("messages")
-        .update({ status: "failed", provider_error: JSON.stringify(waResult.error || waResult) })
-        .eq("conversation_id", conversationId)
-        .eq("sender_label", "ia-auto-reply")
-        .eq("status", "pending")
-        .order("created_at", { ascending: false })
-        .limit(1);
-      return jsonResponse({ error: "Failed to send auto-reply", reply: replyContent, details: waResult }, 502);
-    }
-
-    // Update message status to sent
+  if (!waResponse.ok) {
+    console.error("WhatsApp send error:", waResult);
     await supabase
       .from("messages")
-      .update({ status: "sent", provider_message_id: waResult.messages?.[0]?.id })
+      .update({ status: "failed", provider_error: JSON.stringify(waResult.error || waResult) })
       .eq("conversation_id", conversationId)
       .eq("sender_label", "ia-auto-reply")
       .eq("status", "pending")
       .order("created_at", { ascending: false })
       .limit(1);
+    return jsonResponse({ error: "Failed to send auto-reply", reply: replyContent, details: waResult }, 502);
+  }
 
-    return jsonResponse({ success: true, reply: replyContent });
+  await supabase
+    .from("messages")
+    .update({ status: "sent", provider_message_id: waResult.messages?.[0]?.id })
+    .eq("conversation_id", conversationId)
+    .eq("sender_label", "ia-auto-reply")
+    .eq("status", "pending")
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  return jsonResponse({ success: true, reply: replyContent });
+}
+
+// ─── MAIN HANDLER ──────────────────────────────────────────────
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const body = await req.json();
+    const { conversationId, mode = "schedule" } = body;
+
+    if (!conversationId) {
+      return jsonResponse({ error: "conversationId is required" }, 400);
+    }
+
+    if (mode === "schedule") {
+      return await handleSchedule(conversationId);
+    } else if (mode === "process") {
+      return await handleProcess(conversationId);
+    } else {
+      return jsonResponse({ error: "Invalid mode. Use 'schedule' or 'process'" }, 400);
+    }
   } catch (error) {
     console.error("Auto-reply error:", error);
     return jsonResponse({ error: "Internal server error" }, 500);

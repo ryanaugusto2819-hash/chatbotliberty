@@ -918,6 +918,38 @@ export type Database = {
         }
         Relationships: []
       }
+      pending_ai_replies: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          id: string
+          processed_at: string | null
+          scheduled_for: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          id?: string
+          processed_at?: string | null
+          scheduled_for: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          processed_at?: string | null
+          scheduled_for?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_ai_replies_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: true
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
