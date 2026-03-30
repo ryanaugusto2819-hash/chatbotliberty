@@ -179,7 +179,16 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { flowId, conversationId, senderLabel: requestedLabel } = await req.json();
+    const { flowId, conversationId, senderLabel: requestedLabel, metadata } = await req.json();
+
+    // Helper: replace {{variable}} placeholders with metadata values
+    const replaceVariables = (text: string): string => {
+      if (!text || !metadata || typeof metadata !== "object") return text;
+      return text.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+        const value = (metadata as Record<string, unknown>)[key];
+        return value !== null && value !== undefined ? String(value) : match;
+      });
+    };
 
     if (!flowId || !conversationId) {
       return createJsonResponse({ error: "flowId and conversationId are required" }, 400);
