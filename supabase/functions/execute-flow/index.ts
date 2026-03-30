@@ -533,10 +533,21 @@ Deno.serve(async (req) => {
         } else if (actionType === "set_billing_stage") {
           const billingStage = (config.billing_stage as string) || "";
           if (billingStage) {
-            // Save locally
+            // Get connection label to save and send
+            let connectionLabel = "";
+            if (conversation.connection_config_id) {
+              const { data: connConfig } = await supabase
+                .from("connection_configs")
+                .select("label")
+                .eq("id", conversation.connection_config_id)
+                .maybeSingle();
+              connectionLabel = connConfig?.label || "";
+            }
+
+            // Save locally with connection name
             await supabase
               .from("conversations")
-              .update({ billing_stage: billingStage })
+              .update({ billing_stage: billingStage, billing_connection_name: connectionLabel || null })
               .eq("id", conversationId);
 
             // Get connection label to send as wpp_cobranca
