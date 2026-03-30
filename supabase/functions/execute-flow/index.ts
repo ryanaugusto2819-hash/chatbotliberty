@@ -216,7 +216,7 @@ Deno.serve(async (req) => {
       return createJsonResponse({ success: false, skipped: true, reason: "Sale already registered" }, 200);
     }
 
-    console.log(`[execute-flow] Trigger by "${requestedLabel}" for conversation ${conversationId}`);
+    console.log(`[execute-flow] Trigger by "${requestedLabel}" for conversation ${conversationId}, metadata:`, metadata ? JSON.stringify(metadata) : "none");
 
     // Resolve connection for this conversation's niche
     let resolvedConnection: Record<string, unknown> | null = null;
@@ -613,7 +613,7 @@ Deno.serve(async (req) => {
           const zapiBase = `https://api.z-api.io/instances/${zapiInstanceId}/token/${zapiToken}`;
 
           if (node.node_type === "audio") {
-            zapiEndpoint = `${zapiBase}/send-ptts`;
+            zapiEndpoint = `${zapiBase}/send-audio`;
             zapiBody = { phone, audio: config.media_url };
           } else if (node.node_type === "image") {
             zapiEndpoint = `${zapiBase}/send-link-image`;
