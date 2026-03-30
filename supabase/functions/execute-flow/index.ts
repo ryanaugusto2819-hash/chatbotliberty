@@ -623,7 +623,7 @@ Deno.serve(async (req) => {
             zapiBody = { phone, videoUrl: config.media_url, caption: replaceVariables((config.caption as string) || "") };
           } else if (node.node_type === "call_button") {
             // Z-API doesn't support CTA buttons, send as text with phone number
-            const content = (config.content as string) || "";
+            const content = replaceVariables((config.content as string) || "");
             const callPhone = (config.call_phone as string) || "";
             const callButtonText = (config.call_button_text as string) || "Ligar agora";
             const textContent = `${content}\n\n📞 ${callButtonText}: ${callPhone}`;
