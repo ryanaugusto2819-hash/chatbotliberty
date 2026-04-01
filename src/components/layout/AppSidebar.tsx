@@ -15,6 +15,7 @@ import {
   LogOut,
   ShieldCheck,
   Webhook,
+  Zap,
 } from 'lucide-react';
 
 const allNavItems = [
@@ -27,6 +28,7 @@ const allNavItems = [
   { to: '/reports', icon: BarChart3, label: 'Relatórios', adminOnly: true },
   { to: '/manager-ai', icon: ShieldCheck, label: 'IA Gerente', adminOnly: true },
   
+  { to: '/conversions', icon: Zap, label: 'Conversions API', adminOnly: true },
   { to: '/connections', icon: Plug, label: 'Conexões', adminOnly: true },
   { to: '/users', icon: ShieldCheck, label: 'Usuários', adminOnly: true },
   { to: '/settings', icon: Settings, label: 'Configurações', adminOnly: true },

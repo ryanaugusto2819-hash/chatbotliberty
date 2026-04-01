@@ -331,6 +331,23 @@ async function processWebhook(body: any) {
             .from("conversations")
             .update(updateData)
             .eq("id", conversationId);
+
+          // Upsert conversion_lead (preserve original ctwa_clid)
+          if (ctwaClid) {
+            await supabase
+              .from("conversion_leads")
+              .upsert({
+                conversation_id: conversationId,
+                wa_id: phone,
+                phone,
+                waba_id: value?.metadata?.phone_number_id || null,
+                ctwa_clid: ctwaClid,
+                source_id: sourceId,
+                source_type: sourceType,
+                message_id: msg.id || null,
+                updated_at: new Date().toISOString(),
+              }, { onConflict: "conversation_id", ignoreDuplicates: false });
+          }
         } else {
           const { data: newConv, error: convError } = await supabase
             .from("conversations")
@@ -354,6 +371,22 @@ async function processWebhook(body: any) {
             continue;
           }
           conversationId = newConv.id;
+
+          // Create conversion_lead for new conversation with referral data
+          if (ctwaClid) {
+            await supabase
+              .from("conversion_leads")
+              .insert({
+                conversation_id: conversationId,
+                wa_id: phone,
+                phone,
+                waba_id: value?.metadata?.phone_number_id || null,
+                ctwa_clid: ctwaClid,
+                source_id: sourceId,
+                source_type: sourceType,
+                message_id: msg.id || null,
+              });
+          }
         }
 
         let content = "";
@@ -478,6 +511,12 @@ async function processWebhook(body: any) {
               console.error("Meta ad lookup error:", err)
             );
           }
+          // Trigger Lead conversion event if referral data exists
+          if (ctwaClid && !existing) {
+            triggerConversionEvent(conversationId, phone, ctwaClid, "Lead").catch((err) =>
+              console.error("Lead conversion event error:", err)
+            );
+          }
           triggerAiFlowSelector(conversationId).catch((err) =>
             console.error("Flow selector trigger error:", err)
           );
@@ -572,5 +611,33 @@ async function transcribeAudio(audioUrl: string, conversationId: string): Promis
   } catch (err) {
     console.error("transcribeAudio error:", err);
     return null;
+  }
+}
+
+async function triggerConversionEvent(conversationId: string, phone: string, ctwaClid: string, eventName: string, value?: number, currency?: string) {
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    const response = await fetch(`${supabaseUrl}/functions/v1/meta-conversions-send`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${serviceRoleKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        conversation_id: conversationId,
+        phone,
+        ctwa_clid: ctwaClid,
+        event_name: eventName,
+        value,
+        currency,
+      }),
+    });
+
+    const result = await response.json();
+    console.log(`[triggerConversionEvent] ${eventName} result:`, result);
+  } catch (err) {
+    console.error(`[triggerConversionEvent] ${eventName} error:`, err);
   }
 }
