@@ -530,7 +530,6 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
           conversation_id: conversationId,
           event_name: conversionData.event_name,
           phone: conversation.contact_phone,
-          ctwa_clid: conversation.ctwa_clid || undefined,
           value: parseFloat(conversionData.valor) || 0,
           currency: conversionData.currency,
         },
