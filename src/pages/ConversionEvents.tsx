@@ -129,6 +129,7 @@ export default function ConversionEvents() {
         access_token: c.access_token,
         api_version: c.api_version,
         graph_base_url: c.graph_base_url,
+        page_id: c.page_id || '',
         is_active: c.is_active,
       });
     }
