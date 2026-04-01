@@ -44,11 +44,10 @@ interface ConversionEvent {
 
 interface CapiConfig {
   id: string;
-  dataset_id: string;
+  pixel_id: string;
   access_token: string;
   api_version: string;
   graph_base_url: string;
-  page_id: string;
   is_active: boolean;
 }
 
