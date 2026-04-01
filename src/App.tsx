@@ -24,6 +24,7 @@ const AiSettings = lazy(() => import("./pages/AiSettings"));
 const Reports = lazy(() => import("./pages/Reports"));
 const ManagerAI = lazy(() => import("./pages/ManagerAI"));
 const Connections = lazy(() => import("./pages/Connections"));
+const ConversionEvents = lazy(() => import("./pages/ConversionEvents"));
 const UserManagement = lazy(() => import("./pages/UserManagement"));
 const PlaceholderPage = lazy(() => import("./pages/PlaceholderPage"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
