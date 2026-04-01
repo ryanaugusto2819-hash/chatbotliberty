@@ -341,7 +341,7 @@ export default function ConversionEvents() {
                                             <div><span className="text-muted-foreground">Event ID:</span> <span className="font-mono text-xs">{selectedEvent.event_id}</span></div>
                                             <div><span className="text-muted-foreground">Evento:</span> {selectedEvent.event_name}</div>
                                             <div><span className="text-muted-foreground">Telefone:</span> {selectedEvent.phone}</div>
-                                            <div><span className="text-muted-foreground">CTWA CLID:</span> <span className="font-mono text-xs">{selectedEvent.ctwa_clid || '-'}</span></div>
+                                            <div><span className="text-muted-foreground">Telefone:</span> {selectedEvent.phone}</div>
                                             <div><span className="text-muted-foreground">Valor:</span> {selectedEvent.value ? `${selectedEvent.currency} ${Number(selectedEvent.value).toFixed(2)}` : '-'}</div>
                                             <div><span className="text-muted-foreground">Status:</span> {selectedEvent.status}</div>
                                             <div><span className="text-muted-foreground">Tentativas:</span> {selectedEvent.retry_count}</div>
