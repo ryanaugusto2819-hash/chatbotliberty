@@ -123,11 +123,10 @@ export default function ConversionEvents() {
       const c = data as unknown as CapiConfig;
       setConfig(c);
       setConfigForm({
-        dataset_id: c.dataset_id,
+        pixel_id: c.pixel_id,
         access_token: c.access_token,
         api_version: c.api_version,
         graph_base_url: c.graph_base_url,
-        page_id: c.page_id || '',
         is_active: c.is_active,
       });
     }
