@@ -439,6 +439,15 @@ export default function ConversionEvents() {
                       onChange={(e) => setConfigForm(f => ({ ...f, graph_base_url: e.target.value }))}
                     />
                   </div>
+                  <div>
+                    <Label className="text-xs">Page ID (Facebook)</Label>
+                    <Input
+                      placeholder="Ex: 123456789012345"
+                      value={configForm.page_id}
+                      onChange={(e) => setConfigForm(f => ({ ...f, page_id: e.target.value }))}
+                    />
+                    <p className="text-[10px] text-muted-foreground mt-1">ID da Página do Facebook vinculada ao WhatsApp Business</p>
+                  </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <Switch
