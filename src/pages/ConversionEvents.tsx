@@ -81,6 +81,7 @@ export default function ConversionEvents() {
     access_token: '',
     api_version: 'v21.0',
     graph_base_url: 'https://graph.facebook.com',
+    page_id: '',
     is_active: true,
   });
 
