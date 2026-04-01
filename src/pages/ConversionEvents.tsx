@@ -76,11 +76,10 @@ export default function ConversionEvents() {
   const [config, setConfig] = useState<CapiConfig | null>(null);
   const [configLoading, setConfigLoading] = useState(false);
   const [configForm, setConfigForm] = useState({
-    dataset_id: '',
+    pixel_id: '',
     access_token: '',
-    api_version: 'v21.0',
+    api_version: 'v19.0',
     graph_base_url: 'https://graph.facebook.com',
-    page_id: '',
     is_active: true,
   });
 
