@@ -323,6 +323,7 @@ async function processWebhook(body: any) {
           const updateData: any = { updated_at: new Date().toISOString(), status: "active" };
           if (ctwaClid) updateData.ctwa_clid = ctwaClid;
           if (sourceId) updateData.source_id = sourceId;
+          if (sourceType) updateData.source_type = sourceType;
           if (adTitle) updateData.ad_title = adTitle;
           if (nicheId) updateData.niche_id = nicheId;
           if (connectionConfigId) updateData.connection_config_id = connectionConfigId;
