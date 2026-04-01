@@ -177,17 +177,15 @@ async function handleSend(supabase: any, payload: ConversionEventPayload) {
     metaPayload.data[0].user_data.whatsapp_business_account_id = wabaId;
   }
 
-  // Add page_id (required by Meta for business_messaging/whatsapp events)
-  if (config.page_id) {
+  // For business_messaging + whatsapp, Meta requires ctwa_clid.
+  // page_id must match the page that generated the ctwa_clid.
+  // If ctwa_clid is present, send it and let Meta infer the page (don't send page_id to avoid mismatch).
+  // If no ctwa_clid, send page_id as fallback.
+  if (ctwa_clid) {
+    metaPayload.data[0].user_data.ctwa_clid = ctwa_clid;
+  } else if (config.page_id) {
     metaPayload.data[0].user_data.page_id = config.page_id;
   }
-
-  // Only include ctwa_clid if we can verify it matches the configured page_id
-  // Meta rejects events where ctwa_clid was generated from a different page than page_id
-  // For now, skip ctwa_clid to avoid mismatch errors — it's optional for CAPI
-  // if (ctwa_clid) {
-  //   metaPayload.data[0].user_data.ctwa_clid = ctwa_clid;
-  // }
 
   if (value !== undefined && value !== null) {
     metaPayload.data[0].custom_data.value = value;
