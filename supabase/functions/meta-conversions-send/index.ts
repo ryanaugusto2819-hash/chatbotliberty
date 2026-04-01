@@ -9,9 +9,12 @@ function normalizePhone(phone: string): string {
   return phone.replace(/\D/g, "");
 }
 
-function hashPhone(phone: string): string {
-  // Meta expects raw phone for business_messaging action_source
-  return normalizePhone(phone);
+async function hashSha256(value: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(value);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
 interface ConversionEventPayload {
