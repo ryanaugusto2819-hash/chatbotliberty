@@ -88,6 +88,7 @@ const App = () => (
                   <Route path="/reports" element={<AdminRoute><Reports /></AdminRoute>} />
                   <Route path="/manager-ai" element={<AdminRoute><ManagerAI /></AdminRoute>} />
                   
+                  <Route path="/conversions" element={<AdminRoute><ConversionEvents /></AdminRoute>} />
                   <Route path="/connections" element={<AdminRoute><Connections /></AdminRoute>} />
                   <Route path="/users" element={<AdminRoute><UserManagement /></AdminRoute>} />
                   <Route path="/settings" element={<AdminRoute><PlaceholderPage title="Configurações" subtitle="Configurar conta e integrações" /></AdminRoute>} />
