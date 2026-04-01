@@ -287,6 +287,7 @@ async function processWebhook(body: any) {
         const referral = msg.referral || value?.metadata?.referral;
         const ctwaClid = referral?.ctwa_clid || null;
         const sourceId = referral?.source_id || null;
+        const sourceType = referral?.source_type || null;
         const adTitle = referral?.headline || referral?.body || referral?.source_url || null;
 
         let conversationId: string;
@@ -322,6 +323,7 @@ async function processWebhook(body: any) {
           const updateData: any = { updated_at: new Date().toISOString(), status: "active" };
           if (ctwaClid) updateData.ctwa_clid = ctwaClid;
           if (sourceId) updateData.source_id = sourceId;
+          if (sourceType) updateData.source_type = sourceType;
           if (adTitle) updateData.ad_title = adTitle;
           if (nicheId) updateData.niche_id = nicheId;
           if (connectionConfigId) updateData.connection_config_id = connectionConfigId;
@@ -339,6 +341,7 @@ async function processWebhook(body: any) {
               tags: [],
               ctwa_clid: ctwaClid,
               source_id: sourceId,
+              source_type: sourceType,
               ad_title: adTitle,
               niche_id: nicheId,
               connection_config_id: connectionConfigId,

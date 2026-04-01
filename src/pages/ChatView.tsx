@@ -861,6 +861,15 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
                           </div>
                         </>
                       )}
+                      {(conversation as any).source_type && (
+                        <>
+                          <div className="h-px bg-border" />
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-muted-foreground">Source Type</span>
+                            <span className="text-xs font-mono text-card-foreground">{(conversation as any).source_type}</span>
+                          </div>
+                        </>
+                      )}
                     </>
                   )}
                 </div>

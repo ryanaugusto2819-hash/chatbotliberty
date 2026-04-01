@@ -317,6 +317,7 @@ export type Database = {
           resolved_at: string | null
           sale_registered_at: string | null
           source_id: string | null
+          source_type: string | null
           status: string
           tags: string[] | null
           updated_at: string
@@ -338,6 +339,7 @@ export type Database = {
           resolved_at?: string | null
           sale_registered_at?: string | null
           source_id?: string | null
+          source_type?: string | null
           status?: string
           tags?: string[] | null
           updated_at?: string
@@ -359,6 +361,7 @@ export type Database = {
           resolved_at?: string | null
           sale_registered_at?: string | null
           source_id?: string | null
+          source_type?: string | null
           status?: string
           tags?: string[] | null
           updated_at?: string
