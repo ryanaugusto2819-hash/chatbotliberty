@@ -9,9 +9,12 @@ function normalizePhone(phone: string): string {
   return phone.replace(/\D/g, "");
 }
 
-function hashPhone(phone: string): string {
-  // Meta expects raw phone for business_messaging action_source
-  return normalizePhone(phone);
+async function hashSha256(value: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(value);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
 interface ConversionEventPayload {
@@ -124,6 +127,8 @@ async function handleSend(supabase: any, payload: ConversionEventPayload) {
   const eventTime = Math.floor(Date.now() / 1000);
   const normalizedPhone = normalizePhone(phone);
 
+  const hashedPhone = await hashSha256(normalizedPhone);
+
   const metaPayload: any = {
     data: [
       {
@@ -133,7 +138,7 @@ async function handleSend(supabase: any, payload: ConversionEventPayload) {
         action_source: "business_messaging",
         messaging_channel: "whatsapp",
         user_data: {
-          ph: [normalizedPhone],
+          ph: [hashedPhone],
         },
         custom_data: {} as any,
       },
