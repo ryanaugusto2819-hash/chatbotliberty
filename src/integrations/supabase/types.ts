@@ -394,7 +394,6 @@ export type Database = {
         Row: {
           conversation_id: string | null
           created_at: string
-          ctwa_clid: string | null
           currency: string | null
           error_message: string | null
           event_id: string
@@ -414,7 +413,6 @@ export type Database = {
         Insert: {
           conversation_id?: string | null
           created_at?: string
-          ctwa_clid?: string | null
           currency?: string | null
           error_message?: string | null
           event_id: string
@@ -434,7 +432,6 @@ export type Database = {
         Update: {
           conversation_id?: string | null
           created_at?: string
-          ctwa_clid?: string | null
           currency?: string | null
           error_message?: string | null
           event_id?: string
@@ -945,33 +942,30 @@ export type Database = {
           access_token: string
           api_version: string
           created_at: string
-          dataset_id: string
           graph_base_url: string
           id: string
           is_active: boolean
-          page_id: string
+          pixel_id: string
           updated_at: string
         }
         Insert: {
           access_token?: string
           api_version?: string
           created_at?: string
-          dataset_id?: string
           graph_base_url?: string
           id?: string
           is_active?: boolean
-          page_id?: string
+          pixel_id?: string
           updated_at?: string
         }
         Update: {
           access_token?: string
           api_version?: string
           created_at?: string
-          dataset_id?: string
           graph_base_url?: string
           id?: string
           is_active?: boolean
-          page_id?: string
+          pixel_id?: string
           updated_at?: string
         }
         Relationships: []
