@@ -141,7 +141,7 @@ async function handleSend(supabase: any, payload: ConversionEventPayload) {
   };
 
   if (ctwa_clid) {
-    metaPayload.data[0].business_data = { ctwa_clid };
+    metaPayload.data[0].user_data.ctwa_clid = ctwa_clid;
   }
 
   if (value !== undefined && value !== null) {
