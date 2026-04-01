@@ -331,6 +331,23 @@ async function processWebhook(body: any) {
             .from("conversations")
             .update(updateData)
             .eq("id", conversationId);
+
+          // Upsert conversion_lead (preserve original ctwa_clid)
+          if (ctwaClid) {
+            await supabase
+              .from("conversion_leads")
+              .upsert({
+                conversation_id: conversationId,
+                wa_id: phone,
+                phone,
+                waba_id: value?.metadata?.phone_number_id || null,
+                ctwa_clid: ctwaClid,
+                source_id: sourceId,
+                source_type: sourceType,
+                message_id: msg.id || null,
+                updated_at: new Date().toISOString(),
+              }, { onConflict: "conversation_id", ignoreDuplicates: false });
+          }
         } else {
           const { data: newConv, error: convError } = await supabase
             .from("conversations")
@@ -354,6 +371,22 @@ async function processWebhook(body: any) {
             continue;
           }
           conversationId = newConv.id;
+
+          // Create conversion_lead for new conversation with referral data
+          if (ctwaClid) {
+            await supabase
+              .from("conversion_leads")
+              .insert({
+                conversation_id: conversationId,
+                wa_id: phone,
+                phone,
+                waba_id: value?.metadata?.phone_number_id || null,
+                ctwa_clid: ctwaClid,
+                source_id: sourceId,
+                source_type: sourceType,
+                message_id: msg.id || null,
+              });
+          }
         }
 
         let content = "";
