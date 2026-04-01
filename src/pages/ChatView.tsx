@@ -826,13 +826,10 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
                       <span className="font-mono text-foreground">{conversation.contact_phone}</span>
                     </div>
                     <div className="flex justify-between text-[10px]">
-                      <span className="text-muted-foreground">CTWA CLID</span>
-                      <span className="font-mono text-foreground truncate max-w-[120px]">{conversation.ctwa_clid || 'N/A'}</span>
+                      <span className="text-muted-foreground">Nome</span>
+                      <span className="font-mono text-foreground truncate max-w-[120px]">{conversation.contact_name}</span>
                     </div>
-                    <div className="flex justify-between text-[10px]">
-                      <span className="text-muted-foreground">Source ID</span>
-                      <span className="font-mono text-foreground truncate max-w-[120px]">{conversation.source_id || 'N/A'}</span>
-                    </div>
+                    <p className="text-[9px] text-muted-foreground italic mt-1">Enviado via CAPI server-side (action_source: system_generated)</p>
                   </div>
                   <div className="flex gap-2">
                     <button
