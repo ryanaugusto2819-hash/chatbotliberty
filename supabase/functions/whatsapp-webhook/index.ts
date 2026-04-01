@@ -613,3 +613,31 @@ async function transcribeAudio(audioUrl: string, conversationId: string): Promis
     return null;
   }
 }
+
+async function triggerConversionEvent(conversationId: string, phone: string, ctwaClid: string, eventName: string, value?: number, currency?: string) {
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    const response = await fetch(`${supabaseUrl}/functions/v1/meta-conversions-send`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${serviceRoleKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        conversation_id: conversationId,
+        phone,
+        ctwa_clid: ctwaClid,
+        event_name: eventName,
+        value,
+        currency,
+      }),
+    });
+
+    const result = await response.json();
+    console.log(`[triggerConversionEvent] ${eventName} result:`, result);
+  } catch (err) {
+    console.error(`[triggerConversionEvent] ${eventName} error:`, err);
+  }
+}
