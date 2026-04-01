@@ -127,6 +127,8 @@ async function handleSend(supabase: any, payload: ConversionEventPayload) {
   const eventTime = Math.floor(Date.now() / 1000);
   const normalizedPhone = normalizePhone(phone);
 
+  const hashedPhone = await hashSha256(normalizedPhone);
+
   const metaPayload: any = {
     data: [
       {
@@ -136,7 +138,7 @@ async function handleSend(supabase: any, payload: ConversionEventPayload) {
         action_source: "business_messaging",
         messaging_channel: "whatsapp",
         user_data: {
-          ph: [normalizedPhone],
+          ph: [hashedPhone],
         },
         custom_data: {} as any,
       },
