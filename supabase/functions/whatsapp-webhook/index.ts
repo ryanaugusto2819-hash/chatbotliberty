@@ -287,6 +287,7 @@ async function processWebhook(body: any) {
         const referral = msg.referral || value?.metadata?.referral;
         const ctwaClid = referral?.ctwa_clid || null;
         const sourceId = referral?.source_id || null;
+        const sourceType = referral?.source_type || null;
         const adTitle = referral?.headline || referral?.body || referral?.source_url || null;
 
         let conversationId: string;
