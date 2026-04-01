@@ -15,6 +15,7 @@ import {
   LogOut,
   ShieldCheck,
   Webhook,
+  Zap,
 } from 'lucide-react';
 
 const allNavItems = [
