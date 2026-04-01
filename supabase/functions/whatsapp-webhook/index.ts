@@ -511,6 +511,12 @@ async function processWebhook(body: any) {
               console.error("Meta ad lookup error:", err)
             );
           }
+          // Trigger Lead conversion event if referral data exists
+          if (ctwaClid && !existing) {
+            triggerConversionEvent(conversationId, phone, ctwaClid, "Lead").catch((err) =>
+              console.error("Lead conversion event error:", err)
+            );
+          }
           triggerAiFlowSelector(conversationId).catch((err) =>
             console.error("Flow selector trigger error:", err)
           );
