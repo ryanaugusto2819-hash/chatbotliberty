@@ -1,0 +1,1 @@
+ALTER TABLE conversations ADD COLUMN IF NOT EXISTS source_type text DEFAULT NULL;
