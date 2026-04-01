@@ -48,6 +48,7 @@ interface CapiConfig {
   access_token: string;
   api_version: string;
   graph_base_url: string;
+  page_id: string;
   is_active: boolean;
 }
 
@@ -80,6 +81,7 @@ export default function ConversionEvents() {
     access_token: '',
     api_version: 'v21.0',
     graph_base_url: 'https://graph.facebook.com',
+    page_id: '',
     is_active: true,
   });
 
@@ -127,6 +129,7 @@ export default function ConversionEvents() {
         access_token: c.access_token,
         api_version: c.api_version,
         graph_base_url: c.graph_base_url,
+        page_id: c.page_id || '',
         is_active: c.is_active,
       });
     }
@@ -435,6 +438,15 @@ export default function ConversionEvents() {
                       value={configForm.graph_base_url}
                       onChange={(e) => setConfigForm(f => ({ ...f, graph_base_url: e.target.value }))}
                     />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Page ID (Facebook)</Label>
+                    <Input
+                      placeholder="Ex: 123456789012345"
+                      value={configForm.page_id}
+                      onChange={(e) => setConfigForm(f => ({ ...f, page_id: e.target.value }))}
+                    />
+                    <p className="text-[10px] text-muted-foreground mt-1">ID da Página do Facebook vinculada ao WhatsApp Business</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">

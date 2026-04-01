@@ -949,6 +949,7 @@ export type Database = {
           graph_base_url: string
           id: string
           is_active: boolean
+          page_id: string
           updated_at: string
         }
         Insert: {
@@ -959,6 +960,7 @@ export type Database = {
           graph_base_url?: string
           id?: string
           is_active?: boolean
+          page_id?: string
           updated_at?: string
         }
         Update: {
@@ -969,6 +971,7 @@ export type Database = {
           graph_base_url?: string
           id?: string
           is_active?: boolean
+          page_id?: string
           updated_at?: string
         }
         Relationships: []

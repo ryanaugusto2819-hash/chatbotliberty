@@ -177,6 +177,11 @@ async function handleSend(supabase: any, payload: ConversionEventPayload) {
     metaPayload.data[0].user_data.whatsapp_business_account_id = wabaId;
   }
 
+  // Add page_id (required by Meta for business_messaging/whatsapp events)
+  if (config.page_id) {
+    metaPayload.data[0].user_data.page_id = config.page_id;
+  }
+
   if (ctwa_clid) {
     metaPayload.data[0].user_data.ctwa_clid = ctwa_clid;
   }
