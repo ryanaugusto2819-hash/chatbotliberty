@@ -48,6 +48,7 @@ interface CapiConfig {
   access_token: string;
   api_version: string;
   graph_base_url: string;
+  page_id: string;
   is_active: boolean;
 }
 
