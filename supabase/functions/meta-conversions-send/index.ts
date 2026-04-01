@@ -182,9 +182,12 @@ async function handleSend(supabase: any, payload: ConversionEventPayload) {
     metaPayload.data[0].user_data.page_id = config.page_id;
   }
 
-  if (ctwa_clid) {
-    metaPayload.data[0].user_data.ctwa_clid = ctwa_clid;
-  }
+  // Only include ctwa_clid if we can verify it matches the configured page_id
+  // Meta rejects events where ctwa_clid was generated from a different page than page_id
+  // For now, skip ctwa_clid to avoid mismatch errors — it's optional for CAPI
+  // if (ctwa_clid) {
+  //   metaPayload.data[0].user_data.ctwa_clid = ctwa_clid;
+  // }
 
   if (value !== undefined && value !== null) {
     metaPayload.data[0].custom_data.value = value;
