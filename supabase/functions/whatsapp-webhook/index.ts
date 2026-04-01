@@ -341,6 +341,7 @@ async function processWebhook(body: any) {
               tags: [],
               ctwa_clid: ctwaClid,
               source_id: sourceId,
+              source_type: sourceType,
               ad_title: adTitle,
               niche_id: nicheId,
               connection_config_id: connectionConfigId,
