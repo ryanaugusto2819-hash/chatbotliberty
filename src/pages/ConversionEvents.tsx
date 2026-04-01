@@ -402,13 +402,13 @@ export default function ConversionEvents() {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label className="text-xs">Dataset ID</Label>
+                    <Label className="text-xs">Pixel ID</Label>
                     <Input
-                      placeholder="Ex: 1234567890"
-                      value={configForm.dataset_id}
-                      onChange={(e) => setConfigForm(f => ({ ...f, dataset_id: e.target.value }))}
+                      placeholder="Ex: 2000413737545288"
+                      value={configForm.pixel_id}
+                      onChange={(e) => setConfigForm(f => ({ ...f, pixel_id: e.target.value }))}
                     />
-                    <p className="text-[10px] text-muted-foreground mt-1">ID do dataset no Events Manager da Meta</p>
+                    <p className="text-[10px] text-muted-foreground mt-1">ID do Pixel no Events Manager da Meta</p>
                   </div>
                   <div>
                     <Label className="text-xs">Access Token</Label>
@@ -423,7 +423,7 @@ export default function ConversionEvents() {
                   <div>
                     <Label className="text-xs">Versão da API</Label>
                     <Input
-                      placeholder="v21.0"
+                      placeholder="v19.0"
                       value={configForm.api_version}
                       onChange={(e) => setConfigForm(f => ({ ...f, api_version: e.target.value }))}
                     />
@@ -435,15 +435,6 @@ export default function ConversionEvents() {
                       value={configForm.graph_base_url}
                       onChange={(e) => setConfigForm(f => ({ ...f, graph_base_url: e.target.value }))}
                     />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Page ID (Facebook)</Label>
-                    <Input
-                      placeholder="Ex: 123456789012345"
-                      value={configForm.page_id}
-                      onChange={(e) => setConfigForm(f => ({ ...f, page_id: e.target.value }))}
-                    />
-                    <p className="text-[10px] text-muted-foreground mt-1">ID da Página do Facebook vinculada ao WhatsApp Business</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
