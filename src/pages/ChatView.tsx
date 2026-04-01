@@ -782,12 +782,6 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
               {showConversionDialog && (
                 <div className="rounded-lg border border-border bg-background p-3 space-y-2.5">
                   <p className="text-xs font-semibold text-card-foreground">Enviar Evento de Conversão</p>
-                  {!conversation.ctwa_clid && (
-                    <div className="flex items-center gap-1.5 rounded-md bg-warning/10 border border-warning/20 px-2 py-1.5">
-                      <AlertTriangle className="h-3 w-3 text-warning shrink-0" />
-                      <span className="text-[10px] text-warning">Este lead não possui ctwa_clid. O evento será enviado sem dados de atribuição de anúncio.</span>
-                    </div>
-                  )}
                   <div>
                     <label className="text-[11px] text-muted-foreground">Tipo de Evento *</label>
                     <select
