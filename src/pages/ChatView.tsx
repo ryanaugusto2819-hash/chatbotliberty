@@ -513,43 +513,54 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
     }
   }, []);
 
-  const handleSendSale = async () => {
-    if (!saleData.valor || sendingSale) return;
-    setSendingSale(true);
+  const handleSendConversion = async () => {
+    if (!conversionData.valor || sendingConversion || !conversationId) return;
+    setSendingConversion(true);
     try {
-      const payload = {
-        campanha: saleData.campanha || 'direto',
-        valor: parseFloat(saleData.valor) || 0,
-        pais: saleData.pais || 'brasil',
-        moeda: saleData.moeda || 'BRL',
-        vendas: 1,
-      };
-
-      const res = await fetch('https://simuftsgwryjubmkbnaj.supabase.co/functions/v1/webhookSales', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+      const { data, error } = await supabase.functions.invoke('meta-conversions-send', {
+        body: {
+          conversation_id: conversationId,
+          event_name: conversionData.event_name,
+          phone: conversation.contact_phone,
+          ctwa_clid: conversation.ctwa_clid || undefined,
+          value: parseFloat(conversionData.valor) || 0,
+          currency: conversionData.currency,
+        },
       });
 
-      if (!res.ok) throw new Error('Webhook failed');
+      if (error) throw error;
 
-      // Persist sale registration in the database
-      const now = new Date().toISOString();
-      await supabase
-        .from('conversations')
-        .update({ sale_registered_at: now } as any)
-        .eq('id', conversationId!);
+      // If Purchase, also persist sale_registered_at
+      if (conversionData.event_name === 'Purchase') {
+        const now = new Date().toISOString();
+        await supabase
+          .from('conversations')
+          .update({ sale_registered_at: now } as any)
+          .eq('id', conversationId);
+        setSaleRegisteredAt(now);
+      }
 
-      toast.success('Venda registrada com sucesso!');
-      setShowSaleDialog(false);
-      setSaleData({ valor: '', campanha: '', pais: 'brasil', moeda: 'BRL' });
-      setSaleRegisteredAt(now);
-    } catch (err) {
-      console.error('Sale webhook error:', err);
-      toast.error('Erro ao registrar venda');
+      toast.success(`Evento ${conversionData.event_name} enviado para a Meta!`);
+      setShowConversionDialog(false);
+      setConversionData({ event_name: 'Purchase', valor: '', currency: 'BRL' });
+      fetchConversionEvents();
+    } catch (err: any) {
+      console.error('Conversion event error:', err);
+      toast.error(`Erro ao enviar evento: ${err.message}`);
     } finally {
-      setSendingSale(false);
+      setSendingConversion(false);
     }
+  };
+
+  const fetchConversionEvents = async () => {
+    if (!conversationId) return;
+    const { data } = await supabase
+      .from('conversion_events')
+      .select('event_name, status, sent_at')
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: false })
+      .limit(5);
+    if (data) setLastConversionEvents(data as any);
   };
 
   if (loading) {
