@@ -319,6 +319,14 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
     if (data) {
       setConversation(data);
       setSaleRegisteredAt((data as any).sale_registered_at || null);
+      // Fetch conversion events for this conversation
+      const { data: convEvents } = await supabase
+        .from('conversion_events')
+        .select('event_name, status, sent_at')
+        .eq('conversation_id', data.id)
+        .order('created_at', { ascending: false })
+        .limit(5);
+      if (convEvents) setLastConversionEvents(convEvents as any);
 
       const [agentResult, tagsResult, historyResult] = await Promise.all([
         data.assigned_agent_id
