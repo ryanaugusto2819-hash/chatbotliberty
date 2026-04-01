@@ -123,7 +123,7 @@ async function handleSend(supabase: any, payload: ConversionEventPayload) {
 
   const config = await getCapiConfig(supabase);
 
-  // Fetch waba_id from conversion_leads if available
+  // Fetch waba_id: try conversion_leads first, then fall back to connection_configs via conversation
   let wabaId: string | null = null;
   if (conversation_id) {
     const { data: leadData } = await supabase
@@ -132,6 +132,22 @@ async function handleSend(supabase: any, payload: ConversionEventPayload) {
       .eq("conversation_id", conversation_id)
       .maybeSingle();
     wabaId = leadData?.waba_id || null;
+
+    if (!wabaId) {
+      const { data: convData } = await supabase
+        .from("conversations")
+        .select("connection_config_id")
+        .eq("id", conversation_id)
+        .maybeSingle();
+      if (convData?.connection_config_id) {
+        const { data: connData } = await supabase
+          .from("connection_configs")
+          .select("config")
+          .eq("id", convData.connection_config_id)
+          .maybeSingle();
+        wabaId = connData?.config?.waba_id || null;
+      }
+    }
   }
 
   // Build Meta CAPI payload
