@@ -245,10 +245,11 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
   const [contactTags, setContactTags] = useState<ContactTag[]>([]);
   const [assignedAgent, setAssignedAgent] = useState<AgentProfile | null>(null);
   const [assignmentHistory, setAssignmentHistory] = useState<AssignmentHistory[]>([]);
-  const [showSaleDialog, setShowSaleDialog] = useState(false);
-  const [saleData, setSaleData] = useState({ valor: '', campanha: '', pais: 'brasil', moeda: 'BRL' });
-  const [sendingSale, setSendingSale] = useState(false);
+  const [showConversionDialog, setShowConversionDialog] = useState(false);
+  const [conversionData, setConversionData] = useState({ event_name: 'Purchase', valor: '', currency: 'BRL' });
+  const [sendingConversion, setSendingConversion] = useState(false);
   const [saleRegisteredAt, setSaleRegisteredAt] = useState<string | null>(null);
+  const [lastConversionEvents, setLastConversionEvents] = useState<{ event_name: string; status: string; sent_at: string | null }[]>([]);
   const [blockedConnections, setBlockedConnections] = useState<{ id: string; label: string; status: string }[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
