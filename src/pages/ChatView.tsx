@@ -254,6 +254,8 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
   const [showTermoDialog, setShowTermoDialog] = useState(false);
   const [termoData, setTermoData] = useState({ nomeCliente: '', cpf: '', meses: '', valor: '', formaPagamento: 'boleto à vista' });
   const [sendingTermo, setSendingTermo] = useState(false);
+  const [termoPdfUrl, setTermoPdfUrl] = useState<string | null>(null);
+  const [sendingTermoWhatsApp, setSendingTermoWhatsApp] = useState(false);
   const [blockedConnections, setBlockedConnections] = useState<{ id: string; label: string; status: string }[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -556,7 +558,7 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
     }
   };
 
-  const handleSendTermo = async () => {
+  const handleGenerateTermo = async () => {
     if (!termoData.nomeCliente || !termoData.cpf || !termoData.meses || sendingTermo) return;
     setSendingTermo(true);
     try {
@@ -570,18 +572,34 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
           formaPagamento: termoData.formaPagamento || 'boleto à vista',
           dataCompra: new Date().toLocaleDateString('pt-BR'),
           empresa: 'MEGAFIT',
-          enviar: true,
+          enviar: false,
         },
       });
       if (error) throw error;
-      toast.success('Termo gerado e enviado com sucesso!');
-      setShowTermoDialog(false);
-      setTermoData({ nomeCliente: '', cpf: '', meses: '', valor: '', formaPagamento: 'boleto à vista' });
+      setTermoPdfUrl(data.pdfUrl);
+      toast.success('Termo gerado! Revise antes de enviar.');
     } catch (err: any) {
       console.error('Termo error:', err);
       toast.error('Erro ao gerar termo');
     } finally {
       setSendingTermo(false);
+    }
+  };
+
+  const handleSendTermoWhatsApp = async () => {
+    if (!termoPdfUrl || sendingTermoWhatsApp) return;
+    setSendingTermoWhatsApp(true);
+    try {
+      await sendWhatsAppMessage(id!, '', { mediaUrl: termoPdfUrl, messageType: 'document' });
+      toast.success('Termo enviado com sucesso!');
+      setShowTermoDialog(false);
+      setTermoPdfUrl(null);
+      setTermoData({ nomeCliente: '', cpf: '', meses: '', valor: '', formaPagamento: 'boleto à vista' });
+    } catch (err: any) {
+      console.error('Send termo error:', err);
+      toast.error('Erro ao enviar termo');
+    } finally {
+      setSendingTermoWhatsApp(false);
     }
   };
 
@@ -920,20 +938,48 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
                     </select>
                   </div>
                   <p className="text-[10px] text-muted-foreground">Empresa: MEGAFIT (fixo) • Data: hoje</p>
+
+                  {/* Preview do PDF gerado */}
+                  {termoPdfUrl && (
+                    <div className="rounded-lg border border-primary/30 bg-primary/5 p-2.5 space-y-2">
+                      <div className="flex items-center gap-1.5">
+                        <FileText className="h-3.5 w-3.5 text-primary" />
+                        <span className="text-xs font-medium text-card-foreground">Termo gerado!</span>
+                      </div>
+                      <a
+                        href={termoPdfUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block w-full text-center rounded-lg border border-border py-1.5 text-xs text-primary font-medium hover:bg-secondary transition-colors"
+                      >
+                        📄 Visualizar Termo
+                      </a>
+                      <button
+                        onClick={handleSendTermoWhatsApp}
+                        disabled={sendingTermoWhatsApp}
+                        className="w-full rounded-lg bg-green-600 hover:bg-green-700 text-white py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
+                      >
+                        {sendingTermoWhatsApp ? <Loader2 className="h-3.5 w-3.5 animate-spin mx-auto" /> : '📩 Enviar via WhatsApp'}
+                      </button>
+                    </div>
+                  )}
+
                   <div className="flex gap-2">
                     <button
-                      onClick={() => setShowTermoDialog(false)}
+                      onClick={() => { setShowTermoDialog(false); setTermoPdfUrl(null); }}
                       className="flex-1 rounded-lg border border-border py-1.5 text-xs text-muted-foreground hover:bg-secondary transition-colors"
                     >
                       Cancelar
                     </button>
-                    <button
-                      onClick={handleSendTermo}
-                      disabled={!termoData.nomeCliente || !termoData.cpf || !termoData.meses || sendingTermo}
-                      className="flex-1 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
-                    >
-                      {sendingTermo ? <Loader2 className="h-3.5 w-3.5 animate-spin mx-auto" /> : 'Gerar e Enviar'}
-                    </button>
+                    {!termoPdfUrl && (
+                      <button
+                        onClick={handleGenerateTermo}
+                        disabled={!termoData.nomeCliente || !termoData.cpf || !termoData.meses || sendingTermo}
+                        className="flex-1 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
+                      >
+                        {sendingTermo ? <Loader2 className="h-3.5 w-3.5 animate-spin mx-auto" /> : 'Gerar Termo'}
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
