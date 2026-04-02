@@ -123,33 +123,6 @@ async function handleSend(supabase: any, payload: ConversionEventPayload) {
 
   const config = await getCapiConfig(supabase);
 
-  // Fetch waba_id: try conversion_leads first, then fall back to connection_configs via conversation
-  let wabaId: string | null = null;
-  if (conversation_id) {
-    const { data: leadData } = await supabase
-      .from("conversion_leads")
-      .select("waba_id")
-      .eq("conversation_id", conversation_id)
-      .maybeSingle();
-    wabaId = leadData?.waba_id || null;
-
-    if (!wabaId) {
-      const { data: convData } = await supabase
-        .from("conversations")
-        .select("connection_config_id")
-        .eq("id", conversation_id)
-        .maybeSingle();
-      if (convData?.connection_config_id) {
-        const { data: connData } = await supabase
-          .from("connection_configs")
-          .select("config")
-          .eq("id", convData.connection_config_id)
-          .maybeSingle();
-        wabaId = connData?.config?.waba_id || null;
-      }
-    }
-  }
-
   // Build Meta CAPI payload
   const eventTime = Math.floor(Date.now() / 1000);
   const normalizedPhone = normalizePhone(phone);
@@ -171,11 +144,6 @@ async function handleSend(supabase: any, payload: ConversionEventPayload) {
       },
     ],
   };
-
-  // Add WABA ID (required by Meta for business_messaging)
-  if (wabaId) {
-    metaPayload.data[0].user_data.whatsapp_business_account_id = wabaId;
-  }
 
   if (ctwa_clid) {
     metaPayload.data[0].user_data.ctwa_clid = ctwa_clid;
