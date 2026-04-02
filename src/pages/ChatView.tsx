@@ -946,14 +946,21 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
                         <FileText className="h-3.5 w-3.5 text-primary" />
                         <span className="text-xs font-medium text-card-foreground">Termo gerado!</span>
                       </div>
-                      <a
-                        href={termoPdfUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                      <button
+                        onClick={async () => {
+                          try {
+                            const res = await fetch(termoPdfUrl!);
+                            const blob = await res.blob();
+                            const blobUrl = URL.createObjectURL(blob);
+                            window.open(blobUrl, '_blank');
+                          } catch {
+                            window.open(termoPdfUrl!, '_blank');
+                          }
+                        }}
                         className="block w-full text-center rounded-lg border border-border py-1.5 text-xs text-primary font-medium hover:bg-secondary transition-colors"
                       >
                         📄 Visualizar Termo
-                      </a>
+                      </button>
                       <button
                         onClick={handleSendTermoWhatsApp}
                         disabled={sendingTermoWhatsApp}
