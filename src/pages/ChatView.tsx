@@ -556,7 +556,35 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
     }
   };
 
-  if (loading) {
+  const handleSendTermo = async () => {
+    if (!termoData.nomeCliente || !termoData.cpf || !termoData.meses || sendingTermo) return;
+    setSendingTermo(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-termo', {
+        body: {
+          conversationId: id,
+          nomeCliente: termoData.nomeCliente,
+          cpf: termoData.cpf,
+          meses: termoData.meses,
+          valor: termoData.valor || '397,00',
+          formaPagamento: termoData.formaPagamento || 'boleto à vista',
+          dataCompra: new Date().toLocaleDateString('pt-BR'),
+          empresa: 'MEGAFIT',
+          enviar: true,
+        },
+      });
+      if (error) throw error;
+      toast.success('Termo gerado e enviado com sucesso!');
+      setShowTermoDialog(false);
+      setTermoData({ nomeCliente: '', cpf: '', meses: '', valor: '', formaPagamento: 'boleto à vista' });
+    } catch (err: any) {
+      console.error('Termo error:', err);
+      toast.error('Erro ao gerar termo');
+    } finally {
+      setSendingTermo(false);
+    }
+  };
+
     return (
       <div className="flex h-screen items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
