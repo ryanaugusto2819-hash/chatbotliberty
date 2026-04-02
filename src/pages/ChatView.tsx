@@ -805,6 +805,7 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
                     }
                   }}
                 />
+              {showConversionDialog && (
                 <div className="rounded-lg border border-border bg-background p-3 space-y-2.5">
                   <p className="text-xs font-semibold text-card-foreground">Enviar Evento de Conversão</p>
                   <div>
