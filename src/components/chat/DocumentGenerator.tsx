@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FileText, Loader2, X, Download, Send, Sparkles } from 'lucide-react';
+import { FileText, Loader2, X, Download, Send, Sparkles, ExternalLink } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -7,13 +7,13 @@ interface DocumentGeneratorProps {
   contactName: string;
   contactPhone: string;
   conversationId: string;
-  onSendImage?: (imageUrl: string) => void;
+  onSendDocument?: (pdfUrl: string) => void;
 }
 
-export default function DocumentGenerator({ contactName, contactPhone, conversationId, onSendImage }: DocumentGeneratorProps) {
+export default function DocumentGenerator({ contactName, contactPhone, conversationId, onSendDocument }: DocumentGeneratorProps) {
   const [open, setOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
-  const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+  const [generatedPdfUrl, setGeneratedPdfUrl] = useState<string | null>(null);
   const [form, setForm] = useState({
     nome: contactName || '',
     cpf: '',
@@ -42,16 +42,16 @@ export default function DocumentGenerator({ contactName, contactPhone, conversat
       return;
     }
     setGenerating(true);
-    setGeneratedImage(null);
+    setGeneratedPdfUrl(null);
     try {
       const { data, error } = await supabase.functions.invoke('generate-document', {
-        body: form,
+        body: { ...form, conversation_id: conversationId },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      if (data?.image_url) {
-        setGeneratedImage(data.image_url);
-        toast.success('Documento gerado com sucesso!');
+      if (data?.pdf_url) {
+        setGeneratedPdfUrl(data.pdf_url);
+        toast.success('PDF gerado com sucesso!');
       }
     } catch (err: any) {
       console.error('Document generation error:', err);
@@ -62,20 +62,12 @@ export default function DocumentGenerator({ contactName, contactPhone, conversat
   };
 
   const handleSendViaWhatsApp = () => {
-    if (generatedImage && onSendImage) {
-      onSendImage(generatedImage);
-      toast.success('Documento enviado para o chat!');
+    if (generatedPdfUrl && onSendDocument) {
+      onSendDocument(generatedPdfUrl);
+      toast.success('PDF enviado para o chat!');
       setOpen(false);
-      setGeneratedImage(null);
+      setGeneratedPdfUrl(null);
     }
-  };
-
-  const handleDownload = () => {
-    if (!generatedImage) return;
-    const link = document.createElement('a');
-    link.href = generatedImage;
-    link.download = `termo_${form.nome.replace(/\s+/g, '_')}_${Date.now()}.png`;
-    link.click();
   };
 
   if (!open) {
@@ -85,7 +77,7 @@ export default function DocumentGenerator({ contactName, contactPhone, conversat
         className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white py-2 px-3 text-xs font-medium transition-all shadow-sm hover:shadow-md"
       >
         <FileText className="h-3.5 w-3.5" />
-        Gerar Documento
+        Gerar Documento PDF
       </button>
     );
   }
@@ -96,20 +88,20 @@ export default function DocumentGenerator({ contactName, contactPhone, conversat
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-purple-100 dark:bg-purple-900/50">
-            <Sparkles className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+            <FileText className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
           </div>
           <div>
             <p className="text-xs font-semibold text-foreground">Gerar Documento</p>
-            <p className="text-[10px] text-muted-foreground">Termo de Compromisso via IA</p>
+            <p className="text-[10px] text-muted-foreground">Termo de Compromisso em PDF</p>
           </div>
         </div>
-        <button onClick={() => { setOpen(false); setGeneratedImage(null); }} className="flex h-6 w-6 items-center justify-center rounded-md hover:bg-secondary text-muted-foreground transition-colors">
+        <button onClick={() => { setOpen(false); setGeneratedPdfUrl(null); }} className="flex h-6 w-6 items-center justify-center rounded-md hover:bg-secondary text-muted-foreground transition-colors">
           <X className="h-3.5 w-3.5" />
         </button>
       </div>
 
       {/* Form */}
-      {!generatedImage ? (
+      {!generatedPdfUrl ? (
         <div className="space-y-2">
           <div>
             <label className="text-[11px] font-medium text-muted-foreground">Nome Completo *</label>
@@ -194,12 +186,12 @@ export default function DocumentGenerator({ contactName, contactPhone, conversat
             {generating ? (
               <>
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Gerando com IA...
+                Gerando PDF...
               </>
             ) : (
               <>
-                <Sparkles className="h-3.5 w-3.5" />
-                Gerar Documento
+                <FileText className="h-3.5 w-3.5" />
+                Gerar PDF
               </>
             )}
           </button>
@@ -207,21 +199,35 @@ export default function DocumentGenerator({ contactName, contactPhone, conversat
       ) : (
         /* Preview & Actions */
         <div className="space-y-2.5">
-          <div className="rounded-lg border border-border overflow-hidden bg-white">
-            <img
-              src={generatedImage}
-              alt="Documento gerado"
-              className="w-full h-auto"
-            />
+          <div className="rounded-lg border border-border overflow-hidden bg-muted/30 p-4 flex flex-col items-center gap-3">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-red-100 dark:bg-red-900/30">
+              <FileText className="h-8 w-8 text-red-600 dark:text-red-400" />
+            </div>
+            <div className="text-center">
+              <p className="text-sm font-semibold text-foreground">PDF Gerado!</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">Termo de Compromisso — {form.nome}</p>
+            </div>
+            <a
+              href={generatedPdfUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-xs text-purple-600 dark:text-purple-400 hover:underline"
+            >
+              <ExternalLink className="h-3 w-3" />
+              Visualizar PDF
+            </a>
           </div>
           <div className="flex gap-2">
-            <button
-              onClick={handleDownload}
+            <a
+              href={generatedPdfUrl}
+              download
+              target="_blank"
+              rel="noopener noreferrer"
               className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-border py-1.5 text-xs text-muted-foreground hover:bg-secondary transition-colors"
             >
               <Download className="h-3.5 w-3.5" />
-              Baixar
-            </button>
+              Baixar PDF
+            </a>
             <button
               onClick={handleSendViaWhatsApp}
               className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white py-1.5 text-xs font-medium transition-colors"
@@ -231,7 +237,7 @@ export default function DocumentGenerator({ contactName, contactPhone, conversat
             </button>
           </div>
           <button
-            onClick={() => setGeneratedImage(null)}
+            onClick={() => setGeneratedPdfUrl(null)}
             className="w-full text-center text-[11px] text-muted-foreground hover:text-foreground transition-colors"
           >
             ← Voltar e editar dados
