@@ -317,7 +317,6 @@ export type Database = {
           resolved_at: string | null
           sale_registered_at: string | null
           source_id: string | null
-          source_type: string | null
           status: string
           tags: string[] | null
           updated_at: string
@@ -339,7 +338,6 @@ export type Database = {
           resolved_at?: string | null
           sale_registered_at?: string | null
           source_id?: string | null
-          source_type?: string | null
           status?: string
           tags?: string[] | null
           updated_at?: string
@@ -361,7 +359,6 @@ export type Database = {
           resolved_at?: string | null
           sale_registered_at?: string | null
           source_id?: string | null
-          source_type?: string | null
           status?: string
           tags?: string[] | null
           updated_at?: string
@@ -386,144 +383,6 @@ export type Database = {
             columns: ["niche_id"]
             isOneToOne: false
             referencedRelation: "niches"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      conversion_events: {
-        Row: {
-          conversation_id: string | null
-          created_at: string
-          ctwa_clid: string | null
-          currency: string | null
-          error_message: string | null
-          event_id: string
-          event_name: string
-          id: string
-          lead_id: string | null
-          order_id: string | null
-          payload_json: Json | null
-          phone: string | null
-          response_json: Json | null
-          retry_count: number
-          sent_at: string | null
-          status: string
-          updated_at: string
-          value: number | null
-        }
-        Insert: {
-          conversation_id?: string | null
-          created_at?: string
-          ctwa_clid?: string | null
-          currency?: string | null
-          error_message?: string | null
-          event_id: string
-          event_name: string
-          id?: string
-          lead_id?: string | null
-          order_id?: string | null
-          payload_json?: Json | null
-          phone?: string | null
-          response_json?: Json | null
-          retry_count?: number
-          sent_at?: string | null
-          status?: string
-          updated_at?: string
-          value?: number | null
-        }
-        Update: {
-          conversation_id?: string | null
-          created_at?: string
-          ctwa_clid?: string | null
-          currency?: string | null
-          error_message?: string | null
-          event_id?: string
-          event_name?: string
-          id?: string
-          lead_id?: string | null
-          order_id?: string | null
-          payload_json?: Json | null
-          phone?: string | null
-          response_json?: Json | null
-          retry_count?: number
-          sent_at?: string | null
-          status?: string
-          updated_at?: string
-          value?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "conversion_events_conversation_id_fkey"
-            columns: ["conversation_id"]
-            isOneToOne: false
-            referencedRelation: "conversations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "conversion_events_lead_id_fkey"
-            columns: ["lead_id"]
-            isOneToOne: false
-            referencedRelation: "conversion_leads"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "conversion_events_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      conversion_leads: {
-        Row: {
-          conversation_id: string
-          created_at: string
-          ctwa_clid: string | null
-          first_message_at: string | null
-          id: string
-          message_id: string | null
-          phone: string
-          source_id: string | null
-          source_type: string | null
-          updated_at: string
-          wa_id: string | null
-          waba_id: string | null
-        }
-        Insert: {
-          conversation_id: string
-          created_at?: string
-          ctwa_clid?: string | null
-          first_message_at?: string | null
-          id?: string
-          message_id?: string | null
-          phone: string
-          source_id?: string | null
-          source_type?: string | null
-          updated_at?: string
-          wa_id?: string | null
-          waba_id?: string | null
-        }
-        Update: {
-          conversation_id?: string
-          created_at?: string
-          ctwa_clid?: string | null
-          first_message_at?: string | null
-          id?: string
-          message_id?: string | null
-          phone?: string
-          source_id?: string | null
-          source_type?: string | null
-          updated_at?: string
-          wa_id?: string | null
-          waba_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "conversion_leads_conversation_id_fkey"
-            columns: ["conversation_id"]
-            isOneToOne: true
-            referencedRelation: "conversations"
             referencedColumns: ["id"]
           },
         ]
@@ -940,39 +799,6 @@ export type Database = {
           },
         ]
       }
-      meta_capi_config: {
-        Row: {
-          access_token: string
-          api_version: string
-          created_at: string
-          dataset_id: string
-          graph_base_url: string
-          id: string
-          is_active: boolean
-          updated_at: string
-        }
-        Insert: {
-          access_token?: string
-          api_version?: string
-          created_at?: string
-          dataset_id?: string
-          graph_base_url?: string
-          id?: string
-          is_active?: boolean
-          updated_at?: string
-        }
-        Update: {
-          access_token?: string
-          api_version?: string
-          created_at?: string
-          dataset_id?: string
-          graph_base_url?: string
-          id?: string
-          is_active?: boolean
-          updated_at?: string
-        }
-        Relationships: []
-      }
       niche_connections: {
         Row: {
           connection_config_id: string
@@ -1091,50 +917,6 @@ export type Database = {
           zapi_instance_id?: string | null
         }
         Relationships: []
-      }
-      orders: {
-        Row: {
-          conversation_id: string
-          created_at: string
-          currency: string
-          customer_phone: string
-          id: string
-          paid_at: string | null
-          status: string
-          updated_at: string
-          value: number
-        }
-        Insert: {
-          conversation_id: string
-          created_at?: string
-          currency?: string
-          customer_phone: string
-          id?: string
-          paid_at?: string | null
-          status?: string
-          updated_at?: string
-          value?: number
-        }
-        Update: {
-          conversation_id?: string
-          created_at?: string
-          currency?: string
-          customer_phone?: string
-          id?: string
-          paid_at?: string | null
-          status?: string
-          updated_at?: string
-          value?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "orders_conversation_id_fkey"
-            columns: ["conversation_id"]
-            isOneToOne: false
-            referencedRelation: "conversations"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       pending_ai_replies: {
         Row: {

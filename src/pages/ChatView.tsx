@@ -245,11 +245,10 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
   const [contactTags, setContactTags] = useState<ContactTag[]>([]);
   const [assignedAgent, setAssignedAgent] = useState<AgentProfile | null>(null);
   const [assignmentHistory, setAssignmentHistory] = useState<AssignmentHistory[]>([]);
-  const [showConversionDialog, setShowConversionDialog] = useState(false);
-  const [conversionData, setConversionData] = useState({ event_name: 'Purchase', valor: '', currency: 'BRL' });
-  const [sendingConversion, setSendingConversion] = useState(false);
+  const [showSaleDialog, setShowSaleDialog] = useState(false);
+  const [saleData, setSaleData] = useState({ valor: '', campanha: '', pais: 'brasil', moeda: 'BRL' });
+  const [sendingSale, setSendingSale] = useState(false);
   const [saleRegisteredAt, setSaleRegisteredAt] = useState<string | null>(null);
-  const [lastConversionEvents, setLastConversionEvents] = useState<{ event_name: string; status: string; sent_at: string | null }[]>([]);
   const [blockedConnections, setBlockedConnections] = useState<{ id: string; label: string; status: string }[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -319,14 +318,6 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
     if (data) {
       setConversation(data);
       setSaleRegisteredAt((data as any).sale_registered_at || null);
-      // Fetch conversion events for this conversation
-      const { data: convEvents } = await supabase
-        .from('conversion_events')
-        .select('event_name, status, sent_at')
-        .eq('conversation_id', data.id)
-        .order('created_at', { ascending: false })
-        .limit(5);
-      if (convEvents) setLastConversionEvents(convEvents as any);
 
       const [agentResult, tagsResult, historyResult] = await Promise.all([
         data.assigned_agent_id
@@ -521,54 +512,43 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
     }
   }, []);
 
-  const handleSendConversion = async () => {
-    if (!conversionData.valor || sendingConversion || !conversationId) return;
-    setSendingConversion(true);
+  const handleSendSale = async () => {
+    if (!saleData.valor || sendingSale) return;
+    setSendingSale(true);
     try {
-      const { data, error } = await supabase.functions.invoke('meta-conversions-send', {
-        body: {
-          conversation_id: conversationId,
-          event_name: conversionData.event_name,
-          phone: conversation.contact_phone,
-          ctwa_clid: conversation.ctwa_clid || undefined,
-          value: parseFloat(conversionData.valor) || 0,
-          currency: conversionData.currency,
-        },
+      const payload = {
+        campanha: saleData.campanha || 'direto',
+        valor: parseFloat(saleData.valor) || 0,
+        pais: saleData.pais || 'brasil',
+        moeda: saleData.moeda || 'BRL',
+        vendas: 1,
+      };
+
+      const res = await fetch('https://simuftsgwryjubmkbnaj.supabase.co/functions/v1/webhookSales', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
 
-      if (error) throw error;
+      if (!res.ok) throw new Error('Webhook failed');
 
-      // If Purchase, also persist sale_registered_at
-      if (conversionData.event_name === 'Purchase') {
-        const now = new Date().toISOString();
-        await supabase
-          .from('conversations')
-          .update({ sale_registered_at: now } as any)
-          .eq('id', conversationId);
-        setSaleRegisteredAt(now);
-      }
+      // Persist sale registration in the database
+      const now = new Date().toISOString();
+      await supabase
+        .from('conversations')
+        .update({ sale_registered_at: now } as any)
+        .eq('id', conversationId!);
 
-      toast.success(`Evento ${conversionData.event_name} enviado para a Meta!`);
-      setShowConversionDialog(false);
-      setConversionData({ event_name: 'Purchase', valor: '', currency: 'BRL' });
-      fetchConversionEvents();
-    } catch (err: any) {
-      console.error('Conversion event error:', err);
-      toast.error(`Erro ao enviar evento: ${err.message}`);
+      toast.success('Venda registrada com sucesso!');
+      setShowSaleDialog(false);
+      setSaleData({ valor: '', campanha: '', pais: 'brasil', moeda: 'BRL' });
+      setSaleRegisteredAt(now);
+    } catch (err) {
+      console.error('Sale webhook error:', err);
+      toast.error('Erro ao registrar venda');
     } finally {
-      setSendingConversion(false);
+      setSendingSale(false);
     }
-  };
-
-  const fetchConversionEvents = async () => {
-    if (!conversationId) return;
-    const { data } = await supabase
-      .from('conversion_events')
-      .select('event_name, status, sent_at')
-      .eq('conversation_id', conversationId)
-      .order('created_at', { ascending: false })
-      .limit(5);
-    if (data) setLastConversionEvents(data as any);
   };
 
   if (loading) {
@@ -744,116 +724,91 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
             </div>
 
             <div className="p-4 space-y-5 flex-1">
-              {/* Enviar Conversão */}
-              <div className="space-y-2">
-                <button
-                  onClick={() => setShowConversionDialog(true)}
-                  className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground py-1.5 px-3 text-xs font-medium transition-colors"
-                >
-                  <Send className="h-3.5 w-3.5" />
-                  Enviar Conversão
-                </button>
-
-                {saleRegisteredAt && (
-                  <div className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-success/15 text-success py-1 px-3 text-[10px] font-medium">
-                    <CheckCheck className="h-3 w-3" />
+              {/* Register Sale */}
+              <div>
+                {saleRegisteredAt ? (
+                  <div className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-green-800 text-white py-1.5 px-3 text-xs font-medium">
+                    <CheckCheck className="h-3.5 w-3.5" />
                     Venda Registrada
                   </div>
-                )}
-
-                {/* Last conversion events */}
-                {lastConversionEvents.length > 0 && (
-                  <div className="space-y-1">
-                    {lastConversionEvents.map((ev, i) => (
-                      <div key={i} className="flex items-center justify-between rounded-md bg-muted/50 px-2 py-1">
-                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
-                          ev.event_name === 'Purchase' ? 'bg-success/15 text-success' :
-                          ev.event_name === 'Lead' ? 'bg-info/15 text-info' :
-                          'bg-warning/15 text-warning'
-                        }`}>{ev.event_name}</span>
-                        <span className={`text-[10px] font-medium ${
-                          ev.status === 'sent' ? 'text-success' : ev.status === 'failed' ? 'text-destructive' : 'text-warning'
-                        }`}>{ev.status === 'sent' ? '✓ Enviado' : ev.status === 'failed' ? '✗ Falhou' : '⏳ Pendente'}</span>
-                      </div>
-                    ))}
-                  </div>
+                ) : (
+                  <button
+                    onClick={() => {
+                      const adParts = conversation.ad_title?.split(' › ') || [];
+                      setSaleData({ valor: '', campanha: adParts[0] || '', pais: 'brasil', moeda: 'BRL' });
+                      setShowSaleDialog(true);
+                    }}
+                    className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white py-1.5 px-3 text-xs font-medium transition-colors"
+                  >
+                    <DollarSign className="h-3.5 w-3.5" />
+                    Registrar Venda
+                  </button>
                 )}
               </div>
 
-              {showConversionDialog && (
+              {showSaleDialog && (
                 <div className="rounded-lg border border-border bg-background p-3 space-y-2.5">
-                  <p className="text-xs font-semibold text-card-foreground">Enviar Evento de Conversão</p>
-                  {!conversation.ctwa_clid && (
-                    <div className="flex items-center gap-1.5 rounded-md bg-warning/10 border border-warning/20 px-2 py-1.5">
-                      <AlertTriangle className="h-3 w-3 text-warning shrink-0" />
-                      <span className="text-[10px] text-warning">Este lead não possui ctwa_clid. O evento será enviado sem dados de atribuição de anúncio.</span>
-                    </div>
-                  )}
+                  <p className="text-xs font-semibold text-card-foreground">Dados da Venda</p>
                   <div>
-                    <label className="text-[11px] text-muted-foreground">Tipo de Evento *</label>
-                    <select
-                      value={conversionData.event_name}
-                      onChange={(e) => setConversionData(prev => ({ ...prev, event_name: e.target.value }))}
+                    <label className="text-[11px] text-muted-foreground">Campanha</label>
+                    <input
+                      type="text"
+                      value={saleData.campanha}
+                      onChange={(e) => setSaleData(prev => ({ ...prev, campanha: e.target.value }))}
+                      placeholder="Nome da Campanha"
                       className="w-full mt-1 rounded-lg border border-input bg-background px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
-                    >
-                      <option value="Lead">Lead</option>
-                      <option value="InitiateCheckout">InitiateCheckout</option>
-                      <option value="Purchase">Purchase</option>
-                    </select>
+                    />
                   </div>
                   <div>
                     <label className="text-[11px] text-muted-foreground">Valor *</label>
                     <input
                       type="number"
                       step="0.01"
-                      value={conversionData.valor}
-                      onChange={(e) => setConversionData(prev => ({ ...prev, valor: e.target.value }))}
-                      placeholder="197.00"
+                      value={saleData.valor}
+                      onChange={(e) => setSaleData(prev => ({ ...prev, valor: e.target.value }))}
+                      placeholder="150.00"
                       className="w-full mt-1 rounded-lg border border-input bg-background px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
                     />
                   </div>
-                  <div>
-                    <label className="text-[11px] text-muted-foreground">Moeda</label>
-                    <select
-                      value={conversionData.currency}
-                      onChange={(e) => setConversionData(prev => ({ ...prev, currency: e.target.value }))}
-                      className="w-full mt-1 rounded-lg border border-input bg-background px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
-                    >
-                      <option value="BRL">BRL</option>
-                      <option value="USD">USD</option>
-                      <option value="UYU">UYU</option>
-                      <option value="EUR">EUR</option>
-                    </select>
-                  </div>
-                  {/* Auto-filled info */}
-                  <div className="rounded-md bg-muted/50 p-2 space-y-1">
-                    <p className="text-[10px] font-semibold text-muted-foreground uppercase">Dados automáticos</p>
-                    <div className="flex justify-between text-[10px]">
-                      <span className="text-muted-foreground">Telefone</span>
-                      <span className="font-mono text-foreground">{conversation.contact_phone}</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[11px] text-muted-foreground">País</label>
+                      <select
+                        value={saleData.pais}
+                        onChange={(e) => {
+                          const pais = e.target.value;
+                          const moeda = pais === 'uruguay' ? 'UYU' : 'BRL';
+                          setSaleData(prev => ({ ...prev, pais, moeda }));
+                        }}
+                        className="w-full mt-1 rounded-lg border border-input bg-background px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
+                      >
+                        <option value="brasil">Brasil</option>
+                        <option value="uruguay">Uruguay</option>
+                      </select>
                     </div>
-                    <div className="flex justify-between text-[10px]">
-                      <span className="text-muted-foreground">CTWA CLID</span>
-                      <span className="font-mono text-foreground truncate max-w-[120px]">{conversation.ctwa_clid || 'N/A'}</span>
-                    </div>
-                    <div className="flex justify-between text-[10px]">
-                      <span className="text-muted-foreground">Source ID</span>
-                      <span className="font-mono text-foreground truncate max-w-[120px]">{conversation.source_id || 'N/A'}</span>
+                    <div>
+                      <label className="text-[11px] text-muted-foreground">Moeda</label>
+                      <input
+                        type="text"
+                        value={saleData.moeda}
+                        readOnly
+                        className="w-full mt-1 rounded-lg border border-input bg-muted px-3 py-1.5 text-xs"
+                      />
                     </div>
                   </div>
                   <div className="flex gap-2">
                     <button
-                      onClick={() => setShowConversionDialog(false)}
+                      onClick={() => setShowSaleDialog(false)}
                       className="flex-1 rounded-lg border border-border py-1.5 text-xs text-muted-foreground hover:bg-secondary transition-colors"
                     >
                       Cancelar
                     </button>
                     <button
-                      onClick={handleSendConversion}
-                      disabled={!conversionData.valor || sendingConversion}
-                      className="flex-1 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
+                      onClick={handleSendSale}
+                      disabled={!saleData.valor || sendingSale}
+                      className="flex-1 rounded-lg bg-green-600 hover:bg-green-700 text-white py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
                     >
-                      {sendingConversion ? <Loader2 className="h-3.5 w-3.5 animate-spin mx-auto" /> : 'Enviar para Meta'}
+                      {sendingSale ? <Loader2 className="h-3.5 w-3.5 animate-spin mx-auto" /> : 'Enviar'}
                     </button>
                   </div>
                 </div>
@@ -903,15 +858,6 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
                           <div className="flex items-center justify-between">
                             <span className="text-xs text-muted-foreground">Source ID</span>
                             <span className="text-[10px] font-mono text-card-foreground max-w-[120px] truncate" title={conversation.source_id}>{conversation.source_id}</span>
-                          </div>
-                        </>
-                      )}
-                      {(conversation as any).source_type && (
-                        <>
-                          <div className="h-px bg-border" />
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-muted-foreground">Source Type</span>
-                            <span className="text-xs font-mono text-card-foreground">{(conversation as any).source_type}</span>
                           </div>
                         </>
                       )}

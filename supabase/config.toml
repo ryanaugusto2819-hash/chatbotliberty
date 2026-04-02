@@ -44,6 +44,3 @@ verify_jwt = false
 
 [functions.zapi-qrcode]
 verify_jwt = false
-
-[functions.meta-conversions-send]
-verify_jwt = false
