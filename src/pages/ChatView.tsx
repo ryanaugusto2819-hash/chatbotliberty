@@ -952,14 +952,20 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
                             const res = await fetch(termoPdfUrl!);
                             const blob = await res.blob();
                             const blobUrl = URL.createObjectURL(blob);
-                            window.open(blobUrl, '_blank');
+                            const a = document.createElement('a');
+                            a.href = blobUrl;
+                            a.download = `termo_${termoData.nomeCliente.replace(/\s+/g, '_')}.pdf`;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
                           } catch {
-                            window.open(termoPdfUrl!, '_blank');
+                            toast.error('Erro ao baixar. Desative o bloqueador de anúncios e tente novamente.');
                           }
                         }}
                         className="block w-full text-center rounded-lg border border-border py-1.5 text-xs text-primary font-medium hover:bg-secondary transition-colors"
                       >
-                        📄 Visualizar Termo
+                        📄 Baixar e Visualizar Termo
                       </button>
                       <button
                         onClick={handleSendTermoWhatsApp}
