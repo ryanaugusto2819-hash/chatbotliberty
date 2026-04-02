@@ -6,7 +6,6 @@ import StatusBadge from '@/components/shared/StatusBadge';
 import { ArrowLeft, Send, Paperclip, MoreVertical, User, Clock, CheckCheck, Check, Loader2, Phone, MessageSquare, Tag, Calendar, Hash, History, AlertTriangle, RefreshCw, Bot, UserRound, DollarSign, Image, X, Trash2 } from 'lucide-react';
 import FlowTrigger from '@/components/automation/FlowTrigger';
 import QuickMessages from '@/components/chat/QuickMessages';
-import DocumentGenerator from '@/components/chat/DocumentGenerator';
 import TagManager from '@/components/tags/TagManager';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -778,23 +777,8 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
                     ))}
                   </div>
                 )}
-                </div>
+              </div>
 
-                {/* Gerar Documento */}
-                <DocumentGenerator
-                  contactName={conversation.contact_name}
-                  contactPhone={conversation.contact_phone}
-                  conversationId={id!}
-                  onSendDocument={async (pdfUrl) => {
-                    try {
-                      await sendWhatsAppMessage(id!, '', { mediaUrl: pdfUrl, messageType: 'document' });
-                      toast.success('PDF enviado via WhatsApp!');
-                    } catch (err: any) {
-                      console.error('Send document error:', err);
-                      toast.error('Erro ao enviar documento: ' + (err.message || 'Falha'));
-                    }
-                  }}
-                />
               {showConversionDialog && (
                 <div className="rounded-lg border border-border bg-background p-3 space-y-2.5">
                   <p className="text-xs font-semibold text-card-foreground">Enviar Evento de Conversão</p>
