@@ -19,7 +19,7 @@ export default function DocumentGenerator({ contactName, contactPhone, conversat
     cpf: '',
     tratamento_meses: '',
     valor: '',
-    forma_pagamento: 'boleto à vista',
+    forma_pagamento: '',
     data_compra: new Date().toLocaleDateString('pt-BR'),
     empresa: '',
   });
