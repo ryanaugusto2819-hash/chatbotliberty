@@ -585,7 +585,7 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
     }
   };
 
-    return (
+  if (loading) {
       <div className="flex h-screen items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
