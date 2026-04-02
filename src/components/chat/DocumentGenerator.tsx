@@ -144,19 +144,6 @@ export default function DocumentGenerator({ contactName, contactPhone, conversat
               />
             </div>
           </div>
-          <div>
-            <label className="text-[11px] font-medium text-muted-foreground">Forma de Pagamento *</label>
-            <select
-              value={form.forma_pagamento}
-              onChange={(e) => handleChange('forma_pagamento', e.target.value)}
-              className="w-full mt-0.5 rounded-lg border border-input bg-background px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500"
-            >
-              <option value="boleto à vista">Boleto à Vista</option>
-              <option value="pix">PIX</option>
-              <option value="cartão de crédito">Cartão de Crédito</option>
-              <option value="cartão de crédito parcelado">Cartão Parcelado</option>
-            </select>
-          </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="text-[11px] font-medium text-muted-foreground">Data da Compra *</label>
