@@ -154,7 +154,7 @@ serve(async (req) => {
   try {
     const { nome, cpf, tratamento_meses, valor, forma_pagamento, data_compra, empresa, conversation_id } = await req.json();
 
-    if (!nome || !cpf || !tratamento_meses || !valor || !forma_pagamento || !data_compra) {
+    if (!nome || !cpf || !tratamento_meses || !valor || !data_compra) {
       return new Response(JSON.stringify({ error: "Campos obrigatórios faltando" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
