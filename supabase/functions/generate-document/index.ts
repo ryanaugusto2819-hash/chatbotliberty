@@ -33,7 +33,7 @@ function buildPdf(text: { nome: string; cpf: string; tratamento_meses: string; v
   // Build content lines
   const contentBlocks: Array<{ text: string; bold: boolean; fontSize: number; centered?: boolean; gap?: number }> = [
     { text: "DECLARAÇÃO LEGAL DE COMPRA E CONDIÇÕES DE INADIMPLEMENTO:", bold: true, fontSize: 13, centered: true, gap: 20 },
-    { text: `Eu, ${text.nome}, portador(a) do CPF nº ${text.cpf}, confirmo a compra do tratamento de ${text.tratamento_meses} meses com ${empresa}, no valor de R$ ${text.valor}, com pagamento via ${text.forma_pagamento}.`, bold: false, fontSize: 10, gap: 8 },
+    { text: `Eu, ${text.nome}, portador(a) do CPF nº ${text.cpf}, confirmo a compra do tratamento de ${text.tratamento_meses} meses com ${empresa}, no valor de R$ ${text.valor}.`, bold: false, fontSize: 10, gap: 8 },
     { text: `Me comprometo a realizar o pagamento em no máximo 24 horas após o recebimento, conforme as condições previamente acordadas, estando ciente de todos os termos desta compra realizada em ${text.data_compra}.`, bold: false, fontSize: 10, gap: 8 },
     { text: "Estou ciente de que as opções de pagamento aceitas são cartão de crédito, pix ou boleto à vista. O parcelamento é possível apenas no cartão de crédito, em até 12 vezes, enquanto o boleto deve ser pago à vista.", bold: false, fontSize: 10, gap: 16 },
     { text: "I. CONSEQUÊNCIAS DO INADIMPLEMENTO:", bold: true, fontSize: 11, gap: 10 },
@@ -154,7 +154,7 @@ serve(async (req) => {
   try {
     const { nome, cpf, tratamento_meses, valor, forma_pagamento, data_compra, empresa, conversation_id } = await req.json();
 
-    if (!nome || !cpf || !tratamento_meses || !valor || !forma_pagamento || !data_compra) {
+    if (!nome || !cpf || !tratamento_meses || !valor || !data_compra) {
       return new Response(JSON.stringify({ error: "Campos obrigatórios faltando" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
