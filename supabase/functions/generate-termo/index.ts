@@ -128,51 +128,51 @@ function generateTermoPDF(vars: {
   };
 
   // --- Content ---
-  addTitle("DECLARA\\307\\303O LEGAL DE COMPRA E CONDI\\307\\325ES DE INADIMPLEMENTO:");
+  addTitle("DECLARAÇÃO LEGAL DE COMPRA E CONDIÇÕES DE INADIMPLEMENTO:");
 
   addParagraph(
-    `Eu, ${nomeCliente}, portador(a) do CPF n\\272 ${cpf}, confirmo a compra do tratamento de ${meses} meses com ${empresa}, no valor de R$ ${valor}, com pagamento via ${formaPagamento}.`
+    `Eu, ${nomeCliente}, portador(a) do CPF nº ${cpf}, confirmo a compra do tratamento de ${meses} meses com ${empresa}, no valor de R$ ${valor}, com pagamento via ${formaPagamento}.`
   );
 
   addParagraph(
-    `Me comprometo a realizar o pagamento em no m\\341ximo 24 horas ap\\363s o recebimento, conforme as condi\\347\\365es previamente acordadas, estando ciente de todos os termos desta compra realizada em ${dataCompra}.`
+    `Me comprometo a realizar o pagamento em no máximo 24 horas após o recebimento, conforme as condições previamente acordadas, estando ciente de todos os termos desta compra realizada em ${dataCompra}.`
   );
 
   addParagraph(
-    "Estou ciente de que as op\\347\\365es de pagamento aceitas s\\343o cart\\343o de cr\\351dito, pix ou boleto \\340 vista. O parcelamento \\351 poss\\355vel apenas no cart\\343o de cr\\351dito, em at\\351 12 vezes, enquanto o boleto deve ser pago \\340 vista."
+    "Estou ciente de que as opções de pagamento aceitas são cartão de crédito, pix ou boleto à vista. O parcelamento é possível apenas no cartão de crédito, em até 12 vezes, enquanto o boleto deve ser pago à vista."
   );
 
-  addSectionTitle("I. CONSEQU\\312NCIAS DO INADIMPLEMENTO:");
+  addSectionTitle("I. CONSEQUÊNCIAS DO INADIMPLEMENTO:");
 
   addParagraph(
-    "Em caso de inadimplemento (falta de pagamento), ser\\341 aplicada uma multa de 10% sobre o valor da compra, juros de 1% ao m\\352s, corre\\347\\343o monet\\341ria com base no IGPM-FGV, e honor\\341rios advocat\\355cios no percentual de 20% sobre o valor total devido."
-  );
-
-  addParagraph(
-    "Ap\\363s o envio, estou ciente de que n\\343o ser\\341 poss\\355vel cancelar ou devolver o pedido, pois ele j\\341 estar\\341 em posse dos Correios e ser\\341 entregue normalmente. Se os Correios n\\343o conseguirem a entrega, o produto ficar\\341 dispon\\355vel na ag\\352ncia, e \\351 minha obriga\\347\\343o retir\\341-lo na ag\\352ncia e efetuar o pagamento."
+    "Em caso de inadimplemento (falta de pagamento), será aplicada uma multa de 10% sobre o valor da compra, juros de 1% ao mês, correção monetária com base no IGPM-FGV, e honorários advocatícios no percentual de 20% sobre o valor total devido."
   );
 
   addParagraph(
-    "Reconhe\\347o que, em caso de inadimpl\\352ncia, recusa em receber ou n\\343o retirada nos Correios, a empresa poder\\341 adotar medidas de recupera\\347\\343o de cr\\351dito, incluindo a negativa\\347\\343o do meu CPF e processos judiciais, sendo o valor ainda devido em raz\\343o dos custos operacionais, log\\355sticos e demais despesas envolvidas."
+    "Após o envio, estou ciente de que não será possível cancelar ou devolver o pedido, pois ele já estará em posse dos Correios e será entregue normalmente. Se os Correios não conseguirem a entrega, o produto ficará disponível na agência, e é minha obrigação retirá-lo na agência e efetuar o pagamento."
   );
 
-  addSectionTitle("II. A\\307\\325ES LEGAIS RIGOROSAS:");
+  addParagraph(
+    "Reconheço que, em caso de inadimplência, recusa em receber ou não retirada nos Correios, a empresa poderá adotar medidas de recuperação de crédito, incluindo a negativação do meu CPF e processos judiciais, sendo o valor ainda devido em razão dos custos operacionais, logísticos e demais despesas envolvidas."
+  );
+
+  addSectionTitle("II. AÇÕES LEGAIS RIGOROSAS:");
 
   addBullet(
-    "Impacto no Cr\\351dito: Seu CPF ser\\341 imediatamente inscrito em \\363rg\\343os de prote\\347\\343o ao cr\\351dito, como SPC e Serasa, prejudicando sua capacidade de obter cr\\351dito no futuro."
-  );
-
-  addBullet(
-    "A\\347\\343o Judicial Imediata: Iniciaremos procedimentos legais para a cobran\\347a do d\\351bito, com base nos Artigos 771 a 925 do C\\363digo de Processo Civil. Este processo pode resultar na penhora de bens e outras medidas severas."
+    "Impacto no Crédito: Seu CPF será imediatamente inscrito em órgãos de proteção ao crédito, como SPC e Serasa, prejudicando sua capacidade de obter crédito no futuro."
   );
 
   addBullet(
-    "Implica\\347\\365es Criminais: Qualquer ind\\355cio de m\\341-f\\351 poder\\341 levar a consequ\\352ncias criminais sob o Art. 171 do C\\363digo Penal."
+    "Ação Judicial Imediata: Iniciaremos procedimentos legais para a cobrança do débito, com base nos Artigos 771 a 925 do Código de Processo Civil. Este processo pode resultar na penhora de bens e outras medidas severas."
+  );
+
+  addBullet(
+    "Implicações Criminais: Qualquer indício de má-fé poderá levar a consequências criminais sob o Art. 171 do Código Penal."
   );
 
   y -= 10;
   addParagraph(
-    "VOC\\312 EST\\301 CIENTE E CONFIRMA OS TERMOS ACIMA PARA O ENVIO? Responda por escrito, sim ou n\\343o via Whatsapp."
+    "VOCÊ ESTÁ CIENTE E CONFIRMA OS TERMOS ACIMA PARA O ENVIO? Responda por escrito, sim ou não via Whatsapp."
   );
 
   // Build PDF
