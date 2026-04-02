@@ -21,7 +21,7 @@ export default function DocumentGenerator({ contactName, contactPhone, conversat
     valor: '',
     forma_pagamento: '',
     data_compra: new Date().toLocaleDateString('pt-BR'),
-    empresa: '',
+    empresa: 'MEGAFIT',
   });
 
   const handleChange = (field: string, value: string) => {
