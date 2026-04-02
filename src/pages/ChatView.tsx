@@ -558,7 +558,7 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
     }
   };
 
-  const handleSendTermo = async () => {
+  const handleGenerateTermo = async () => {
     if (!termoData.nomeCliente || !termoData.cpf || !termoData.meses || sendingTermo) return;
     setSendingTermo(true);
     try {
@@ -572,18 +572,34 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
           formaPagamento: termoData.formaPagamento || 'boleto à vista',
           dataCompra: new Date().toLocaleDateString('pt-BR'),
           empresa: 'MEGAFIT',
-          enviar: true,
+          enviar: false,
         },
       });
       if (error) throw error;
-      toast.success('Termo gerado e enviado com sucesso!');
-      setShowTermoDialog(false);
-      setTermoData({ nomeCliente: '', cpf: '', meses: '', valor: '', formaPagamento: 'boleto à vista' });
+      setTermoPdfUrl(data.pdfUrl);
+      toast.success('Termo gerado! Revise antes de enviar.');
     } catch (err: any) {
       console.error('Termo error:', err);
       toast.error('Erro ao gerar termo');
     } finally {
       setSendingTermo(false);
+    }
+  };
+
+  const handleSendTermoWhatsApp = async () => {
+    if (!termoPdfUrl || sendingTermoWhatsApp) return;
+    setSendingTermoWhatsApp(true);
+    try {
+      await sendWhatsAppMessage(id!, '', { mediaUrl: termoPdfUrl, messageType: 'document' });
+      toast.success('Termo enviado com sucesso!');
+      setShowTermoDialog(false);
+      setTermoPdfUrl(null);
+      setTermoData({ nomeCliente: '', cpf: '', meses: '', valor: '', formaPagamento: 'boleto à vista' });
+    } catch (err: any) {
+      console.error('Send termo error:', err);
+      toast.error('Erro ao enviar termo');
+    } finally {
+      setSendingTermoWhatsApp(false);
     }
   };
 
