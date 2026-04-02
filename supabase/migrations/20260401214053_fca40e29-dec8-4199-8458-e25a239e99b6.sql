@@ -1,1 +1,0 @@
-ALTER TABLE public.meta_capi_config ADD COLUMN page_id text NOT NULL DEFAULT '';

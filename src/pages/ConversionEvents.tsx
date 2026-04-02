@@ -44,7 +44,7 @@ interface ConversionEvent {
 
 interface CapiConfig {
   id: string;
-  pixel_id: string;
+  dataset_id: string;
   access_token: string;
   api_version: string;
   graph_base_url: string;
@@ -76,9 +76,9 @@ export default function ConversionEvents() {
   const [config, setConfig] = useState<CapiConfig | null>(null);
   const [configLoading, setConfigLoading] = useState(false);
   const [configForm, setConfigForm] = useState({
-    pixel_id: '',
+    dataset_id: '',
     access_token: '',
-    api_version: 'v19.0',
+    api_version: 'v21.0',
     graph_base_url: 'https://graph.facebook.com',
     is_active: true,
   });
@@ -123,7 +123,7 @@ export default function ConversionEvents() {
       const c = data as unknown as CapiConfig;
       setConfig(c);
       setConfigForm({
-        pixel_id: c.pixel_id,
+        dataset_id: c.dataset_id,
         access_token: c.access_token,
         api_version: c.api_version,
         graph_base_url: c.graph_base_url,
@@ -341,7 +341,7 @@ export default function ConversionEvents() {
                                             <div><span className="text-muted-foreground">Event ID:</span> <span className="font-mono text-xs">{selectedEvent.event_id}</span></div>
                                             <div><span className="text-muted-foreground">Evento:</span> {selectedEvent.event_name}</div>
                                             <div><span className="text-muted-foreground">Telefone:</span> {selectedEvent.phone}</div>
-                                            <div><span className="text-muted-foreground">Telefone:</span> {selectedEvent.phone}</div>
+                                            <div><span className="text-muted-foreground">CTWA CLID:</span> <span className="font-mono text-xs">{selectedEvent.ctwa_clid || '-'}</span></div>
                                             <div><span className="text-muted-foreground">Valor:</span> {selectedEvent.value ? `${selectedEvent.currency} ${Number(selectedEvent.value).toFixed(2)}` : '-'}</div>
                                             <div><span className="text-muted-foreground">Status:</span> {selectedEvent.status}</div>
                                             <div><span className="text-muted-foreground">Tentativas:</span> {selectedEvent.retry_count}</div>
@@ -402,13 +402,13 @@ export default function ConversionEvents() {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label className="text-xs">Pixel ID</Label>
+                    <Label className="text-xs">Dataset ID</Label>
                     <Input
-                      placeholder="Ex: 2000413737545288"
-                      value={configForm.pixel_id}
-                      onChange={(e) => setConfigForm(f => ({ ...f, pixel_id: e.target.value }))}
+                      placeholder="Ex: 1234567890"
+                      value={configForm.dataset_id}
+                      onChange={(e) => setConfigForm(f => ({ ...f, dataset_id: e.target.value }))}
                     />
-                    <p className="text-[10px] text-muted-foreground mt-1">ID do Pixel no Events Manager da Meta</p>
+                    <p className="text-[10px] text-muted-foreground mt-1">ID do dataset no Events Manager da Meta</p>
                   </div>
                   <div>
                     <Label className="text-xs">Access Token</Label>
@@ -423,7 +423,7 @@ export default function ConversionEvents() {
                   <div>
                     <Label className="text-xs">Versão da API</Label>
                     <Input
-                      placeholder="v19.0"
+                      placeholder="v21.0"
                       value={configForm.api_version}
                       onChange={(e) => setConfigForm(f => ({ ...f, api_version: e.target.value }))}
                     />

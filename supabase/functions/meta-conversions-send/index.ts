@@ -11,7 +11,7 @@ function normalizePhone(phone: string): string {
 
 async function hashSha256(value: string): Promise<string> {
   const encoder = new TextEncoder();
-  const data = encoder.encode(value.trim().toLowerCase());
+  const data = encoder.encode(value);
   const hashBuffer = await crypto.subtle.digest("SHA-256", data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
@@ -23,15 +23,10 @@ interface ConversionEventPayload {
   order_id?: string;
   event_name: string;
   phone: string;
+  ctwa_clid?: string;
   value?: number;
   currency?: string;
   event_id?: string;
-  email?: string;
-  first_name?: string;
-  last_name?: string;
-  gender?: string;
-  country?: string;
-  state?: string;
 }
 
 interface RetryPayload {
@@ -50,7 +45,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const mode = body.mode || "send";
+    const mode = body.mode || "send"; // "send" | "retry" | "batch_retry"
 
     if (mode === "retry") {
       return await handleRetry(supabase, body as RetryPayload);
@@ -60,6 +55,7 @@ Deno.serve(async (req) => {
       return await handleBatchRetry(supabase);
     }
 
+    // mode === "send"
     return await handleSend(supabase, body as ConversionEventPayload);
   } catch (err) {
     console.error("[meta-conversions-send] Error:", err);
@@ -82,8 +78,8 @@ async function getCapiConfig(supabase: any) {
     throw new Error("Meta CAPI configuration not found or inactive");
   }
 
-  if (!data.pixel_id || !data.access_token) {
-    throw new Error("Meta CAPI configuration incomplete: missing pixel_id or access_token");
+  if (!data.dataset_id || !data.access_token) {
+    throw new Error("Meta CAPI configuration incomplete: missing dataset_id or access_token");
   }
 
   return data;
@@ -96,14 +92,9 @@ async function handleSend(supabase: any, payload: ConversionEventPayload) {
     order_id,
     event_name,
     phone,
+    ctwa_clid,
     value,
     currency = "BRL",
-    email,
-    first_name,
-    last_name,
-    gender,
-    country = "br",
-    state,
   } = payload;
 
   if (!event_name || !phone) {
@@ -113,13 +104,13 @@ async function handleSend(supabase: any, payload: ConversionEventPayload) {
     );
   }
 
-  const normalizedPhone = normalizePhone(phone);
-  const eventId = payload.event_id || `${event_name}_${normalizedPhone}_${Date.now()}`;
+  // Generate unique event_id for idempotency
+  const eventId = payload.event_id || `${event_name}_${normalizePhone(phone)}_${Date.now()}`;
 
   // Check for duplicate
   const { data: existingEvent } = await supabase
     .from("conversion_events")
-    .select("id, status, retry_count")
+    .select("id, status")
     .eq("event_id", eventId)
     .maybeSingle();
 
@@ -132,56 +123,76 @@ async function handleSend(supabase: any, payload: ConversionEventPayload) {
 
   const config = await getCapiConfig(supabase);
 
-  // Build user_data with SHA-256 hashed values
-  const hashedPhone = await hashSha256(normalizedPhone);
-  const userData: any = {
-    ph: [hashedPhone],
-    country: [await hashSha256(country)],
-  };
+  // Fetch waba_id: try conversion_leads first, then fall back to connection_configs via conversation
+  let wabaId: string | null = null;
+  if (conversation_id) {
+    const { data: leadData } = await supabase
+      .from("conversion_leads")
+      .select("waba_id")
+      .eq("conversation_id", conversation_id)
+      .maybeSingle();
+    wabaId = leadData?.waba_id || null;
 
-  if (email) {
-    userData.em = [await hashSha256(email)];
-  }
-  if (first_name) {
-    userData.fn = [await hashSha256(first_name)];
-  }
-  if (last_name) {
-    userData.ln = [await hashSha256(last_name)];
-  }
-  if (gender) {
-    userData.ge = [await hashSha256(gender)];
-  }
-  if (state) {
-    userData.st = [await hashSha256(state)];
+    if (!wabaId) {
+      const { data: convData } = await supabase
+        .from("conversations")
+        .select("connection_config_id")
+        .eq("id", conversation_id)
+        .maybeSingle();
+      if (convData?.connection_config_id) {
+        const { data: connData } = await supabase
+          .from("connection_configs")
+          .select("config")
+          .eq("id", convData.connection_config_id)
+          .maybeSingle();
+        wabaId = connData?.config?.waba_id || null;
+      }
+    }
   }
 
-  // Build standard CAPI payload
+  // Build Meta CAPI payload
   const eventTime = Math.floor(Date.now() / 1000);
+  const normalizedPhone = normalizePhone(phone);
+
+  const hashedPhone = await hashSha256(normalizedPhone);
+
   const metaPayload: any = {
     data: [
       {
         event_name,
         event_time: eventTime,
         event_id: eventId,
-        action_source: "system_generated",
-        user_data: userData,
+        action_source: "business_messaging",
+        messaging_channel: "whatsapp",
+        user_data: {
+          ph: [hashedPhone],
+        },
+        custom_data: {} as any,
       },
     ],
   };
 
-  // Add custom_data if value is present
+  // Add WABA ID (required by Meta for business_messaging)
+  if (wabaId) {
+    metaPayload.data[0].user_data.whatsapp_business_account_id = wabaId;
+  }
+
+  if (ctwa_clid) {
+    metaPayload.data[0].user_data.ctwa_clid = ctwa_clid;
+  }
+
   if (value !== undefined && value !== null) {
-    metaPayload.data[0].custom_data = {
-      value,
-      currency,
-    };
+    metaPayload.data[0].custom_data.value = value;
+    metaPayload.data[0].custom_data.currency = currency;
   }
 
   if (order_id) {
-    if (!metaPayload.data[0].custom_data) {
-      metaPayload.data[0].custom_data = {};
-    }
     metaPayload.data[0].custom_data.order_id = order_id;
+  }
+
+  // Remove empty custom_data
+  if (Object.keys(metaPayload.data[0].custom_data).length === 0) {
+    delete metaPayload.data[0].custom_data;
   }
 
   // Create or update event record
@@ -192,6 +203,7 @@ async function handleSend(supabase: any, payload: ConversionEventPayload) {
     order_id: order_id || null,
     event_name,
     phone: normalizedPhone,
+    ctwa_clid: ctwa_clid || null,
     value: value || null,
     currency,
     status: "pending",
@@ -220,8 +232,8 @@ async function handleSend(supabase: any, payload: ConversionEventPayload) {
     eventDbId = inserted.id;
   }
 
-  // Send to Meta using Pixel ID
-  const url = `${config.graph_base_url}/${config.api_version}/${config.pixel_id}/events?access_token=${config.access_token}`;
+  // Send to Meta
+  const url = `${config.graph_base_url}/${config.api_version}/${config.dataset_id}/events?access_token=${config.access_token}`;
 
   try {
     console.log(`[meta-conversions-send] Sending ${event_name} to Meta for phone ${normalizedPhone}`);
@@ -313,8 +325,9 @@ async function handleRetry(supabase: any, payload: RetryPayload) {
     );
   }
 
+  // Re-send using stored payload
   const config = await getCapiConfig(supabase);
-  const url = `${config.graph_base_url}/${config.api_version}/${config.pixel_id}/events?access_token=${config.access_token}`;
+  const url = `${config.graph_base_url}/${config.api_version}/${config.dataset_id}/events?access_token=${config.access_token}`;
 
   // Update event_time to now for retry
   const retryPayload = { ...event.payload_json };
@@ -382,6 +395,7 @@ async function handleRetry(supabase: any, payload: RetryPayload) {
 }
 
 async function handleBatchRetry(supabase: any) {
+  // Find all failed events with retry_count < 5
   const { data: failedEvents, error } = await supabase
     .from("conversion_events")
     .select("id")

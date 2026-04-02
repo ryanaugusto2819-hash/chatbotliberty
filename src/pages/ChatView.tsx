@@ -530,6 +530,7 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
           conversation_id: conversationId,
           event_name: conversionData.event_name,
           phone: conversation.contact_phone,
+          ctwa_clid: conversation.ctwa_clid || undefined,
           value: parseFloat(conversionData.valor) || 0,
           currency: conversionData.currency,
         },
@@ -782,6 +783,12 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
               {showConversionDialog && (
                 <div className="rounded-lg border border-border bg-background p-3 space-y-2.5">
                   <p className="text-xs font-semibold text-card-foreground">Enviar Evento de Conversão</p>
+                  {!conversation.ctwa_clid && (
+                    <div className="flex items-center gap-1.5 rounded-md bg-warning/10 border border-warning/20 px-2 py-1.5">
+                      <AlertTriangle className="h-3 w-3 text-warning shrink-0" />
+                      <span className="text-[10px] text-warning">Este lead não possui ctwa_clid. O evento será enviado sem dados de atribuição de anúncio.</span>
+                    </div>
+                  )}
                   <div>
                     <label className="text-[11px] text-muted-foreground">Tipo de Evento *</label>
                     <select
@@ -826,10 +833,13 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
                       <span className="font-mono text-foreground">{conversation.contact_phone}</span>
                     </div>
                     <div className="flex justify-between text-[10px]">
-                      <span className="text-muted-foreground">Nome</span>
-                      <span className="font-mono text-foreground truncate max-w-[120px]">{conversation.contact_name}</span>
+                      <span className="text-muted-foreground">CTWA CLID</span>
+                      <span className="font-mono text-foreground truncate max-w-[120px]">{conversation.ctwa_clid || 'N/A'}</span>
                     </div>
-                    <p className="text-[9px] text-muted-foreground italic mt-1">Enviado via CAPI server-side (action_source: system_generated)</p>
+                    <div className="flex justify-between text-[10px]">
+                      <span className="text-muted-foreground">Source ID</span>
+                      <span className="font-mono text-foreground truncate max-w-[120px]">{conversation.source_id || 'N/A'}</span>
+                    </div>
                   </div>
                   <div className="flex gap-2">
                     <button
