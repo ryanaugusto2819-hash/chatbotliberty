@@ -785,20 +785,10 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
                   contactName={conversation.contact_name}
                   contactPhone={conversation.contact_phone}
                   conversationId={id!}
-                  onSendImage={async (imageDataUrl) => {
-                    // Convert base64 to blob, upload, then send via WhatsApp
+                  onSendDocument={async (pdfUrl) => {
                     try {
-                      const res = await fetch(imageDataUrl);
-                      const blob = await res.blob();
-                      const path = `${id}/${Date.now()}_documento.png`;
-                      const { error: uploadError } = await supabase.storage
-                        .from('chat-media')
-                        .upload(path, blob, { contentType: 'image/png' });
-                      if (uploadError) throw uploadError;
-                      const { data: urlData } = supabase.storage.from('chat-media').getPublicUrl(path);
-                      const mediaUrl = urlData.publicUrl;
-                      await sendWhatsAppMessage(id!, '', { mediaUrl, messageType: 'image' });
-                      toast.success('Documento enviado via WhatsApp!');
+                      await sendWhatsAppMessage(id!, '', { mediaUrl: pdfUrl, messageType: 'document' });
+                      toast.success('PDF enviado via WhatsApp!');
                     } catch (err: any) {
                       console.error('Send document error:', err);
                       toast.error('Erro ao enviar documento: ' + (err.message || 'Falha'));
