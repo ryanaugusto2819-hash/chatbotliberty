@@ -848,7 +848,97 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
                 </div>
               )}
 
-              {/* Contact Details */}
+              {/* Gerar Termo */}
+              <div>
+                <button
+                  onClick={() => {
+                    setTermoData(prev => ({ ...prev, nomeCliente: conversation.contact_name }));
+                    setShowTermoDialog(true);
+                  }}
+                  className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground py-1.5 px-3 text-xs font-medium transition-colors"
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  Gerar Termo de Compromisso
+                </button>
+              </div>
+
+              {showTermoDialog && (
+                <div className="rounded-lg border border-border bg-background p-3 space-y-2.5">
+                  <p className="text-xs font-semibold text-card-foreground">Termo de Compromisso</p>
+                  <div>
+                    <label className="text-[11px] text-muted-foreground">Nome do Cliente *</label>
+                    <input
+                      type="text"
+                      value={termoData.nomeCliente}
+                      onChange={(e) => setTermoData(prev => ({ ...prev, nomeCliente: e.target.value }))}
+                      placeholder="Nome completo"
+                      className="w-full mt-1 rounded-lg border border-input bg-background px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-muted-foreground">CPF *</label>
+                    <input
+                      type="text"
+                      value={termoData.cpf}
+                      onChange={(e) => setTermoData(prev => ({ ...prev, cpf: e.target.value }))}
+                      placeholder="000.000.000-00"
+                      className="w-full mt-1 rounded-lg border border-input bg-background px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[11px] text-muted-foreground">Meses de Tratamento *</label>
+                      <input
+                        type="text"
+                        value={termoData.meses}
+                        onChange={(e) => setTermoData(prev => ({ ...prev, meses: e.target.value }))}
+                        placeholder="5"
+                        className="w-full mt-1 rounded-lg border border-input bg-background px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] text-muted-foreground">Valor (R$)</label>
+                      <input
+                        type="text"
+                        value={termoData.valor}
+                        onChange={(e) => setTermoData(prev => ({ ...prev, valor: e.target.value }))}
+                        placeholder="397,00"
+                        className="w-full mt-1 rounded-lg border border-input bg-background px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-muted-foreground">Forma de Pagamento</label>
+                    <select
+                      value={termoData.formaPagamento}
+                      onChange={(e) => setTermoData(prev => ({ ...prev, formaPagamento: e.target.value }))}
+                      className="w-full mt-1 rounded-lg border border-input bg-background px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
+                    >
+                      <option value="boleto à vista">Boleto à vista</option>
+                      <option value="cartão de crédito">Cartão de crédito</option>
+                      <option value="pix">PIX</option>
+                    </select>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">Empresa: MEGAFIT (fixo) • Data: hoje</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setShowTermoDialog(false)}
+                      className="flex-1 rounded-lg border border-border py-1.5 text-xs text-muted-foreground hover:bg-secondary transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={handleSendTermo}
+                      disabled={!termoData.nomeCliente || !termoData.cpf || !termoData.meses || sendingTermo}
+                      className="flex-1 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
+                    >
+                      {sendingTermo ? <Loader2 className="h-3.5 w-3.5 animate-spin mx-auto" /> : 'Gerar e Enviar'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+
               <div>
                 <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
                   <User className="h-3 w-3" /> Detalhes do Contato
