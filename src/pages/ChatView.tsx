@@ -254,8 +254,6 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
   const [showTermoDialog, setShowTermoDialog] = useState(false);
   const [termoData, setTermoData] = useState({ nomeCliente: '', cpf: '', meses: '', valor: '', formaPagamento: 'boleto à vista' });
   const [sendingTermo, setSendingTermo] = useState(false);
-  const [sendingSale, setSendingSale] = useState(false);
-  const [saleRegisteredAt, setSaleRegisteredAt] = useState<string | null>(null);
   const [blockedConnections, setBlockedConnections] = useState<{ id: string; label: string; status: string }[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
