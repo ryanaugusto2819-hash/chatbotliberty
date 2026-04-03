@@ -12,9 +12,10 @@ interface FlowOption {
 
 interface FlowTriggerProps {
   conversationId: string;
+  nicheId: string | null;
 }
 
-export default function FlowTrigger({ conversationId }: FlowTriggerProps) {
+export default function FlowTrigger({ conversationId, nicheId }: FlowTriggerProps) {
   const [open, setOpen] = useState(false);
   const [flows, setFlows] = useState<FlowOption[]>([]);
   const [executing, setExecuting] = useState<string | null>(null);
