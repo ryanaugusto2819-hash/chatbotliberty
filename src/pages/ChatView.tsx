@@ -328,7 +328,7 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
     if (!id) return;
     const { data } = await supabase
       .from('conversations')
-      .select('id, contact_name, contact_phone, status, tags, updated_at, created_at, assigned_agent_id, ctwa_clid, source_id, ad_title, sale_registered_at')
+      .select('id, contact_name, contact_phone, status, tags, updated_at, created_at, assigned_agent_id, ctwa_clid, source_id, ad_title, sale_registered_at, niche_id')
       .eq('id', id)
       .single();
     if (data) {
@@ -726,7 +726,7 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
               <Paperclip className="h-4 w-4" />
             </button>
             <QuickMessages onSelect={(content) => setInput(content)} />
-            <FlowTrigger conversationId={id!} />
+            <FlowTrigger conversationId={id!} nicheId={(conversation as any)?.niche_id || null} />
             <div className="flex-1 relative">
               <textarea
                 value={input}

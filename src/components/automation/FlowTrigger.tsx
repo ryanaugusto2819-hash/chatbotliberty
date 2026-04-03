@@ -12,9 +12,10 @@ interface FlowOption {
 
 interface FlowTriggerProps {
   conversationId: string;
+  nicheId: string | null;
 }
 
-export default function FlowTrigger({ conversationId }: FlowTriggerProps) {
+export default function FlowTrigger({ conversationId, nicheId }: FlowTriggerProps) {
   const [open, setOpen] = useState(false);
   const [flows, setFlows] = useState<FlowOption[]>([]);
   const [executing, setExecuting] = useState<string | null>(null);
@@ -28,14 +29,21 @@ export default function FlowTrigger({ conversationId }: FlowTriggerProps) {
 
   useEffect(() => {
     if (open) {
-      supabase
+      let query = supabase
         .from('automation_flows')
         .select('id, name, is_active')
         .order('is_active', { ascending: false })
-        .order('created_at', { ascending: false })
-        .then(({ data }) => setFlows(data || []));
+        .order('created_at', { ascending: false });
+
+      if (nicheId) {
+        query = query.eq('niche_id', nicheId);
+      } else {
+        query = query.is('niche_id', null);
+      }
+
+      query.then(({ data }) => setFlows(data || []));
     }
-  }, [open]);
+  }, [open, nicheId]);
 
   const trigger = async (flowId: string) => {
     setExecuting(flowId);
