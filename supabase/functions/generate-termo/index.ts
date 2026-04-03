@@ -23,18 +23,19 @@ async function generateTermoPDF(vars: {
 
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const fontBoldOblique = await pdfDoc.embedFont(StandardFonts.HelveticaBoldOblique);
 
   const marginLeft = 50;
-  const marginRight = 50;
-  const contentWidth = width - marginLeft - marginRight;
+  const contentWidth = width - marginLeft - 50;
   const fontSize = 10;
-  const titleFontSize = 13;
-  const sectionFontSize = 11;
   const lineHeight = 14;
+
+  const purple = rgb(0.502, 0.0, 0.502); // #800080
+  const black = rgb(0, 0, 0);
 
   let y = height - 60;
 
-  // Helper: wrap text into lines
+  // Word wrap using actual font metrics
   const wrapText = (text: string, font: typeof fontRegular, size: number, maxW: number): string[] => {
     const words = text.split(" ");
     const lines: string[] = [];
@@ -53,103 +54,146 @@ async function generateTermoPDF(vars: {
     return lines;
   };
 
-  // Helper: draw wrapped text
-  const drawText = (text: string, font: typeof fontRegular, size: number, indent = 0) => {
-    const lines = wrapText(text, font, size, contentWidth - indent);
+  // Draw title centered, bold, purple, larger
+  const drawTitle = (text: string) => {
+    const titleSize = 16;
+    const lines = wrapText(text, fontBold, titleSize, contentWidth);
     for (const line of lines) {
-      if (y < 50) {
-        // Would need new page - content should fit on one page
-        y = height - 50;
-      }
-      page.drawText(line, { x: marginLeft + indent, y, size, font, color: rgb(0, 0, 0) });
+      const w = fontBold.widthOfTextAtSize(line, titleSize);
+      const x = marginLeft + (contentWidth - w) / 2;
+      page.drawText(line, { x, y, size: titleSize, font: fontBold, color: purple });
+      y -= titleSize + 6;
+    }
+    y -= 10;
+  };
+
+  // Draw section title - purple, bold oblique (italic), underlined
+  const drawSectionTitle = (text: string) => {
+    y -= 10;
+    const secSize = 12;
+    page.drawText(text, { x: marginLeft, y, size: secSize, font: fontBoldOblique, color: purple });
+    // Underline
+    const tw = fontBoldOblique.widthOfTextAtSize(text, secSize);
+    page.drawLine({
+      start: { x: marginLeft, y: y - 2 },
+      end: { x: marginLeft + tw, y: y - 2 },
+      thickness: 0.8,
+      color: purple,
+    });
+    y -= secSize + 12;
+  };
+
+  // Draw paragraph - regular, black
+  const drawParagraph = (text: string) => {
+    const lines = wrapText(text, fontRegular, fontSize, contentWidth);
+    for (const line of lines) {
+      page.drawText(line, { x: marginLeft, y, size: fontSize, font: fontRegular, color: black });
       y -= lineHeight;
     }
-  };
-
-  const addTitle = (text: string) => {
-    drawText(text, fontBold, titleFontSize);
-    y -= 8;
-  };
-
-  const addSectionTitle = (text: string) => {
     y -= 6;
-    drawText(text, fontBold, sectionFontSize);
+  };
+
+  // Draw bullet with bold label prefix: "Label: rest of text"
+  const drawBullet = (label: string, text: string) => {
+    const fullText = label + " " + text;
+    const labelWidth = fontBold.widthOfTextAtSize(label + " ", fontSize);
+
+    // First line: bold label then regular text
+    const firstLineMax = contentWidth;
+    // Measure how much regular text fits after the label on first line
+    const remainingWidth = firstLineMax - labelWidth;
+
+    const words = text.split(" ");
+    let firstLineText = "";
+    let wordIdx = 0;
+    for (; wordIdx < words.length; wordIdx++) {
+      const test = firstLineText ? firstLineText + " " + words[wordIdx] : words[wordIdx];
+      if (fontRegular.widthOfTextAtSize(test, fontSize) > remainingWidth && firstLineText) {
+        break;
+      }
+      firstLineText = test;
+    }
+
+    // Draw bold label
+    page.drawText(label + " ", { x: marginLeft, y, size: fontSize, font: fontBold, color: black });
+    // Draw regular text after label
+    page.drawText(firstLineText, { x: marginLeft + labelWidth, y, size: fontSize, font: fontRegular, color: black });
+    y -= lineHeight;
+
+    // Remaining lines
+    const remaining = words.slice(wordIdx).join(" ");
+    if (remaining) {
+      const lines = wrapText(remaining, fontRegular, fontSize, contentWidth);
+      for (const line of lines) {
+        page.drawText(line, { x: marginLeft, y, size: fontSize, font: fontRegular, color: black });
+        y -= lineHeight;
+      }
+    }
     y -= 4;
   };
 
-  const addParagraph = (text: string) => {
-    drawText(text, fontRegular, fontSize);
-    y -= 6;
-  };
-
-  const addBullet = (text: string) => {
-    // Draw bullet character
-    const bulletLines = wrapText(text, fontRegular, fontSize, contentWidth - 15);
-    for (let i = 0; i < bulletLines.length; i++) {
-      if (y < 50) y = height - 50;
-      const prefix = i === 0 ? "\u2022 " : "";
-      const indent = i === 0 ? 0 : 15;
-      page.drawText(prefix + bulletLines[i], {
-        x: marginLeft + indent,
-        y,
-        size: fontSize,
-        font: fontRegular,
-        color: rgb(0, 0, 0),
-      });
-      y -= lineHeight;
+  // Draw centered bold text
+  const drawCenteredBold = (text: string, size = fontSize) => {
+    const lines = wrapText(text, fontBold, size, contentWidth);
+    for (const line of lines) {
+      const w = fontBold.widthOfTextAtSize(line, size);
+      const x = marginLeft + (contentWidth - w) / 2;
+      page.drawText(line, { x, y, size, font: fontBold, color: black });
+      y -= size + 4;
     }
-    y -= 2;
   };
 
-  // --- Content ---
-  addTitle("DECLARACAO LEGAL DE COMPRA E CONDICOES DE INADIMPLEMENTO:");
+  // === CONTENT ===
 
-  addParagraph(
+  drawTitle("DECLARACAO LEGAL DE COMPRA E CONDICOES DE INADIMPLEMENTO:");
+
+  drawParagraph(
     `Eu, ${nomeCliente}, portador(a) do CPF no ${cpf}, confirmo a compra do tratamento de ${meses} meses com ${empresa}, no valor de R$ ${valor}, com pagamento via ${formaPagamento}.`
   );
 
-  addParagraph(
+  drawParagraph(
     `Me comprometo a realizar o pagamento em no maximo 24 horas apos o recebimento, conforme as condicoes previamente acordadas, estando ciente de todos os termos desta compra realizada em ${dataCompra}.`
   );
 
-  addParagraph(
+  drawParagraph(
     "Estou ciente de que as opcoes de pagamento aceitas sao cartao de credito, pix ou boleto a vista. O parcelamento e possivel apenas no cartao de credito, em ate 12 vezes, enquanto o boleto deve ser pago a vista."
   );
 
-  addSectionTitle("I. CONSEQUENCIAS DO INADIMPLEMENTO:");
+  drawSectionTitle("I. CONSEQUENCIAS DO INADIMPLEMENTO:");
 
-  addParagraph(
+  drawParagraph(
     "Em caso de inadimplemento (falta de pagamento), sera aplicada uma multa de 10% sobre o valor da compra, juros de 1% ao mes, correcao monetaria com base no IGPM-FGV, e honorarios advocaticios no percentual de 20% sobre o valor total devido."
   );
 
-  addParagraph(
+  drawParagraph(
     "Apos o envio, estou ciente de que nao sera possivel cancelar ou devolver o pedido, pois ele ja estara em posse dos Correios e sera entregue normalmente. Se os Correios nao conseguirem a entrega, o produto ficara disponivel na agencia, e e minha obrigacao retira-lo na agencia e efetuar o pagamento."
   );
 
-  addParagraph(
+  drawParagraph(
     "Reconheco que, em caso de inadimplencia, recusa em receber ou nao retirada nos Correios, a empresa podera adotar medidas de recuperacao de credito, incluindo a negativacao do meu CPF e processos judiciais, sendo o valor ainda devido em razao dos custos operacionais, logisticos e demais despesas envolvidas."
   );
 
-  addSectionTitle("II. ACOES LEGAIS RIGOROSAS:");
+  drawSectionTitle("II. ACOES LEGAIS RIGOROSAS:");
 
-  addBullet(
-    "Impacto no Credito: Seu CPF sera imediatamente inscrito em orgaos de protecao ao credito, como SPC e Serasa, prejudicando sua capacidade de obter credito no futuro."
+  drawBullet(
+    "Impacto no Credito:",
+    "Seu CPF sera imediatamente inscrito em orgaos de protecao ao credito, como SPC e Serasa, prejudicando sua capacidade de obter credito no futuro."
   );
 
-  addBullet(
-    "Acao Judicial Imediata: Iniciaremos procedimentos legais para a cobranca do debito, com base nos Artigos 771 a 925 do Codigo de Processo Civil. Este processo pode resultar na penhora de bens e outras medidas severas."
+  drawBullet(
+    "Acao Judicial Imediata:",
+    "Iniciaremos procedimentos legais para a cobranca do debito, com base nos Artigos 771 a 925 do Codigo de Processo Civil. Este processo pode resultar na penhora de bens e outras medidas severas."
   );
 
-  addBullet(
-    "Implicacoes Criminais: Qualquer indicio de ma-fe podera levar a consequencias criminais sob o Art. 171 do Codigo Penal."
+  drawBullet(
+    "Implicacoes Criminais:",
+    "Qualquer indicio de ma-fe podera levar a consequencias criminais sob o Art. 171 do Codigo Penal."
   );
 
   y -= 10;
-  drawText(
-    "VOCE ESTA CIENTE E CONFIRMA OS TERMOS ACIMA PARA O ENVIO? Responda por escrito, sim ou nao via Whatsapp.",
-    fontBold,
-    fontSize
-  );
+  drawCenteredBold("VOCE ESTA CIENTE E CONFIRMA OS TERMOS ACIMA PARA O ENVIO?");
+  y -= 4;
+  drawCenteredBold("Responda por escrito, sim ou nao via Whatsapp.");
 
   return await pdfDoc.save();
 }
@@ -175,7 +219,6 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Generate PDF
     const pdfBytes = await generateTermoPDF({
       nomeCliente,
       cpf,
@@ -186,20 +229,16 @@ Deno.serve(async (req) => {
       empresa: empresa || "MEGAFIT",
     });
 
-    // Upload to storage
     const fileName = `${conversationId}/termo_${Date.now()}.pdf`;
     const { error: uploadError } = await supabase.storage
       .from("chat-media")
       .upload(fileName, pdfBytes, { contentType: "application/pdf" });
 
-    if (uploadError) {
-      throw new Error(`Upload failed: ${uploadError.message}`);
-    }
+    if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
 
     const { data: urlData } = supabase.storage.from("chat-media").getPublicUrl(fileName);
     const pdfUrl = urlData.publicUrl;
 
-    // If enviar=true, send via WhatsApp
     if (enviar) {
       const { data: conv } = await supabase
         .from("conversations")
@@ -210,17 +249,13 @@ Deno.serve(async (req) => {
       if (!conv) throw new Error("Conversa nao encontrada");
 
       let functionName = "whatsapp-send";
-
       if (conv.connection_config_id) {
         const { data: connConfig } = await supabase
           .from("connection_configs")
           .select("connection_id")
           .eq("id", conv.connection_config_id)
           .single();
-
-        if (connConfig?.connection_id === "zapi") {
-          functionName = "zapi-send";
-        }
+        if (connConfig?.connection_id === "zapi") functionName = "zapi-send";
       }
 
       const sendUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/${functionName}`;
@@ -231,14 +266,9 @@ Deno.serve(async (req) => {
           Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
         },
         body: JSON.stringify({
-          conversationId,
-          message: "",
-          mediaUrl: pdfUrl,
-          type: "document",
-          senderLabel: "humano",
+          conversationId, message: "", mediaUrl: pdfUrl, type: "document", senderLabel: "humano",
         }),
       });
-
       const sendResult = await sendRes.json();
 
       return new Response(JSON.stringify({ success: true, pdfUrl, sent: true, sendResult }), {
