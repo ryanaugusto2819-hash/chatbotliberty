@@ -257,6 +257,15 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
   const [termoPdfUrl, setTermoPdfUrl] = useState<string | null>(null);
   const [sendingTermoWhatsApp, setSendingTermoWhatsApp] = useState(false);
   const [blockedConnections, setBlockedConnections] = useState<{ id: string; label: string; status: string }[]>([]);
+
+  // Reset termo state when conversation changes
+  useEffect(() => {
+    setShowTermoDialog(false);
+    setTermoData({ nomeCliente: '', cpf: '', meses: '', valor: '', formaPagamento: 'boleto à vista' });
+    setTermoPdfUrl(null);
+    setSendingTermo(false);
+    setSendingTermoWhatsApp(false);
+  }, [id]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
