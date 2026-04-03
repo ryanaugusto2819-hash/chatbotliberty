@@ -28,61 +28,15 @@ export default function FlowTrigger({ conversationId, nicheId }: FlowTriggerProp
   }, [flows, search]);
 
   useEffect(() => {
-    if (!open) return;
-
-    let cancelled = false;
-
-    const createQuery = () =>
+    if (open) {
       supabase
         .from('automation_flows')
         .select('id, name, is_active')
         .order('is_active', { ascending: false })
-        .order('created_at', { ascending: false });
-
-    const loadFlows = async () => {
-      if (nicheId) {
-        const { data: nicheFlows, error: nicheError } = await createQuery().eq('niche_id', nicheId);
-
-        if (nicheError) {
-          console.error('Erro ao carregar fluxos do nicho:', nicheError);
-          if (!cancelled) setFlows([]);
-          return;
-        }
-
-        if (nicheFlows && nicheFlows.length > 0) {
-          if (!cancelled) setFlows(nicheFlows);
-          return;
-        }
-
-        const { data: globalFlows, error: globalError } = await createQuery().is('niche_id', null);
-
-        if (globalError) {
-          console.error('Erro ao carregar fluxos globais:', globalError);
-          if (!cancelled) setFlows([]);
-          return;
-        }
-
-        if (!cancelled) setFlows(globalFlows || []);
-        return;
-      }
-
-      const { data, error } = await createQuery().is('niche_id', null);
-
-      if (error) {
-        console.error('Erro ao carregar fluxos:', error);
-        if (!cancelled) setFlows([]);
-        return;
-      }
-
-      if (!cancelled) setFlows(data || []);
-    };
-
-    loadFlows();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [open, nicheId]);
+        .order('created_at', { ascending: false })
+        .then(({ data }) => setFlows(data || []));
+    }
+  }, [open]);
 
   const trigger = async (flowId: string) => {
     setExecuting(flowId);
