@@ -1,12 +1,12 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.98.0";
+import { PDFDocument, StandardFonts, rgb } from "https://esm.sh/pdf-lib@1.17.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// PDF generation using raw byte stream (PDF/1.4)
-function generateTermoPDF(vars: {
+async function generateTermoPDF(vars: {
   nomeCliente: string;
   cpf: string;
   meses: string;
@@ -14,217 +14,144 @@ function generateTermoPDF(vars: {
   formaPagamento: string;
   dataCompra: string;
   empresa: string;
-}): Uint8Array {
+}): Promise<Uint8Array> {
   const { nomeCliente, cpf, meses, valor, formaPagamento, dataCompra, empresa } = vars;
 
-  // Helper to encode text to PDF Latin encoding
-  const encodePdfText = (text: string): string => {
-    return text
-      .replace(/\\/g, "\\\\")
-      .replace(/\(/g, "\\(")
-      .replace(/\)/g, "\\)")
-      .replace(/á/g, "\\341")
-      .replace(/à/g, "\\340")
-      .replace(/ã/g, "\\343")
-      .replace(/â/g, "\\342")
-      .replace(/é/g, "\\351")
-      .replace(/ê/g, "\\352")
-      .replace(/í/g, "\\355")
-      .replace(/ó/g, "\\363")
-      .replace(/ô/g, "\\364")
-      .replace(/õ/g, "\\365")
-      .replace(/ú/g, "\\372")
-      .replace(/ü/g, "\\374")
-      .replace(/ç/g, "\\347")
-      .replace(/Á/g, "\\301")
-      .replace(/À/g, "\\300")
-      .replace(/Ã/g, "\\303")
-      .replace(/Â/g, "\\302")
-      .replace(/É/g, "\\311")
-      .replace(/Ê/g, "\\312")
-      .replace(/Í/g, "\\315")
-      .replace(/Ó/g, "\\323")
-      .replace(/Ô/g, "\\324")
-      .replace(/Õ/g, "\\325")
-      .replace(/Ú/g, "\\332")
-      .replace(/Ç/g, "\\307")
-      .replace(/º/g, "\\272")
-      .replace(/ª/g, "\\252");
-  };
+  const pdfDoc = await PDFDocument.create();
+  const page = pdfDoc.addPage([595, 842]);
+  const { width, height } = page.getSize();
 
-  // Word wrap helper
-  const wrapText = (text: string, maxWidth: number, fontSize: number): string[] => {
-    const charWidth = fontSize * 0.45; // approximate
-    const maxChars = Math.floor(maxWidth / charWidth);
-    const words = text.split(" ");
-    const lines: string[] = [];
-    let currentLine = "";
+  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
-    for (const word of words) {
-      if ((currentLine + " " + word).trim().length > maxChars) {
-        if (currentLine) lines.push(currentLine.trim());
-        currentLine = word;
-      } else {
-        currentLine = currentLine ? currentLine + " " + word : word;
-      }
-    }
-    if (currentLine) lines.push(currentLine.trim());
-    return lines;
-  };
-
-  const pageWidth = 595;
-  const pageHeight = 842;
   const marginLeft = 50;
   const marginRight = 50;
-  const contentWidth = pageWidth - marginLeft - marginRight;
+  const contentWidth = width - marginLeft - marginRight;
   const fontSize = 10;
   const titleFontSize = 13;
   const sectionFontSize = 11;
   const lineHeight = 14;
 
-  // Build content blocks
-  let y = pageHeight - 60;
-  const commands: string[] = [];
+  let y = height - 60;
+
+  // Helper: wrap text into lines
+  const wrapText = (text: string, font: typeof fontRegular, size: number, maxW: number): string[] => {
+    const words = text.split(" ");
+    const lines: string[] = [];
+    let current = "";
+    for (const word of words) {
+      const test = current ? current + " " + word : word;
+      const w = font.widthOfTextAtSize(test, size);
+      if (w > maxW && current) {
+        lines.push(current);
+        current = word;
+      } else {
+        current = test;
+      }
+    }
+    if (current) lines.push(current);
+    return lines;
+  };
+
+  // Helper: draw wrapped text
+  const drawText = (text: string, font: typeof fontRegular, size: number, indent = 0) => {
+    const lines = wrapText(text, font, size, contentWidth - indent);
+    for (const line of lines) {
+      if (y < 50) {
+        // Would need new page - content should fit on one page
+        y = height - 50;
+      }
+      page.drawText(line, { x: marginLeft + indent, y, size, font, color: rgb(0, 0, 0) });
+      y -= lineHeight;
+    }
+  };
 
   const addTitle = (text: string) => {
-    const encoded = encodePdfText(text);
-    commands.push(`BT /F1 ${titleFontSize} Tf ${marginLeft} ${y} Td (${encoded}) Tj ET`);
-    y -= titleFontSize + 12;
+    drawText(text, fontBold, titleFontSize);
+    y -= 8;
   };
 
   const addSectionTitle = (text: string) => {
-    y -= 8;
-    const encoded = encodePdfText(text);
-    commands.push(`BT /F1 ${sectionFontSize} Tf ${marginLeft} ${y} Td (${encoded}) Tj ET`);
-    y -= sectionFontSize + 6;
+    y -= 6;
+    drawText(text, fontBold, sectionFontSize);
+    y -= 4;
   };
 
   const addParagraph = (text: string) => {
-    const lines = wrapText(text, contentWidth, fontSize);
-    for (const line of lines) {
-      if (y < 50) {
-        // Would need second page, but content should fit
-        y = pageHeight - 50;
-      }
-      const encoded = encodePdfText(line);
-      commands.push(`BT /F2 ${fontSize} Tf ${marginLeft} ${y} Td (${encoded}) Tj ET`);
-      y -= lineHeight;
-    }
+    drawText(text, fontRegular, fontSize);
     y -= 6;
   };
 
   const addBullet = (text: string) => {
-    const lines = wrapText(text, contentWidth - 15, fontSize);
-    for (let i = 0; i < lines.length; i++) {
-      const encoded = encodePdfText(lines[i]);
-      if (i === 0) {
-        commands.push(`BT /F2 ${fontSize} Tf ${marginLeft} ${y} Td (\\267 ${encoded}) Tj ET`);
-      } else {
-        commands.push(`BT /F2 ${fontSize} Tf ${marginLeft + 15} ${y} Td (${encoded}) Tj ET`);
-      }
+    // Draw bullet character
+    const bulletLines = wrapText(text, fontRegular, fontSize, contentWidth - 15);
+    for (let i = 0; i < bulletLines.length; i++) {
+      if (y < 50) y = height - 50;
+      const prefix = i === 0 ? "\u2022 " : "";
+      const indent = i === 0 ? 0 : 15;
+      page.drawText(prefix + bulletLines[i], {
+        x: marginLeft + indent,
+        y,
+        size: fontSize,
+        font: fontRegular,
+        color: rgb(0, 0, 0),
+      });
       y -= lineHeight;
     }
     y -= 2;
   };
 
   // --- Content ---
-  addTitle("DECLARAÇÃO LEGAL DE COMPRA E CONDIÇÕES DE INADIMPLEMENTO:");
+  addTitle("DECLARACAO LEGAL DE COMPRA E CONDICOES DE INADIMPLEMENTO:");
 
   addParagraph(
-    `Eu, ${nomeCliente}, portador(a) do CPF nº ${cpf}, confirmo a compra do tratamento de ${meses} meses com ${empresa}, no valor de R$ ${valor}, com pagamento via ${formaPagamento}.`
+    `Eu, ${nomeCliente}, portador(a) do CPF no ${cpf}, confirmo a compra do tratamento de ${meses} meses com ${empresa}, no valor de R$ ${valor}, com pagamento via ${formaPagamento}.`
   );
 
   addParagraph(
-    `Me comprometo a realizar o pagamento em no máximo 24 horas após o recebimento, conforme as condições previamente acordadas, estando ciente de todos os termos desta compra realizada em ${dataCompra}.`
+    `Me comprometo a realizar o pagamento em no maximo 24 horas apos o recebimento, conforme as condicoes previamente acordadas, estando ciente de todos os termos desta compra realizada em ${dataCompra}.`
   );
 
   addParagraph(
-    "Estou ciente de que as opções de pagamento aceitas são cartão de crédito, pix ou boleto à vista. O parcelamento é possível apenas no cartão de crédito, em até 12 vezes, enquanto o boleto deve ser pago à vista."
+    "Estou ciente de que as opcoes de pagamento aceitas sao cartao de credito, pix ou boleto a vista. O parcelamento e possivel apenas no cartao de credito, em ate 12 vezes, enquanto o boleto deve ser pago a vista."
   );
 
-  addSectionTitle("I. CONSEQUÊNCIAS DO INADIMPLEMENTO:");
+  addSectionTitle("I. CONSEQUENCIAS DO INADIMPLEMENTO:");
 
   addParagraph(
-    "Em caso de inadimplemento (falta de pagamento), será aplicada uma multa de 10% sobre o valor da compra, juros de 1% ao mês, correção monetária com base no IGPM-FGV, e honorários advocatícios no percentual de 20% sobre o valor total devido."
-  );
-
-  addParagraph(
-    "Após o envio, estou ciente de que não será possível cancelar ou devolver o pedido, pois ele já estará em posse dos Correios e será entregue normalmente. Se os Correios não conseguirem a entrega, o produto ficará disponível na agência, e é minha obrigação retirá-lo na agência e efetuar o pagamento."
+    "Em caso de inadimplemento (falta de pagamento), sera aplicada uma multa de 10% sobre o valor da compra, juros de 1% ao mes, correcao monetaria com base no IGPM-FGV, e honorarios advocaticios no percentual de 20% sobre o valor total devido."
   );
 
   addParagraph(
-    "Reconheço que, em caso de inadimplência, recusa em receber ou não retirada nos Correios, a empresa poderá adotar medidas de recuperação de crédito, incluindo a negativação do meu CPF e processos judiciais, sendo o valor ainda devido em razão dos custos operacionais, logísticos e demais despesas envolvidas."
+    "Apos o envio, estou ciente de que nao sera possivel cancelar ou devolver o pedido, pois ele ja estara em posse dos Correios e sera entregue normalmente. Se os Correios nao conseguirem a entrega, o produto ficara disponivel na agencia, e e minha obrigacao retira-lo na agencia e efetuar o pagamento."
   );
 
-  addSectionTitle("II. AÇÕES LEGAIS RIGOROSAS:");
+  addParagraph(
+    "Reconheco que, em caso de inadimplencia, recusa em receber ou nao retirada nos Correios, a empresa podera adotar medidas de recuperacao de credito, incluindo a negativacao do meu CPF e processos judiciais, sendo o valor ainda devido em razao dos custos operacionais, logisticos e demais despesas envolvidas."
+  );
+
+  addSectionTitle("II. ACOES LEGAIS RIGOROSAS:");
 
   addBullet(
-    "Impacto no Crédito: Seu CPF será imediatamente inscrito em órgãos de proteção ao crédito, como SPC e Serasa, prejudicando sua capacidade de obter crédito no futuro."
-  );
-
-  addBullet(
-    "Ação Judicial Imediata: Iniciaremos procedimentos legais para a cobrança do débito, com base nos Artigos 771 a 925 do Código de Processo Civil. Este processo pode resultar na penhora de bens e outras medidas severas."
+    "Impacto no Credito: Seu CPF sera imediatamente inscrito em orgaos de protecao ao credito, como SPC e Serasa, prejudicando sua capacidade de obter credito no futuro."
   );
 
   addBullet(
-    "Implicações Criminais: Qualquer indício de má-fé poderá levar a consequências criminais sob o Art. 171 do Código Penal."
+    "Acao Judicial Imediata: Iniciaremos procedimentos legais para a cobranca do debito, com base nos Artigos 771 a 925 do Codigo de Processo Civil. Este processo pode resultar na penhora de bens e outras medidas severas."
+  );
+
+  addBullet(
+    "Implicacoes Criminais: Qualquer indicio de ma-fe podera levar a consequencias criminais sob o Art. 171 do Codigo Penal."
   );
 
   y -= 10;
-  addParagraph(
-    "VOCÊ ESTÁ CIENTE E CONFIRMA OS TERMOS ACIMA PARA O ENVIO? Responda por escrito, sim ou não via Whatsapp."
+  drawText(
+    "VOCE ESTA CIENTE E CONFIRMA OS TERMOS ACIMA PARA O ENVIO? Responda por escrito, sim ou nao via Whatsapp.",
+    fontBold,
+    fontSize
   );
 
-  // Build PDF
-  const stream = commands.join("\n");
-  const streamLength = new TextEncoder().encode(stream).length;
-
-  const pdf = `%PDF-1.4
-1 0 obj
-<< /Type /Catalog /Pages 2 0 R >>
-endobj
-
-2 0 obj
-<< /Type /Pages /Kids [3 0 R] /Count 1 >>
-endobj
-
-3 0 obj
-<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}]
-   /Contents 4 0 R /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> >>
-endobj
-
-4 0 obj
-<< /Length ${streamLength} >>
-stream
-${stream}
-endstream
-endobj
-
-5 0 obj
-<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
-endobj
-
-6 0 obj
-<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
-endobj
-
-xref
-0 7
-0000000000 65535 f 
-0000000009 00000 n 
-0000000058 00000 n 
-0000000115 00000 n 
-0000000314 00000 n 
-${String(383 + streamLength).padStart(10, "0")} 00000 n 
-${String(483 + streamLength).padStart(10, "0")} 00000 n 
-
-trailer
-<< /Size 7 /Root 1 0 R >>
-startxref
-${573 + streamLength}
-%%EOF`;
-
-  return new TextEncoder().encode(pdf);
+  return await pdfDoc.save();
 }
 
 Deno.serve(async (req) => {
@@ -237,7 +164,7 @@ Deno.serve(async (req) => {
     const { conversationId, nomeCliente, cpf, meses, valor, formaPagamento, dataCompra, empresa, enviar } = body;
 
     if (!conversationId || !nomeCliente || !cpf || !meses) {
-      return new Response(JSON.stringify({ error: "Campos obrigatórios: conversationId, nomeCliente, cpf, meses" }), {
+      return new Response(JSON.stringify({ error: "Campos obrigatorios: conversationId, nomeCliente, cpf, meses" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -249,12 +176,12 @@ Deno.serve(async (req) => {
     );
 
     // Generate PDF
-    const pdfBytes = generateTermoPDF({
+    const pdfBytes = await generateTermoPDF({
       nomeCliente,
       cpf,
       meses,
       valor: valor || "397,00",
-      formaPagamento: formaPagamento || "boleto à vista",
+      formaPagamento: formaPagamento || "boleto a vista",
       dataCompra: dataCompra || new Date().toLocaleDateString("pt-BR"),
       empresa: empresa || "MEGAFIT",
     });
@@ -274,14 +201,13 @@ Deno.serve(async (req) => {
 
     // If enviar=true, send via WhatsApp
     if (enviar) {
-      // Get conversation's connection to decide which send function to use
       const { data: conv } = await supabase
         .from("conversations")
         .select("connection_config_id, contact_phone")
         .eq("id", conversationId)
         .single();
 
-      if (!conv) throw new Error("Conversa não encontrada");
+      if (!conv) throw new Error("Conversa nao encontrada");
 
       let functionName = "whatsapp-send";
 
@@ -297,7 +223,6 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Call the send function
       const sendUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/${functionName}`;
       const sendRes = await fetch(sendUrl, {
         method: "POST",
