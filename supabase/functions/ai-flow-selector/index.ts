@@ -13,6 +13,39 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
+async function resolveConversationNiche(params: {
+  supabase: any;
+  conversationId: string;
+  nicheId: string | null;
+  connectionConfigId: string | null;
+}) {
+  if (params.nicheId || !params.connectionConfigId) {
+    return params.nicheId;
+  }
+
+  const { data: nicheConnection } = await params.supabase
+    .from("niche_connections")
+    .select("niche_id")
+    .eq("connection_config_id", params.connectionConfigId)
+    .limit(1)
+    .maybeSingle();
+
+  const resolvedNicheId = nicheConnection?.niche_id ?? null;
+
+  if (resolvedNicheId) {
+    await params.supabase
+      .from("conversations")
+      .update({ niche_id: resolvedNicheId })
+      .eq("id", params.conversationId);
+
+    console.log(
+      `[ai-flow-selector] Recovered niche ${resolvedNicheId} from connection ${params.connectionConfigId} for conversation ${params.conversationId}`
+    );
+  }
+
+  return resolvedNicheId;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -33,7 +66,7 @@ Deno.serve(async (req) => {
     // Get conversation with niche_id
     const { data: conversation } = await supabase
       .from("conversations")
-      .select("niche_id, sale_registered_at")
+      .select("niche_id, sale_registered_at, connection_config_id")
       .eq("id", conversationId)
       .single();
 
@@ -42,7 +75,12 @@ Deno.serve(async (req) => {
       return jsonResponse({ skipped: true, reason: "Sale already registered" });
     }
 
-    const nicheId = conversation?.niche_id;
+    const nicheId = await resolveConversationNiche({
+      supabase,
+      conversationId,
+      nicheId: conversation?.niche_id ?? null,
+      connectionConfigId: conversation?.connection_config_id ?? null,
+    });
 
     // Check if flow selector is enabled (niche-specific or global)
     let selectorEnabled = false;
