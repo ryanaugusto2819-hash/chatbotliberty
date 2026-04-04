@@ -93,6 +93,13 @@ Deno.serve(async (req) => {
       connectionConfigId: conversation?.connection_config_id ?? null,
     });
 
+    if (!nicheId && conversation?.connection_config_id) {
+      console.log(
+        `[ai-flow-selector] Skipping: no niche mapped for connection ${conversation.connection_config_id} on conversation ${conversationId}`
+      );
+      return jsonResponse({ skipped: true, reason: "No niche mapped to connection" });
+    }
+
     // Check if flow selector is enabled (niche-specific or global)
     let selectorEnabled = false;
     let customInstructions = "";
