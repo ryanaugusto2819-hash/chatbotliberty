@@ -622,7 +622,7 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
     if (!termoPdfUrl || sendingTermoWhatsApp) return;
     setSendingTermoWhatsApp(true);
     try {
-      await sendWhatsAppMessage(id!, '', { mediaUrl: termoPdfUrl, messageType: 'document' });
+      await sendWhatsAppMessage(id!, 'TERMO DE COMPROMISSO', { mediaUrl: termoPdfUrl, messageType: 'document' });
       toast.success('Termo enviado com sucesso!');
       setShowTermoDialog(false);
       setTermoPdfUrl(null);
