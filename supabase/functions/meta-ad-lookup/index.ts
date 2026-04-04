@@ -21,11 +21,48 @@ Deno.serve(async (req) => {
       );
     }
 
-    const accessToken = Deno.env.get("META_ADS_ACCESS_TOKEN");
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    // Try to get per-connection token first
+    let accessToken: string | null = null;
+
+    if (conversationId) {
+      const { data: conv } = await supabase
+        .from("conversations")
+        .select("connection_config_id")
+        .eq("id", conversationId)
+        .single();
+
+      if (conv?.connection_config_id) {
+        const { data: connConfig } = await supabase
+          .from("connection_configs")
+          .select("config")
+          .eq("id", conv.connection_config_id)
+          .single();
+
+        const config = connConfig?.config as Record<string, string> | null;
+        if (config?.meta_ads_token?.trim()) {
+          accessToken = config.meta_ads_token.trim();
+          console.log(`Using per-connection Meta Ads token for connection ${conv.connection_config_id}`);
+        }
+      }
+    }
+
+    // Fallback to global secret
     if (!accessToken) {
-      console.error("META_ADS_ACCESS_TOKEN not configured");
+      accessToken = Deno.env.get("META_ADS_ACCESS_TOKEN") || null;
+      if (accessToken) {
+        console.log("Using global META_ADS_ACCESS_TOKEN");
+      }
+    }
+
+    if (!accessToken) {
+      console.error("No Meta Ads access token available");
       return new Response(
-        JSON.stringify({ success: false, error: "META_ADS_ACCESS_TOKEN not configured" }),
+        JSON.stringify({ success: false, error: "No Meta Ads access token configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -57,11 +94,6 @@ Deno.serve(async (req) => {
 
     // Update conversation with ad info if conversationId provided
     if (conversationId && adTitle) {
-      const supabase = createClient(
-        Deno.env.get("SUPABASE_URL")!,
-        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-      );
-
       await supabase
         .from("conversations")
         .update({ ad_title: adTitle })
