@@ -141,19 +141,39 @@ async function processZapiWebhook(body: any) {
 
   let conversationId: string;
 
-  const { data: existing } = await supabase
+  let existingQuery = supabase
     .from("conversations")
     .select("id")
     .eq("contact_phone", phone)
     .order("created_at", { ascending: false })
-    .limit(1)
-    .single();
+    .limit(1);
+
+  if (connectionConfigId) {
+    existingQuery = existingQuery.eq("connection_config_id", connectionConfigId);
+  }
+
+  let { data: existing } = await existingQuery.maybeSingle();
+
+  if (!existing && !connectionConfigId) {
+    const fallbackResult = await supabase
+      .from("conversations")
+      .select("id")
+      .eq("contact_phone", phone)
+      .is("connection_config_id", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    existing = fallbackResult.data;
+  }
 
   if (existing) {
     conversationId = existing.id;
     const updateData: any = { updated_at: new Date().toISOString(), status: "active" };
-    if (nicheId) updateData.niche_id = nicheId;
-    if (connectionConfigId) updateData.connection_config_id = connectionConfigId;
+    if (connectionConfigId !== null) {
+      updateData.connection_config_id = connectionConfigId;
+      updateData.niche_id = nicheId;
+    }
     await supabase
       .from("conversations")
       .update(updateData)

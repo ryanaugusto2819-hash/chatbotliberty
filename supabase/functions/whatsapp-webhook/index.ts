@@ -323,8 +323,12 @@ async function processWebhook(body: any) {
           if (ctwaClid) updateData.ctwa_clid = ctwaClid;
           if (sourceId) updateData.source_id = sourceId;
           if (adTitle) updateData.ad_title = adTitle;
-          if (nicheId) updateData.niche_id = nicheId;
-          if (connectionConfigId) updateData.connection_config_id = connectionConfigId;
+
+          if (connectionConfigId !== null) {
+            updateData.connection_config_id = connectionConfigId;
+            updateData.niche_id = nicheId;
+          }
+
           await supabase
             .from("conversations")
             .update(updateData)

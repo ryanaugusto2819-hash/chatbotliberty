@@ -19,31 +19,42 @@ async function resolveConversationNiche(params: {
   nicheId: string | null;
   connectionConfigId: string | null;
 }) {
-  if (params.nicheId || !params.connectionConfigId) {
+  if (!params.connectionConfigId) {
     return params.nicheId;
   }
 
-  const { data: nicheConnection } = await params.supabase
+  const { data: nicheConnection, error } = await params.supabase
     .from("niche_connections")
     .select("niche_id")
     .eq("connection_config_id", params.connectionConfigId)
     .limit(1)
     .maybeSingle();
 
-  const resolvedNicheId = nicheConnection?.niche_id ?? null;
-
-  if (resolvedNicheId) {
-    await params.supabase
-      .from("conversations")
-      .update({ niche_id: resolvedNicheId })
-      .eq("id", params.conversationId);
-
-    console.log(
-      `[ai-flow-selector] Recovered niche ${resolvedNicheId} from connection ${params.connectionConfigId} for conversation ${params.conversationId}`
-    );
+  if (error) {
+    throw error;
   }
 
-  return resolvedNicheId;
+  const mappedNicheId = nicheConnection?.niche_id ?? null;
+
+  if (params.nicheId !== mappedNicheId) {
+    const { error: updateError } = await params.supabase
+      .from("conversations")
+      .update({ niche_id: mappedNicheId })
+      .eq("id", params.conversationId);
+
+    if (updateError) {
+      console.error(
+        `[ai-flow-selector] Failed to sync niche for conversation ${params.conversationId}:`,
+        updateError
+      );
+    } else {
+      console.log(
+        `[ai-flow-selector] Synced niche for conversation ${params.conversationId} from ${params.nicheId ?? "null"} to ${mappedNicheId ?? "null"} based on connection ${params.connectionConfigId}`
+      );
+    }
+  }
+
+  return mappedNicheId;
 }
 
 Deno.serve(async (req) => {
