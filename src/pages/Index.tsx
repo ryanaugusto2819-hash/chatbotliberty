@@ -3,60 +3,10 @@ import MetricCard from '@/components/dashboard/MetricCard';
 import ActivityChart from '@/components/dashboard/ActivityChart';
 import RecentConversations from '@/components/dashboard/RecentConversations';
 import { dashboardMetrics } from '@/data/mockData';
+import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
 import { MessageSquare, Send, Inbox, Clock, CheckCircle2, Users, Zap } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { motion } from 'framer-motion';
-
-const metrics = [
-  {
-    title: 'Total de Conversas',
-    value: dashboardMetrics.totalConversations.toLocaleString('pt-BR'),
-    change: '+12% esta semana',
-    changeType: 'positive' as const,
-    icon: MessageSquare,
-    accentColor: 'purple' as const,
-  },
-  {
-    title: 'Mensagens Enviadas',
-    value: dashboardMetrics.messagesSent.toLocaleString('pt-BR'),
-    change: '+8% esta semana',
-    changeType: 'positive' as const,
-    icon: Send,
-    accentColor: 'green' as const,
-  },
-  {
-    title: 'Mensagens Recebidas',
-    value: dashboardMetrics.messagesReceived.toLocaleString('pt-BR'),
-    change: '+15% esta semana',
-    changeType: 'positive' as const,
-    icon: Inbox,
-    accentColor: 'blue' as const,
-  },
-  {
-    title: 'Tempo Médio de Resposta',
-    value: dashboardMetrics.avgResponseTime,
-    change: '-18% esta semana',
-    changeType: 'positive' as const,
-    icon: Clock,
-    accentColor: 'amber' as const,
-  },
-  {
-    title: 'Taxa de Resolução',
-    value: `${dashboardMetrics.resolutionRate}%`,
-    change: '+2.1% esta semana',
-    changeType: 'positive' as const,
-    icon: CheckCircle2,
-    accentColor: 'teal' as const,
-  },
-  {
-    title: 'Atendentes Ativos',
-    value: dashboardMetrics.activeAgents,
-    change: '2 online agora',
-    changeType: 'neutral' as const,
-    icon: Users,
-    accentColor: 'red' as const,
-  },
-];
 
 function getGreeting() {
   const h = new Date().getHours();
@@ -71,6 +21,59 @@ export default function Index() {
     user?.user_metadata?.full_name?.split(' ')[0] ||
     user?.email?.split('@')[0] ||
     'Usuário';
+
+  const { data: realMetrics, isLoading: metricsLoading } = useDashboardMetrics();
+
+  const metrics = [
+    {
+      title: 'Total de Conversas',
+      value: metricsLoading ? '...' : (realMetrics?.totalConversations ?? dashboardMetrics.totalConversations).toLocaleString('pt-BR'),
+      change: '+12% esta semana',
+      changeType: 'positive' as const,
+      icon: MessageSquare,
+      accentColor: 'purple' as const,
+    },
+    {
+      title: 'Mensagens Enviadas',
+      value: metricsLoading ? '...' : (realMetrics?.messagesSent ?? dashboardMetrics.messagesSent).toLocaleString('pt-BR'),
+      change: '+8% esta semana',
+      changeType: 'positive' as const,
+      icon: Send,
+      accentColor: 'green' as const,
+    },
+    {
+      title: 'Mensagens Recebidas',
+      value: metricsLoading ? '...' : (realMetrics?.messagesReceived ?? dashboardMetrics.messagesReceived).toLocaleString('pt-BR'),
+      change: '+15% esta semana',
+      changeType: 'positive' as const,
+      icon: Inbox,
+      accentColor: 'blue' as const,
+    },
+    {
+      title: 'Tempo Médio de Resposta',
+      value: dashboardMetrics.avgResponseTime,
+      change: '-18% esta semana',
+      changeType: 'positive' as const,
+      icon: Clock,
+      accentColor: 'amber' as const,
+    },
+    {
+      title: 'Taxa de Resolução',
+      value: metricsLoading ? '...' : `${realMetrics?.resolutionRate ?? dashboardMetrics.resolutionRate}%`,
+      change: '+2.1% esta semana',
+      changeType: 'positive' as const,
+      icon: CheckCircle2,
+      accentColor: 'teal' as const,
+    },
+    {
+      title: 'Atendentes Ativos',
+      value: metricsLoading ? '...' : (realMetrics?.activeAgents ?? dashboardMetrics.activeAgents),
+      change: '2 online agora',
+      changeType: 'neutral' as const,
+      icon: Users,
+      accentColor: 'red' as const,
+    },
+  ];
 
   return (
     <div>

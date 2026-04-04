@@ -45,16 +45,23 @@ export function useFunnelMetrics(days: number = 30) {
       // 2. Fetch messages for these conversations (batch)
       const allMessages: Array<{ conversation_id: string; sender_type: string; created_at: string }> = [];
       const chunkSize = 100;
+      const chunks: string[][] = [];
       for (let i = 0; i < convIds.length; i += chunkSize) {
-        const chunk = convIds.slice(i, i + chunkSize);
-        const { data, error } = await supabase
-          .from('messages')
-          .select('conversation_id, sender_type, created_at')
-          .in('conversation_id', chunk)
-          .order('created_at', { ascending: true });
-        if (error) { console.error('useFunnelMetrics chunk error:', error); continue; }
-        if (data) allMessages.push(...data);
+        chunks.push(convIds.slice(i, i + chunkSize));
       }
+      const chunkResults = await Promise.all(
+        chunks.map(chunk =>
+          supabase
+            .from('messages')
+            .select('conversation_id, sender_type, created_at')
+            .in('conversation_id', chunk)
+            .order('created_at', { ascending: true })
+        )
+      );
+      chunkResults.forEach(({ data, error }) => {
+        if (error) { console.error('useFunnelMetrics chunk error:', error); return; }
+        if (data) allMessages.push(...data);
+      });
 
       // Group messages by conversation
       const msgsByConv = new Map<string, typeof allMessages>();
