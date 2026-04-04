@@ -306,26 +306,6 @@ export default function ConnectionCard({ connection, onDeleted, onUpdated }: Con
               </div>
             ))}
 
-          {/* Meta Ads Token (opcional, para todas as conexões) */}
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-card-foreground">Meta Ads Token <span className="text-xs text-muted-foreground font-normal">(opcional — para puxar nome do anúncio)</span></label>
-            <div className="relative">
-              <input
-                type={showSecrets['meta_ads_token'] ? 'text' : 'password'}
-                value={values['meta_ads_token'] || ''}
-                onChange={e => setValues(prev => ({ ...prev, meta_ads_token: e.target.value }))}
-                placeholder="EAAxxxxxxx... (deixe vazio para usar o token global)"
-                className="w-full rounded-xl border border-input bg-background py-2.5 px-4 pr-10 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring font-mono"
-              />
-              <button
-                type="button"
-                onClick={() => setShowSecrets(prev => ({ ...prev, meta_ads_token: !prev.meta_ads_token }))}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {showSecrets['meta_ads_token'] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            </div>
-          </div>
 
           {connection.connection_id === 'whatsapp' && (
             <div className="rounded-xl border border-border bg-secondary/30 p-4 space-y-2">
