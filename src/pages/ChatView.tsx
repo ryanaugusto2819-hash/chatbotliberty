@@ -164,8 +164,31 @@ const MessageBubble = memo(function MessageBubble({ msg, onDelete }: MessageBubb
           </div>
         )}
 
+        {/* Document / PDF */}
+        {msg.message_type === 'document' && msg.media_url && (
+          <div
+            className={`mb-1.5 flex items-center gap-2 p-2.5 rounded-lg cursor-pointer border ${msg.sender_type === 'agent' ? 'border-primary-foreground/20 bg-primary-foreground/10' : 'border-border bg-muted/50'} ${msg.status === 'failed' ? 'opacity-50' : ''}`}
+            onClick={() => window.open(msg.media_url!, '_blank')}
+          >
+            <span className="text-2xl">📄</span>
+            <div className="flex flex-col min-w-0">
+              <span className="text-sm font-medium truncate">{msg.content || 'Documento'}</span>
+              <span className="text-[10px] opacity-60">Clique para abrir</span>
+            </div>
+          </div>
+        )}
+
+        {/* Document without media_url */}
+        {msg.message_type === 'document' && !msg.media_url && (
+          <div className="flex items-center gap-2 min-w-[180px]">
+            <span className="text-lg">📄</span>
+            <span className="text-sm italic opacity-70">Documento (indisponível)</span>
+          </div>
+        )}
+
         {/* Text content — always show for audio with transcription */}
-        {msg.content && !(msg.message_type === 'audio' && msg.media_url && !msg.content.trim()) && (
+        {/* Text content — hide for document (shown in card) and audio without text */}
+        {msg.content && msg.message_type !== 'document' && !(msg.message_type === 'audio' && msg.media_url && !msg.content.trim()) && (
           <p className={`text-sm leading-relaxed whitespace-pre-wrap ${msg.status === 'failed' ? 'text-destructive/80' : ''}`}>{msg.content}</p>
         )}
 

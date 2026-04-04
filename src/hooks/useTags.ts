@@ -1,17 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
-export function useTags(workspaceId?: string) {
+export function useTags() {
   return useQuery({
-    queryKey: ['tags', workspaceId],
+    queryKey: ['tags'],
     queryFn: async () => {
-      let query = supabase.from('tags').select('*').order('name');
-      if (workspaceId) query = query.eq('workspace_id', workspaceId);
-      const { data, error } = await query;
+      const { data, error } = await supabase.from('tags').select('*').order('name');
       if (error) throw error;
       return data ?? [];
     },
-    staleTime: 1000 * 60 * 10, // tags mudam raramente
+    staleTime: 1000 * 60 * 10,
     enabled: true,
   });
 }
