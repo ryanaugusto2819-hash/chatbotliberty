@@ -187,7 +187,8 @@ const MessageBubble = memo(function MessageBubble({ msg, onDelete }: MessageBubb
         )}
 
         {/* Text content — always show for audio with transcription */}
-        {msg.content && !(msg.message_type === 'audio' && msg.media_url && !msg.content.trim()) && (
+        {/* Text content — hide for document (shown in card) and audio without text */}
+        {msg.content && msg.message_type !== 'document' && !(msg.message_type === 'audio' && msg.media_url && !msg.content.trim()) && (
           <p className={`text-sm leading-relaxed whitespace-pre-wrap ${msg.status === 'failed' ? 'text-destructive/80' : ''}`}>{msg.content}</p>
         )}
 
