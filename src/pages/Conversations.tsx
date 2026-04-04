@@ -133,13 +133,13 @@ function ConnectionBadge({ conn }: { conn: ConnectionInfo | null }) {
     <TooltipProvider delayDuration={200}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
+            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium shrink-0 ${
             isMeta
               ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
               : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
           }`}>
-            <Icon className="h-2.5 w-2.5" />
-            <span className="max-w-[80px] truncate">{conn.label}</span>
+            <Icon className="h-3 w-3" />
+            <span className="max-w-[100px] truncate">{conn.label}</span>
           </span>
         </TooltipTrigger>
         <TooltipContent>
