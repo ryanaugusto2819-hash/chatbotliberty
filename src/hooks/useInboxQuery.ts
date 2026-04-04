@@ -73,7 +73,7 @@ export function useInboxQuery(filters: InboxFilters) {
           ...r,
           unread_count: Number(r.unread_count) || 0,
           contact_tags: typeof r.contact_tags === 'string'
-            ? JSON.parse(r.contact_tags)
+            ? (() => { try { return JSON.parse(r.contact_tags); } catch { return []; } })()
             : Array.isArray(r.contact_tags) ? r.contact_tags : [],
         })),
         totalCount,

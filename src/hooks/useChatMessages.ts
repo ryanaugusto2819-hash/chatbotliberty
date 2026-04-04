@@ -30,13 +30,14 @@ export function useChatMessages(conversationId: string | undefined) {
       return;
     }
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('messages')
       .select('id, content, sender_type, message_type, status, created_at, media_url, provider_error, provider_status, sender_agent_id, sender_label')
       .eq('conversation_id', conversationId)
       .order('created_at', { ascending: false })
       .limit(MESSAGES_PER_PAGE + 1);
 
+    if (error) throw error;
     if (data) {
       setHasMore(data.length > MESSAGES_PER_PAGE);
       setMessages(data.slice(0, MESSAGES_PER_PAGE).reverse());
@@ -49,7 +50,7 @@ export function useChatMessages(conversationId: string | undefined) {
     setLoadingMore(true);
 
     const oldestTimestamp = messages[0].created_at;
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('messages')
       .select('id, content, sender_type, message_type, status, created_at, media_url, provider_error, provider_status, sender_agent_id, sender_label')
       .eq('conversation_id', conversationId)
@@ -57,6 +58,7 @@ export function useChatMessages(conversationId: string | undefined) {
       .order('created_at', { ascending: false })
       .limit(MESSAGES_PER_PAGE + 1);
 
+    if (error) throw error;
     if (data) {
       setHasMore(data.length > MESSAGES_PER_PAGE);
       setMessages((prev) => [...data.slice(0, MESSAGES_PER_PAGE).reverse(), ...prev]);

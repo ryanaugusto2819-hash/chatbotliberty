@@ -71,30 +71,32 @@ export function useReportMetrics(days: number = 30) {
   const dailyQuery = useQuery({
     queryKey: ['report-daily', days],
     queryFn: async (): Promise<DailyActivity[]> => {
-      const result: DailyActivity[] = [];
       const numDays = Math.min(days, 14);
+      const dayIndices = Array.from({ length: numDays }, (_, idx) => numDays - 1 - idx);
 
-      for (let i = numDays - 1; i >= 0; i--) {
-        const date = subDays(new Date(), i);
-        const dayStart = startOfDay(date).toISOString();
-        const dayEnd = endOfDay(date).toISOString();
+      const result: DailyActivity[] = await Promise.all(
+        dayIndices.map(async (i) => {
+          const date = subDays(new Date(), i);
+          const dayStart = startOfDay(date).toISOString();
+          const dayEnd = endOfDay(date).toISOString();
 
-        const [customerMsgs, agentMsgs, resolvedConvs] = await Promise.all([
-          supabase.from('messages').select('id', { count: 'exact', head: true })
-            .eq('sender_type', 'customer').gte('created_at', dayStart).lte('created_at', dayEnd),
-          supabase.from('messages').select('id', { count: 'exact', head: true })
-            .in('sender_type', ['agent', 'bot']).gte('created_at', dayStart).lte('created_at', dayEnd),
-          supabase.from('conversations').select('id', { count: 'exact', head: true })
-            .eq('status', 'resolved').gte('resolved_at', dayStart).lte('resolved_at', dayEnd),
-        ]);
+          const [customerMsgs, agentMsgs, resolvedConvs] = await Promise.all([
+            supabase.from('messages').select('id', { count: 'exact', head: true })
+              .eq('sender_type', 'customer').gte('created_at', dayStart).lte('created_at', dayEnd),
+            supabase.from('messages').select('id', { count: 'exact', head: true })
+              .in('sender_type', ['agent', 'bot']).gte('created_at', dayStart).lte('created_at', dayEnd),
+            supabase.from('conversations').select('id', { count: 'exact', head: true })
+              .eq('status', 'resolved').gte('resolved_at', dayStart).lte('resolved_at', dayEnd),
+          ]);
 
-        result.push({
-          day: format(date, 'dd/MM', { locale: ptBR }),
-          received: customerMsgs.count ?? 0,
-          sent: agentMsgs.count ?? 0,
-          resolved: resolvedConvs.count ?? 0,
-        });
-      }
+          return {
+            day: format(date, 'dd/MM', { locale: ptBR }),
+            received: customerMsgs.count ?? 0,
+            sent: agentMsgs.count ?? 0,
+            resolved: resolvedConvs.count ?? 0,
+          };
+        })
+      );
 
       return result;
     },

@@ -97,6 +97,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (!mounted || currentRequestId !== requestId) return;
 
+        if (profileRes.error) {
+          console.error('Error fetching user profile:', profileRes.error);
+        }
+        if (roleRes.error) {
+          console.error('Error fetching user roles:', roleRes.error);
+        }
+
         const approved = profileRes.data?.is_approved ?? false;
         setIsApproved(approved);
 
