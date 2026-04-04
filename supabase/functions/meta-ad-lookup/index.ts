@@ -6,6 +6,14 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+async function tryFetchAd(sourceId: string, accessToken: string) {
+  const res = await fetch(
+    `https://graph.facebook.com/v21.0/${sourceId}?fields=name,campaign{name},adset{name},status,creative{title,body}&access_token=${accessToken}`
+  );
+  if (!res.ok) return null;
+  return await res.json();
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -21,96 +29,61 @@ Deno.serve(async (req) => {
       );
     }
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    // Collect all available tokens
+    const tokens: string[] = [];
+    const t1 = Deno.env.get("META_ADS_ACCESS_TOKEN");
+    const t2 = Deno.env.get("META_ADS_ACCESS_TOKEN_2");
+    if (t1) tokens.push(t1);
+    if (t2) tokens.push(t2);
 
-    // Try to get per-connection token first
-    let accessToken: string | null = null;
-
-    if (conversationId) {
-      const { data: conv } = await supabase
-        .from("conversations")
-        .select("connection_config_id")
-        .eq("id", conversationId)
-        .single();
-
-      if (conv?.connection_config_id) {
-        const { data: connConfig } = await supabase
-          .from("connection_configs")
-          .select("config")
-          .eq("id", conv.connection_config_id)
-          .single();
-
-        const config = connConfig?.config as Record<string, string> | null;
-        if (config?.meta_ads_token?.trim()) {
-          accessToken = config.meta_ads_token.trim();
-          console.log(`Using per-connection Meta Ads token for connection ${conv.connection_config_id}`);
-        }
-      }
-    }
-
-    // Fallback to global secret
-    if (!accessToken) {
-      accessToken = Deno.env.get("META_ADS_ACCESS_TOKEN") || null;
-      if (accessToken) {
-        console.log("Using global META_ADS_ACCESS_TOKEN");
-      }
-    }
-
-    if (!accessToken) {
-      console.error("No Meta Ads access token available");
+    if (tokens.length === 0) {
       return new Response(
-        JSON.stringify({ success: false, error: "No Meta Ads access token configured" }),
+        JSON.stringify({ success: false, error: "No Meta Ads access tokens configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Query Meta Marketing API for ad details
-    const adResponse = await fetch(
-      `https://graph.facebook.com/v21.0/${sourceId}?fields=name,campaign{name},adset{name},status,creative{title,body}&access_token=${accessToken}`
-    );
-
-    if (!adResponse.ok) {
-      const errorText = await adResponse.text();
-      console.error(`Meta API error [${adResponse.status}]:`, errorText);
-      return new Response(
-        JSON.stringify({ success: false, error: `Meta API error: ${adResponse.status}` }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    // Try each token until one returns data
+    let adData = null;
+    for (let i = 0; i < tokens.length; i++) {
+      console.log(`Trying token ${i + 1} of ${tokens.length}...`);
+      adData = await tryFetchAd(sourceId, tokens[i]);
+      if (adData?.name || adData?.campaign) {
+        console.log(`Token ${i + 1} found the ad.`);
+        break;
+      }
+      adData = null;
     }
 
-    const adData = await adResponse.json();
-    console.log("Ad data fetched:", JSON.stringify(adData));
+    if (!adData) {
+      console.error(`No token could resolve ad for sourceId: ${sourceId}`);
+      return new Response(
+        JSON.stringify({ success: false, error: "Ad not found with any configured token" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     const adName = adData.name || null;
     const campaignName = adData.campaign?.name || null;
     const adsetName = adData.adset?.name || null;
 
-    // Build a descriptive ad_title
     const parts = [campaignName, adsetName, adName].filter(Boolean);
     const adTitle = parts.length > 0 ? parts.join(" › ") : null;
 
-    // Update conversation with ad info if conversationId provided
     if (conversationId && adTitle) {
+      const supabase = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      );
       await supabase
         .from("conversations")
         .update({ ad_title: adTitle })
         .eq("id", conversationId);
-
       console.log(`Updated conversation ${conversationId} with ad_title: ${adTitle}`);
     }
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        adName,
-        campaignName,
-        adsetName,
-        adTitle,
-        raw: adData,
-      }),
+      JSON.stringify({ success: true, adName, campaignName, adsetName, adTitle, raw: adData }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
