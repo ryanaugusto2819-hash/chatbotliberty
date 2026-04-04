@@ -112,7 +112,8 @@ Deno.serve(async (req) => {
       zapiEndpoint = `https://api.z-api.io/instances/${instanceId}/token/${token}/send-video`;
       zapiBody = { phone, video: mediaUrl, caption: message || "" };
     } else if (mediaUrl && type === "document") {
-      zapiEndpoint = `https://api.z-api.io/instances/${instanceId}/token/${token}/send-document/${encodeURIComponent("documento")}`;
+      const docName = message || "Documento";
+      zapiEndpoint = `https://api.z-api.io/instances/${instanceId}/token/${token}/send-document/${encodeURIComponent(docName)}`;
       zapiBody = { phone, document: mediaUrl };
     }
 

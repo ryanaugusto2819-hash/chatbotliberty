@@ -476,7 +476,8 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
         setUploading(false);
       }
 
-      const result = await sendWhatsAppMessage(id, msg || '', mediaUrl ? { mediaUrl, messageType } : undefined);
+      const sendMessage = (messageType === 'document' && !msg && file) ? file.name : (msg || '');
+      const result = await sendWhatsAppMessage(id, sendMessage, mediaUrl ? { mediaUrl, messageType } : undefined);
 
       if (result?.savedMessage) {
         const savedMsg = result.savedMessage as ChatMessage;
@@ -622,7 +623,7 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
     if (!termoPdfUrl || sendingTermoWhatsApp) return;
     setSendingTermoWhatsApp(true);
     try {
-      await sendWhatsAppMessage(id!, '', { mediaUrl: termoPdfUrl, messageType: 'document' });
+      await sendWhatsAppMessage(id!, 'TERMO DE COMPROMISSO', { mediaUrl: termoPdfUrl, messageType: 'document' });
       toast.success('Termo enviado com sucesso!');
       setShowTermoDialog(false);
       setTermoPdfUrl(null);

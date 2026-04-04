@@ -266,7 +266,7 @@ Deno.serve(async (req) => {
           Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
         },
         body: JSON.stringify({
-          conversationId, message: "", mediaUrl: pdfUrl, type: "document", senderLabel: "humano",
+          conversationId, message: "TERMO DE COMPROMISSO", mediaUrl: pdfUrl, type: "document", senderLabel: "humano",
         }),
       });
       const sendResult = await sendRes.json();

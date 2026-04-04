@@ -194,14 +194,18 @@ Deno.serve(async (req) => {
     };
 
     if (mediaUrl && (type === "image" || type === "video" || type === "document")) {
+      const mediaObj: Record<string, unknown> = {
+        link: mediaUrl,
+        ...(message ? { caption: message } : {}),
+      };
+      if (type === "document") {
+        mediaObj.filename = message || "Documento";
+      }
       waPayload = {
         messaging_product: "whatsapp",
         to: phone,
         type,
-        [type]: {
-          link: mediaUrl,
-          ...(message ? { caption: message } : {}),
-        },
+        [type]: mediaObj,
       };
     }
 
