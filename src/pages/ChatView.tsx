@@ -476,7 +476,8 @@ export default function ChatView({ embedded, conversationId, onBack }: ChatViewP
         setUploading(false);
       }
 
-      const result = await sendWhatsAppMessage(id, msg || '', mediaUrl ? { mediaUrl, messageType } : undefined);
+      const sendMessage = (messageType === 'document' && !msg && file) ? file.name : (msg || '');
+      const result = await sendWhatsAppMessage(id, sendMessage, mediaUrl ? { mediaUrl, messageType } : undefined);
 
       if (result?.savedMessage) {
         const savedMsg = result.savedMessage as ChatMessage;
