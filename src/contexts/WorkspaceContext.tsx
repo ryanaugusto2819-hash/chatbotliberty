@@ -2,6 +2,8 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
+export type WorkspaceCountry = 'BR' | 'UY';
+
 export interface Workspace {
   id: string;
   name: string;
@@ -11,15 +13,28 @@ export interface Workspace {
   max_agents: number;
   max_connections: number;
   is_active: boolean;
+  country: WorkspaceCountry | null;
   created_at: string;
   updated_at: string;
 }
+
+export const COUNTRY_LABELS: Record<WorkspaceCountry, string> = {
+  BR: 'Brasil',
+  UY: 'Uruguai',
+};
+
+export const COUNTRY_FLAGS: Record<WorkspaceCountry, string> = {
+  BR: '🇧🇷',
+  UY: '🇺🇾',
+};
 
 interface WorkspaceContextValue {
   workspace: Workspace | null;
   workspaces: Workspace[];
   workspaceId: string | null;
   isLoading: boolean;
+  country: WorkspaceCountry | null;
+  workspacesByCountry: (country: WorkspaceCountry) => Workspace | undefined;
   switchWorkspace: (id: string) => void;
   refetch: () => Promise<void>;
 }
@@ -92,6 +107,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   };
 
   const workspace = workspaces.find((w) => w.id === workspaceId) ?? null;
+  const country = (workspace?.country ?? null) as WorkspaceCountry | null;
+
+  const workspacesByCountry = (c: WorkspaceCountry) =>
+    workspaces.find((w) => w.country === c);
 
   return (
     <WorkspaceContext.Provider
@@ -100,6 +119,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         workspaces,
         workspaceId,
         isLoading,
+        country,
+        workspacesByCountry,
         switchWorkspace,
         refetch: fetchWorkspaces,
       }}

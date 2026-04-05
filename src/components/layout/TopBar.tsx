@@ -1,6 +1,6 @@
 import { Bell, Moon, Sun, Sparkles, Search, Building2, ChevronDown, Check } from 'lucide-react';
 import { useTheme } from '@/hooks/useTheme';
-import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { useWorkspace, COUNTRY_FLAGS, WorkspaceCountry } from '@/contexts/WorkspaceContext';
 import { useState, useRef, useEffect } from 'react';
 
 interface TopBarProps {
@@ -50,7 +50,10 @@ export default function TopBar({ title, subtitle }: TopBarProps) {
                 maxWidth: 180,
               }}
             >
-              <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              {workspace?.country
+                ? <span className="text-base leading-none shrink-0">{COUNTRY_FLAGS[workspace.country as WorkspaceCountry]}</span>
+                : <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              }
               <span className="truncate">{workspace?.name ?? 'Workspace'}</span>
               <ChevronDown
                 className="h-3 w-3 shrink-0 text-muted-foreground transition-transform"
@@ -76,6 +79,9 @@ export default function TopBar({ title, subtitle }: TopBarProps) {
                     onClick={() => { switchWorkspace(ws.id); setWsOpen(false); }}
                     className="flex items-center gap-2 w-full px-3 py-2 text-sm text-left transition-colors hover:bg-secondary"
                   >
+                    {ws.country && (
+                      <span className="text-base leading-none shrink-0">{COUNTRY_FLAGS[ws.country as WorkspaceCountry]}</span>
+                    )}
                     <span className="flex-1 truncate font-medium text-foreground">{ws.name}</span>
                     {ws.id === workspace?.id && (
                       <Check className="h-3.5 w-3.5 shrink-0" style={{ color: '#7c3aed' }} />
